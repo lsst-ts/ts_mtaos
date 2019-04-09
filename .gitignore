@@ -1,0 +1,17 @@
+.sconsign.dblite
+config.log
+.sconf_temp
+*.cfgc
+*.pyc
+bin/*
+ospl-*.log
+
+# Built by sconsUtils
+version.py
+
+# Pytest
+.coverage
+tests/.tests
+pytest_session.txt
+.cache/
+.pytest_cache
