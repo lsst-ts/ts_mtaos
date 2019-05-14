@@ -109,7 +109,7 @@ class MTAOS(salobj.BaseCsc):
         self.numberOfWEPProcessors = 1
 
         self.wepFactory = WEPCalculationFactory()
-        self.wep = self.wepFactory.getCalculator(self.camera, "/home/lsst/ts_MTAOS/testData/input")
+        self.wep = self.wepFactory.getCalculator(self.camera, "/home/lsst/testData/input")
 
         self.ofcFactory = OFCCalculationFactory()
         self.ofc = self.ofcFactory.getCalculator(self.instrument)
