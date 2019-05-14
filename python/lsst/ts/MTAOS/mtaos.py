@@ -46,8 +46,9 @@ from lsst.ts.ofc.ctrlIntf.OFCCalculationFactory import OFCCalculationFactory
 # from lsst.ts.ofc.ctrlIntf.OFCCalculationOfLsst import OFCCalculationOfLsst
 from lsst.ts.ofc.ctrlIntf.SensorWavefrontError import SensorWavefrontError
 # from lsst.ts.wep.ctrlIntf.AstWcsSol import AstWcsSol
+from lsst.ts.wep.ctrlIntf.RawExpData import RawExpData
 # from lsst.ts.wep.ctrlIntf.SensorWavefrontData import SensorWavefrontData
-from lsst.ts.wep.ctrlIntf.WcsData import WcsData
+# from lsst.ts.wep.ctrlIntf.WcsData import WcsData
 from lsst.ts.wep.ctrlIntf.WEPCalculationFactory import WEPCalculationFactory
 # from lsst.ts.wep.ctrlIntf.WEPCalculationOfComCam import WEPCalculationOfComCam
 # from lsst.ts.wep.ctrlIntf.WEPCalculationOfLsstCam import WEPCalculationOfLsstCam
@@ -103,12 +104,12 @@ class MTAOS(salobj.BaseCsc):
         self.m2Correction = M2Correction(np.zeros(72))
         self.m2HexapodCorrection = M2HexapodCorrection(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
-        self.camera = CamType.LsstCam
-        self.instrument = InstName.LSST
+        self.camera = CamType.ComCam
+        self.instrument = InstName.COMCAM
         self.numberOfWEPProcessors = 1
 
         self.wepFactory = WEPCalculationFactory()
-        self.wep = self.wepFactory.getCalculator(self.camera)
+        self.wep = self.wepFactory.getCalculator(self.camera, "/home/lsst/ts_MTAOS/testData/input")
 
         self.ofcFactory = OFCCalculationFactory()
         self.ofc = self.ofcFactory.getCalculator(self.instrument)
@@ -359,58 +360,31 @@ class MTAOS(salobj.BaseCsc):
 
         startTime = time.time()
 
-        wcsData = WcsData(np.zeros(1))
-        self.wep.setWcsData(wcsData)
+        # self.wep.setSkyFile("skyFile")
+
+        # Not sure what this is for it isn't used for
+        # WEP unit tests don't seem to call it
+        # wcsData = WcsData(np.zeros(1))
+        # self.wep.setWcsData(wcsData)
+
+        # R22_S11
+        # R22_S10
+
+        # This is temporarily hard coded for WEP testing
+        intraExposureData = RawExpData()
+        intraExposureData.append(9005001, 0, primaryDirectory)
+
+        # This is temporarily hard coded for WEP testing
+        extraExposureData = RawExpData()
+        extraExposureData.append(9005000, 0, secondaryDirectory)
+
         self.wep.setFilter(fieldFilter)
         self.wep.setBoresight(fieldRA, fieldDEC)
         self.wep.setRotAng(cameraRotation)
-        self.wep.setNumOfProc(self.numberOfWEPProcessors)
 
-        # This is commented out to test only OFC
-        # wavefrontData = self.wep.calculateWavefrontErrors()
-        # wavefrontDataValid, wavefrontError = \
-        #     self.convertWavefrontDataToWavefrontError(timestamp, wavefrontData)
-
-        # This is code to test OFC only
-        # R44_S00: 198
-        wfErr1 = SensorWavefrontError(198, np.asarray(
-            [-6.153917390910894625e-01, 6.800721617519535078e-01, 7.156367199512111421e-01,
-             -1.160736861912169682e-01, -5.102712621247364189e-02, 1.543248524492320806e-01,
-             2.937848549762492670e-02, -3.797015954213123212e-02, -3.099129598642007266e-02,
-             -6.330189569219045118e-03, 1.454797898400303213e-01, 4.730209733706434994e-02,
-             1.040252378444658440e-02, 2.339768113271831554e-02, 1.101866708804799533e-02,
-             -3.515152035538683661e-02, 5.674920993267872776e-02, 4.062308183947008211e-02,
-             -2.706689685617463814e-03]))
-        # R04_S20: 31
-        wfErr2 = SensorWavefrontError(31, np.asarray(
-            [-6.508025658456179086e-01, 1.077484851406983246e+00, 6.619831230825762303e-01,
-             -5.280921416422450915e-02, 1.195858978531248555e-02, 6.224911738783732440e-02,
-             5.997471924534075738e-02, -3.412540804053735416e-02, -2.458755478845710274e-02,
-             -6.695443423383920512e-02, 9.813334757580062517e-02, 4.944647631600296300e-02,
-             -6.907523554670066436e-03, 2.340636456000866686e-02, -4.869086883414252415e-02,
-             -2.918418017494414998e-02, 4.201074469237146836e-02, 2.951184764628276419e-02,
-             -2.161628407805408006e-03]))
-        # R00_S22: 2
-        wfErr3 = SensorWavefrontError(2, np.asarray(
-            [-5.364835666589059526e-01, 7.834904898482739632e-01, 4.580432878801197760e-01,
-             1.322239860081102919e-02, 2.717302077193928245e-02, 1.320376479551270688e-01,
-             1.354213134433924492e-01, -3.796888614780912635e-02, -4.863708304767278695e-02,
-             2.025441640237930600e-03, 1.188792620929283866e-01, -7.423205235517253697e-02,
-             -1.590907144014760966e-02, -1.500990401179183240e-02, -1.711300292664839212e-02,
-             1.653917968798911467e-02, -6.635913889407275834e-02, 4.454640570529196791e-02,
-             -3.382080575084947961e-03]))
-        # R40_S02: 169
-        wfErr4 = SensorWavefrontError(169, np.asarray(
-            [-5.731407802472003876e-01, 1.120233673138077091e+00, 5.497975405958508421e-01,
-             -8.879783186066200762e-02, -1.043655677029090012e-01, 1.212888514877605989e-01,
-             1.346889615803068159e-02, -4.229652934813449283e-02, -1.233579508301714360e-02,
-             -7.258821002407078726e-02, 1.047862248292259768e-01, 3.050152051017651460e-03,
-             2.390182037902876047e-02, 5.975219894465437845e-03, 2.965160596788523652e-03,
-             2.820190845764394914e-03, 4.733646843564373596e-02, 1.460241530850708153e-02,
-             -1.900365060864501153e-03]))
-        wavefrontData = 0
-        wavefrontDataValid = True
-        wavefrontError = [wfErr1, wfErr2, wfErr3, wfErr4]
+        wavefrontData = self.wep.calculateWavefrontErrors(intraExposureData, extraExposureData)
+        wavefrontDataValid, wavefrontError = \
+            self.convertWavefrontDataToWavefrontError(timestamp, wavefrontData)
 
         if wavefrontDataValid:
             self.wavefrontError = wavefrontError
