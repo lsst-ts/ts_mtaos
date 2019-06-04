@@ -21,7 +21,9 @@
 
 __all__ = ["MTAOS"]
 
+import os
 import enum
+import warnings
 import numpy as np
 import time
 import traceback
@@ -32,32 +34,20 @@ import SALPY_MTAOS
 import SALPY_MTM1M3
 import SALPY_MTM2
 
-from lsst.ts.ofc.Utility import InstName
+from lsst.ts.MTAOS.Utility import getModulePath, getConfigDir, getIsrDirPath
+
 from lsst.ts.wep.Utility import FilterType, CamType
+from lsst.ts.wep.ParamReader import ParamReader
+
+from lsst.ts.ofc.Utility import InstName
 from lsst.ts.ofc.ctrlIntf.CameraHexapodCorrection import CameraHexapodCorrection
-# from lsst.ts.ofc.ctrlIntf.FWHMSensorData import FWHMSensorData
-# from lsst.ts.ofc.ctrlIntf.FWHMToPSSN import FWHMToPSSN
 from lsst.ts.ofc.ctrlIntf.M1M3Correction import M1M3Correction
 from lsst.ts.ofc.ctrlIntf.M2Correction import M2Correction
 from lsst.ts.ofc.ctrlIntf.M2HexapodCorrection import M2HexapodCorrection
-# from lsst.ts.ofc.ctrlIntf.OFCCalculation import OFCCalculation
 from lsst.ts.ofc.ctrlIntf.OFCCalculationFactory import OFCCalculationFactory
-# from lsst.ts.ofc.ctrlIntf.OFCCalculationOfComCam import OFCCalculationOfComCam
-# from lsst.ts.ofc.ctrlIntf.OFCCalculationOfLsst import OFCCalculationOfLsst
 from lsst.ts.ofc.ctrlIntf.SensorWavefrontError import SensorWavefrontError
-# from lsst.ts.wep.ctrlIntf.AstWcsSol import AstWcsSol
 from lsst.ts.wep.ctrlIntf.RawExpData import RawExpData
-# from lsst.ts.wep.ctrlIntf.SensorWavefrontData import SensorWavefrontData
-# from lsst.ts.wep.ctrlIntf.WcsData import WcsData
 from lsst.ts.wep.ctrlIntf.WEPCalculationFactory import WEPCalculationFactory
-# from lsst.ts.wep.ctrlIntf.WEPCalculationOfComCam import WEPCalculationOfComCam
-# from lsst.ts.wep.ctrlIntf.WEPCalculationOfLsstCam import WEPCalculationOfLsstCam
-# from lsst.ts.wep.ctrlIntf.WEPCalculationOfLsstFamCam import WEPCalculationOfLsstFamCam
-# from lsst.ts.wep.ctrlIntf.WEPCalculationOfPiston import WEPCalculationOfPiston
-# from lsst.ts.wep.ctrlIntf.WEPCalculation import WEPCalculation
-
-
-ANNULAR_ZERNIKE_POLY_COUNT = 19
 
 
 class WEPWarning(enum.Enum):
@@ -71,9 +61,16 @@ class OFCWarning(enum.Enum):
 
 
 class MTAOS(salobj.BaseCsc):
-    def __init__(self, initial_state=salobj.State.STANDBY, initial_simulation_mode=0):
+    def __init__(self, settingFileName="default.yaml",
+                 initial_state=salobj.State.STANDBY,
+                 initial_simulation_mode=0):
         super().__init__(SALPY_MTAOS, index=0, initial_state=initial_state,
                          initial_simulation_mode=initial_simulation_mode)
+
+        # Read the configuration file
+        settingFilePath = os.path.join(getConfigDir(), settingFileName)
+        self.settingFile = ParamReader(filePath=settingFilePath)
+
         self.telemetry_period = 0.05
         self.salinfo.manager.setDebugLevel(0)
 
@@ -108,13 +105,60 @@ class MTAOS(salobj.BaseCsc):
         self.instrument = InstName.COMCAM
         self.numberOfWEPProcessors = 1
 
-        self.wepFactory = WEPCalculationFactory()
-        self.wep = self.wepFactory.getCalculator(self.camera, "/home/lsst/testData/input")
-
-        self.ofcFactory = OFCCalculationFactory()
-        self.ofc = self.ofcFactory.getCalculator(self.instrument)
+        isrDir = self.getIsrDir()
+        self.wep = WEPCalculationFactory.getCalculator(self.camera, isrDir)
+        self.ofc = OFCCalculationFactory.getCalculator(self.instrument)
 
         print("READY")
+
+    def getNumOfZk(self):
+        """Get the number of annular Zernike polynomial.
+
+        Returns
+        -------
+        int
+            Number of annular Zernike polynomial.
+        """
+
+        return self.settingFile.getSetting("annularZernikePolyCount")
+
+    def getIsrDir(self):
+        """Get the instrument signature removal (ISR) directory.
+
+        This directory will have the input and output that the data butler
+        needs.
+
+        Returns
+        -------
+        str
+            ISR directory.
+        """
+
+        isrDir = getIsrDirPath()
+        if (isrDir is None):
+            isrDir = self.settingFile.getSetting("defaultIsrDir")
+            warnings.warn("No 'ISRDIRPATH' assigned. Use %s instead." % isrDir,
+                          category=UserWarning)
+
+        return isrDir
+
+    def getDefaultSkyFile(self):
+        """Get the default sky file path.
+
+        This is for the test only.
+
+        Returns
+        -------
+        str or None
+            Get the default sky file path. Return None if there is no such
+            setting.
+        """
+
+        try:
+            relativePath = self.settingFile.getSetting("defaultSkyFilePath")
+            return os.path.join(getModulePath(), relativePath)
+        except KeyError:
+            return None
 
     def do_measureAlignment(self, id_data):
         pass
@@ -371,8 +415,6 @@ class MTAOS(salobj.BaseCsc):
 
         startTime = time.time()
 
-        # self.wep.setSkyFile("skyFile")
-
         # Not sure what this is for it isn't used for
         # WEP unit tests don't seem to call it
         # wcsData = WcsData(np.zeros(1))
@@ -380,6 +422,10 @@ class MTAOS(salobj.BaseCsc):
 
         # R22_S11
         # R22_S10
+
+        # Set the default sky file for the test
+        # This will be removed in the final
+        self._setSkyFile()
 
         # This is temporarily hard coded for WEP testing
         intraExposureData = RawExpData()
@@ -408,6 +454,16 @@ class MTAOS(salobj.BaseCsc):
         self.putSample_wepDuration(timestamp, (stopTime - startTime))
 
         return wavefrontDataValid
+
+    def _setSkyFile(self):
+        """Set the sky file for the test.
+
+        This function will be removed in the final.
+        """
+
+        skyFile = self.getDefaultSkyFile()
+        if (skyFile is not None):
+            self.wep.setSkyFile(skyFile)
 
     def runOFC(self, timestamp, fieldFilter, cameraRotation, userGain, listOfFWHMSensorData):
         """
@@ -501,10 +557,11 @@ class MTAOS(salobj.BaseCsc):
                 sensorId = 0
 
             annularZernikePoly = data.getAnnularZernikePoly()
-            if len(annularZernikePoly) != ANNULAR_ZERNIKE_POLY_COUNT:
+            numOfZk = self.getNumOfZk()
+            if len(annularZernikePoly) != numOfZk:
                 valid = False
                 print(f"Invalid annular zernike polynomial length {len(annularZernikePoly)}. "
-                      "Must be {ANNULAR_ZERNIKE_POLY_COUNT}.")
+                      "Must be {numOfZk}.")
                 self.logEvent_wepWarning(timestamp, WEPWarning.InvalidAnnularZernikePoly)
                 annularZernikePoly = [0.0] * 19
 

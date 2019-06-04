@@ -1,0 +1,15 @@
+---
+
+# Default setting
+
+# Number of annularZernike polynomial
+annularZernikePolyCount: 19
+
+# Default instrument signature removal (ISR) directory
+# This setting will be override by the 'ISRDIRPATH' path variable.
+defaultIsrDir: /home/lsst/testData/input
+
+# Default sky file path relative to the root of module
+# This is for the test only
+# Comment this if use the bright star catalog instead
+defaultSkyFilePath: tests/testData/skyComCamInfo.txt

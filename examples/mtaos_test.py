@@ -19,9 +19,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import os
 import asyncio
 import numpy as np
 import time
+
+from lsst.ts.wep.Utility import runProgram
 
 from lsst.ts import salobj
 import SALPY_MTAOS
@@ -37,7 +40,7 @@ import SALPY_MTAOS
 #   REF = 7
 
 
-def main():
+def main(testDataDir):
 
     mtaos = salobj.Remote(SALPY_MTAOS, index=0)
     mtaos.salinfo.manager.setDebugLevel(0)
@@ -103,8 +106,13 @@ def main():
     mtaos.evt_cameraHexapodCorrection.flush()
     mtaos.evt_m2HexapodCorrection.flush()
 
+    # Make the calibration products
+    sensorNameList = _getComCamSensorNameList()
+    calibPath = os.path.join(testDataDir, "calibrationProducts")
+    fakeFlatDir = _makeCalibs(calibPath, sensorNameList)
+
     data = mtaos.cmd_processCalibrationProducts.DataType()
-    data.directoryPath = "/home/lsst/testData/calibrationProducts"
+    data.directoryPath = fakeFlatDir
     asyncio.get_event_loop().run_until_complete(
         mtaos.cmd_processCalibrationProducts.start(data, timeout=60.0))
 
@@ -191,5 +199,48 @@ def main():
     print(f"\tw ({round(m2HexapodCorrection.w*3600,4)}) ==   0.0000 : {round(m2HexapodCorrection.w*3600,4) == 0.0}")
 
 
+def _getComCamSensorNameList():
+
+    sensorNameList = ["R22_S00", "R22_S01", "R22_S02", "R22_S10", "R22_S11",
+                      "R22_S12", "R22_S20", "R22_S21", "R22_S22"]
+    return sensorNameList
+
+
+def _makeCalibs(outputDir, sensorNameList):
+
+    fakeFlatDirName = "fake_flats"
+    fakeFlatDir = os.path.join(outputDir, fakeFlatDirName)
+    _makeDir(fakeFlatDir)
+
+    detector = " ".join(sensorNameList)
+    _genFakeFlat(fakeFlatDir, detector)
+
+    return fakeFlatDir
+
+
+def _makeDir(directory):
+
+    if (not os.path.exists(directory)):
+        os.makedirs(directory)
+
+
+def _genFakeFlat(fakeFlatDir, detector):
+
+    currWorkDir = os.getcwd()
+
+    os.chdir(fakeFlatDir)
+    _makeFakeFlat(detector)
+    os.chdir(currWorkDir)
+
+
+def _makeFakeFlat(detector):
+
+    command = "makeGainImages.py"
+    argstring = "--detector_list %s" % detector
+    runProgram(command, argstring=argstring)
+
+
 if __name__ == "__main__":
-    main()
+
+    testDataDir = os.path.join(os.sep, "home", "lsst", "testData")
+    main(testDataDir)
