@@ -264,6 +264,10 @@ class MTAOS(salobj.BaseCsc):
 
         Parameters
         ----------
+        id_data.data.intraVisit : int
+            Intra-focal image visit number.
+        id_data.data.extraVisit : int
+            Extra-focal image visit number.
         id_data.data.intraDirectoryPath : str
             The local directory containing the intra-focal image products.
         id_data.data.extraDirectoryPath : str
@@ -289,7 +293,9 @@ class MTAOS(salobj.BaseCsc):
                 fieldDEC=id_data.data.fieldDEC,
                 fieldFilter=FilterType(id_data.data.filter),
                 cameraRotation=id_data.data.cameraRotation,
+                primaryVisit=id_data.data.intraVisit,
                 primaryDirectory=id_data.data.intraDirectoryPath,
+                secondaryVisit=id_data.data.extraVisit,
                 secondaryDirectory=id_data.data.extraDirectoryPath)
 
             if wavefrontDataValid:
@@ -333,7 +339,8 @@ class MTAOS(salobj.BaseCsc):
         pass
 
     def runWEP(self, timestamp, fieldRA, fieldDEC, fieldFilter,
-               cameraRotation, primaryDirectory, secondaryDirectory=None):
+               cameraRotation, primaryVisit, primaryDirectory,
+               secondaryVisit=None, secondaryDirectory=None):
         """
 
         Parameters
@@ -348,10 +355,14 @@ class MTAOS(salobj.BaseCsc):
             The filter used by the imaging sensor.
         cameraRotation : float
             The rotation of the imaging sensor.
+        primaryVisit: int
+            The primary visit number (intra-focal visit number).
         primaryDirectory : str
-            The primary directory of image data (intra focal images).
+            The primary directory of image data (intra-focal images).
+        secondaryVisit: int (optional)
+            The secondary visit number (extra-focal visit number).
         secondaryDirectory : str (optional)
-            The secondary directory of image data (extra focal images).
+            The secondary directory of image data (extra-focal images).
         Returns
         -------
         bool
@@ -372,17 +383,18 @@ class MTAOS(salobj.BaseCsc):
 
         # This is temporarily hard coded for WEP testing
         intraExposureData = RawExpData()
-        intraExposureData.append(9005001, 0, primaryDirectory)
+        intraExposureData.append(primaryVisit, 0, primaryDirectory)
 
         # This is temporarily hard coded for WEP testing
         extraExposureData = RawExpData()
-        extraExposureData.append(9005000, 0, secondaryDirectory)
+        extraExposureData.append(secondaryVisit, 0, secondaryDirectory)
 
         self.wep.setFilter(fieldFilter)
         self.wep.setBoresight(fieldRA, fieldDEC)
         self.wep.setRotAng(cameraRotation)
 
-        wavefrontData = self.wep.calculateWavefrontErrors(intraExposureData, extraExposureData)
+        wavefrontData = self.wep.calculateWavefrontErrors(intraExposureData,
+                                                          extraExposureData)
         wavefrontDataValid, wavefrontError = \
             self.convertWavefrontDataToWavefrontError(timestamp, wavefrontData)
 
