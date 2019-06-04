@@ -15,3 +15,6 @@ tests/.tests
 pytest_session.txt
 .cache/
 .pytest_cache
+
+# Output directory
+/output/*
