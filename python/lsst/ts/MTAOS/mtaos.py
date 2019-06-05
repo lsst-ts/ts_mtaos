@@ -93,8 +93,9 @@ class MTAOS(salobj.BaseCsc):
 
         self.wavefrontError = []
 
-        self.aggregatedDoF = np.zeros(50)
-        self.visitDoF = np.zeros(50)
+        numOfDOf = self.getNumOfDof()
+        self.aggregatedDoF = np.zeros(numOfDOf)
+        self.visitDoF = np.zeros(numOfDOf)
 
         self.cameraHexapodCorrection = CameraHexapodCorrection(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         self.m1m3Correction = M1M3Correction(np.zeros(156))
@@ -111,6 +112,17 @@ class MTAOS(salobj.BaseCsc):
 
         print("READY")
 
+    def getNumOfDof(self):
+        """Get the number of degree of freedom (DOF).
+
+        Returns
+        -------
+        int
+            Number of DOF.
+        """
+
+        return int(self.settingFile.getSetting("numOfDOf"))
+
     def getNumOfZk(self):
         """Get the number of annular Zernike polynomial.
 
@@ -120,7 +132,7 @@ class MTAOS(salobj.BaseCsc):
             Number of annular Zernike polynomial.
         """
 
-        return self.settingFile.getSetting("annularZernikePolyCount")
+        return int(self.settingFile.getSetting("annularZernikePolyCount"))
 
     def getIsrDir(self):
         """Get the instrument signature removal (ISR) directory.
@@ -159,6 +171,28 @@ class MTAOS(salobj.BaseCsc):
             return os.path.join(getModulePath(), relativePath)
         except KeyError:
             return None
+
+    def getWep(self):
+        """Get the wavefront estimation pipeline (WEP) calculation instance.
+
+        Returns
+        -------
+        lsst.ts.wep.ctrlIntf.WEPCalculation or related derivatives
+            WEP calculation instance.
+        """
+
+        return self.wep
+
+    def getOfc(self):
+        """Get the optical feedback control (OFC) calculation instance.
+
+        Returns
+        -------
+        lsst.ts.ofc.ctrlIntf.OFCCalculation or related derivatives
+            OFC calculation instance.
+        """
+
+        return self.ofc
 
     def do_measureAlignment(self, id_data):
         pass
@@ -423,24 +457,14 @@ class MTAOS(salobj.BaseCsc):
         # R22_S11
         # R22_S10
 
-        # Set the default sky file for the test
-        # This will be removed in the final
-        self._setSkyFile()
+        intraExposureData, extraExposureData = self._collectRawExpData(
+            primaryVisit, primaryDirectory, secondaryVisit=secondaryVisit,
+            secondaryDirectory=secondaryDirectory)
 
-        # This is temporarily hard coded for WEP testing
-        intraExposureData = RawExpData()
-        intraExposureData.append(primaryVisit, 0, primaryDirectory)
+        wavefrontData = self._calcWavefrontError(
+            fieldRA, fieldDEC, fieldFilter, cameraRotation, intraExposureData,
+            extraRawExpData=extraExposureData)
 
-        # This is temporarily hard coded for WEP testing
-        extraExposureData = RawExpData()
-        extraExposureData.append(secondaryVisit, 0, secondaryDirectory)
-
-        self.wep.setFilter(fieldFilter)
-        self.wep.setBoresight(fieldRA, fieldDEC)
-        self.wep.setRotAng(cameraRotation)
-
-        wavefrontData = self.wep.calculateWavefrontErrors(intraExposureData,
-                                                          extraExposureData)
         wavefrontDataValid, wavefrontError = \
             self.convertWavefrontDataToWavefrontError(timestamp, wavefrontData)
 
@@ -455,6 +479,83 @@ class MTAOS(salobj.BaseCsc):
 
         return wavefrontDataValid
 
+    def _collectRawExpData(self, primaryVisit, primaryDirectory,
+                           secondaryVisit=None, secondaryDirectory=None):
+        """Collect the raw exposure data.
+
+        Parameters
+        ----------
+        primaryVisit: int
+            The primary visit number (intra-focal visit number).
+        primaryDirectory : str
+            The primary directory of image data (intra-focal images).
+        secondaryVisit: int (optional)
+            The secondary visit number (extra-focal visit number).
+        secondaryDirectory : str (optional)
+            The secondary directory of image data (extra-focal images).
+
+        Returns
+        -------
+        lsst.ts.wep.ctrlIntf.RawExpData
+            Raw exposure data for the corner wavefront sensor. If the input of
+            extraRawExpData is not None, this input will be the intra-focal raw
+            exposure data.
+        lsst.ts.wep.ctrlIntf.RawExpData
+            This is the extra-focal raw exposure data if not None.
+        """
+
+        intraExposureData = RawExpData()
+        intraExposureData.append(primaryVisit, 0, primaryDirectory)
+
+        if (secondaryVisit is None) or (secondaryDirectory is None):
+            extraExposureData = None
+        else:
+            extraExposureData = RawExpData()
+            extraExposureData.append(secondaryVisit, 0, secondaryDirectory)
+
+        return intraExposureData, extraExposureData
+
+    def _calcWavefrontError(self, fieldRA, fieldDEC, fieldFilter,
+                            cameraRotation, rawExpData, extraRawExpData=None):
+        """Calculate the wavefront error.
+
+        Parameters
+        ----------
+        fieldRA : float
+            The RA of the center of the imaging sensor.
+        fieldDEC : float
+            The DEC of the center of the imaging sensor.
+        fieldFilter : lsst.ts.wep.Utility.FilterType
+            The filter used by the imaging sensor.
+        cameraRotation : float
+            The rotation of the imaging sensor.
+        rawExpData : lsst.ts.wep.ctrlIntf.RawExpData
+            Raw exposure data for the corner wavefront sensor. If the input of
+            extraRawExpData is not None, this input will be the intra-focal raw
+            exposure data.
+        extraRawExpData : lsst.ts.wep.ctrlIntf.RawExpData, optional
+            This is the extra-focal raw exposure data if not None. (the default
+            is None.)
+
+        Returns
+        -------
+        list [lsst.ts.wep.ctrlIntf.SensorWavefrontData]
+            List of SensorWavefrontData object.
+        """
+
+        # Set the default sky file for the test
+        # This will be removed in the final
+        self._setSkyFile()
+
+        self.wep.setBoresight(fieldRA, fieldDEC)
+        self.wep.setFilter(fieldFilter)
+        self.wep.setRotAng(cameraRotation)
+
+        wavefrontData = self.wep.calculateWavefrontErrors(
+            rawExpData, extraRawExpData=extraRawExpData)
+
+        return wavefrontData
+
     def _setSkyFile(self):
         """Set the sky file for the test.
 
@@ -464,70 +565,6 @@ class MTAOS(salobj.BaseCsc):
         skyFile = self.getDefaultSkyFile()
         if (skyFile is not None):
             self.wep.setSkyFile(skyFile)
-
-    def runOFC(self, timestamp, fieldFilter, cameraRotation, userGain, listOfFWHMSensorData):
-        """
-
-        Parameters
-        ----------
-        timestamp : float
-            The timestamp of the calculation.
-        fieldFilter : lsst.ts.wep.Utility.FilterType
-            The filter used by the imaging sensor.
-        cameraRotation : float
-            The rotation of the imaging sensor.
-        userGain : float
-            The gain requested by the user. A value of -1 means don't use user gain.
-        listOfFWHMSensorData : ???
-            Unknown at this time.
-
-        Returns
-        -------
-        bool
-            True if the OFC calculation was successful.
-        """
-
-        startTime = time.time()
-
-        self.ofc.setFilter(fieldFilter)
-        self.ofc.setRotAng(cameraRotation)
-        if userGain == -1:
-            self.ofc.setGainByPSSN()
-            self.ofc.setFWHMSensorDataOfCam(listOfFWHMSensorData)
-        else:
-            self.ofc.setGainByUser(userGain)
-
-        m2HexapodCorrection, cameraHexapodCorrection, m1m3Correction, m2Correction = \
-            self.ofc.calculateCorrections(self.wavefrontError)
-        aggregatedDoF = self.ofc.getStateAggregated()
-        visitDoF = self.ofc.getStateCorrectionFromLastVisit()
-
-        correctionsValid = True
-
-        if correctionsValid:
-            self.aggregatedDoF = aggregatedDoF
-            self.visitDoF = visitDoF
-            self.cameraHexapodCorrection = cameraHexapodCorrection
-            self.m2HexapodCorrection = m2HexapodCorrection
-            self.m1m3Correction = m1m3Correction
-            self.m2Correction = m2Correction
-
-            self.logEvent_degreeOfFreedom(timestamp)
-            self.logEvent_cameraHexapodCorrection(timestamp)
-            self.logEvent_m1m3Correction(timestamp)
-            self.logEvent_m2Correction(timestamp)
-            self.logEvent_m2HexapodCorrection(timestamp)
-        else:
-            self.logEvent_rejectedDegreeOfFreedom(timestamp, aggregatedDoF, visitDoF)
-            self.logEvent_rejectedCameraHexapodCorrection(timestamp, cameraHexapodCorrection)
-            self.logEvent_rejectedM2HexapodCorrection(timestamp, m2HexapodCorrection)
-            self.logEvent_rejectedM1M3Correction(timestamp, m1m3Correction)
-            self.logEvent_rejectedM2Correction(timestamp, m2Correction)
-
-        stopTime = time.time()
-        self.putSample_ofcDuration(timestamp, (stopTime - startTime))
-
-        return correctionsValid
 
     def convertWavefrontDataToWavefrontError(self, timestamp, wavefrontData):
         """Convert wavefront data from WEP to wavefront error for OFC.
@@ -567,6 +604,103 @@ class MTAOS(salobj.BaseCsc):
 
             wavefrontError.append(SensorWavefrontError(sensorId, annularZernikePoly))
         return (valid or self.bypassWavefrontErrorCheck), wavefrontError
+
+    def runOFC(self, timestamp, fieldFilter, cameraRotation, userGain,
+               listOfFWHMSensorData):
+        """
+
+        Parameters
+        ----------
+        timestamp : float
+            The timestamp of the calculation.
+        fieldFilter : lsst.ts.wep.Utility.FilterType
+            The filter used by the imaging sensor.
+        cameraRotation : float
+            The rotation of the imaging sensor.
+        userGain : float
+            The gain requested by the user. A value of -1 means don't use user
+            gain.
+        listOfFWHMSensorData : ???
+            Unknown at this time.
+
+        Returns
+        -------
+        bool
+            True if the OFC calculation was successful.
+        """
+
+        startTime = time.time()
+
+        m2HexapodCorrection, cameraHexapodCorrection, m1m3Correction, m2Correction = \
+            self._calcCorrection(fieldFilter, cameraRotation, userGain,
+                                 listOfFWHMSensorData)
+        aggregatedDoF = self.ofc.getStateAggregated()
+        visitDoF = self.ofc.getStateCorrectionFromLastVisit()
+
+        correctionsValid = True
+
+        if correctionsValid:
+            self.aggregatedDoF = aggregatedDoF
+            self.visitDoF = visitDoF
+            self.cameraHexapodCorrection = cameraHexapodCorrection
+            self.m2HexapodCorrection = m2HexapodCorrection
+            self.m1m3Correction = m1m3Correction
+            self.m2Correction = m2Correction
+
+            self.logEvent_degreeOfFreedom(timestamp)
+            self.logEvent_cameraHexapodCorrection(timestamp)
+            self.logEvent_m1m3Correction(timestamp)
+            self.logEvent_m2Correction(timestamp)
+            self.logEvent_m2HexapodCorrection(timestamp)
+        else:
+            self.logEvent_rejectedDegreeOfFreedom(timestamp, aggregatedDoF, visitDoF)
+            self.logEvent_rejectedCameraHexapodCorrection(timestamp, cameraHexapodCorrection)
+            self.logEvent_rejectedM2HexapodCorrection(timestamp, m2HexapodCorrection)
+            self.logEvent_rejectedM1M3Correction(timestamp, m1m3Correction)
+            self.logEvent_rejectedM2Correction(timestamp, m2Correction)
+
+        stopTime = time.time()
+        self.putSample_ofcDuration(timestamp, (stopTime - startTime))
+
+        return correctionsValid
+
+    def _calcCorrection(self, fieldFilter, cameraRotation, userGain,
+                        listOfFWHMSensorData):
+        """Calculation the correction of subsystems.
+
+        Parameters
+        ----------
+        fieldFilter : lsst.ts.wep.Utility.FilterType
+            The filter used by the imaging sensor.
+        cameraRotation : float
+            The rotation of the imaging sensor.
+        userGain : float
+            The gain requested by the user. A value of -1 means don't use user
+            gain.
+        listOfFWHMSensorData : ???
+            Unknown at this time.
+
+        Returns
+        -------
+        lsst.ts.ofc.ctrlIntf.M2HexapodCorrection
+            The position offset for the MT M2 Hexapod.
+        lsst.ts.ofc.ctrlIntf.CameraHexapodCorrection
+            The position offset for the MT Hexapod.
+        lsst.ts.ofc.ctrlIntf.M1M3Correction
+            The figure offset for the MT M1M3.
+        lsst.ts.ofc.ctrlIntf.M2Correction
+            The figure offset for the MT M2.
+        """
+
+        self.ofc.setFilter(fieldFilter)
+        self.ofc.setRotAng(cameraRotation)
+        if (userGain == -1):
+            self.ofc.setGainByPSSN()
+            self.ofc.setFWHMSensorDataOfCam(listOfFWHMSensorData)
+        else:
+            self.ofc.setGainByUser(userGain)
+
+        return self.ofc.calculateCorrections(self.wavefrontError)
 
     def logEvent_cameraHexapodCorrection(self, timestamp):
         """Publishes the Camera Hexapod correction that would be commanded if the
@@ -798,3 +932,7 @@ class MTAOS(salobj.BaseCsc):
         """
 
         self.tel_wepDuration.set_put(timestamp=timestamp, duration=duration)
+
+
+if __name__ == "__main__":
+    pass

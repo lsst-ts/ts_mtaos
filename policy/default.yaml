@@ -2,14 +2,21 @@
 
 # Default setting
 
+# Type of camera for wavefront estimation pipeline (WEP) to use
+
+# Type of instrument for optical feedback control (OFC) to use
+
 # Number of annularZernike polynomial
 annularZernikePolyCount: 19
 
+# Number of degree of freedom (DOF)
+numOfDOf: 50
+
 # Default instrument signature removal (ISR) directory
 # This setting will be override by the 'ISRDIRPATH' path variable.
-defaultIsrDir: /home/lsst/testData/input
+defaultIsrDir: /home/lsst/input
 
 # Default sky file path relative to the root of module
 # This is for the test only
 # Comment this if use the bright star catalog instead
-defaultSkyFilePath: tests/testData/skyComCamInfo.txt
+defaultSkyFilePath: tests/testData/phosimOutput/realComCam/skyComCamInfo.txt

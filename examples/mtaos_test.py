@@ -25,6 +25,7 @@ import numpy as np
 import time
 
 from lsst.ts.wep.Utility import runProgram
+from lsst.ts.MTAOS.Utility import getModulePath
 
 from lsst.ts import salobj
 import SALPY_MTAOS
@@ -108,26 +109,27 @@ def main(testDataDir):
 
     # Make the calibration products
     sensorNameList = _getComCamSensorNameList()
-    calibPath = os.path.join(testDataDir, "calibrationProducts")
-    fakeFlatDir = _makeCalibs(calibPath, sensorNameList)
+    fakeFlatDir = _makeCalibs(testDataDir, sensorNameList)
 
     data = mtaos.cmd_processCalibrationProducts.DataType()
     data.directoryPath = fakeFlatDir
     asyncio.get_event_loop().run_until_complete(
         mtaos.cmd_processCalibrationProducts.start(data, timeout=60.0))
 
+    rawImgDir = os.path.join(getModulePath(), "tests", "testData",
+                             "phosimOutput", "realComCam")
     data = mtaos.cmd_processIntraExtraWavefrontError.DataType()
-    data.intraVisit = 9005001
-    data.extraVisit = 9005000
-    data.intraDirectoryPath = "/home/lsst/testData/rawImages/intra"
-    data.extraDirectoryPath = "/home/lsst/testData/rawImages/extra"
+    data.intraVisit = 9006002
+    data.extraVisit = 9006001
+    data.intraDirectoryPath = os.path.join(rawImgDir, "intra")
+    data.extraDirectoryPath = os.path.join(rawImgDir, "extra")
     data.fieldRA = 0.0
     data.fieldDEC = 0.0
     data.filter = 7
     data.cameraRotation = 0.0
     data.userGain = 1.0
     asyncio.get_event_loop().run_until_complete(
-        mtaos.cmd_processIntraExtraWavefrontError.start(data, timeout=300.0))
+        mtaos.cmd_processIntraExtraWavefrontError.start(data, timeout=3600.0))
 
     time.sleep(0.5)
 
@@ -242,5 +244,10 @@ def _makeFakeFlat(detector):
 
 if __name__ == "__main__":
 
-    testDataDir = os.path.join(os.sep, "home", "lsst", "testData")
+    testDataDir = os.path.join(os.sep, "home", "lsst")
+
+    # Make the ISR directory
+    _makeDir(os.path.join(testDataDir, "input"))
+
+    # Run the test script
     main(testDataDir)
