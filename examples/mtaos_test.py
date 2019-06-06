@@ -169,6 +169,11 @@ def main():
     print(f"\tv ({round(m2HexapodCorrection.v * 3600, 4)})")
     print(f"\tw ({round(m2HexapodCorrection.w * 3600, 4)})")
 
+    # Exit the MTAOS control
+    data = mtaos.cmd_exitControl.DataType()
+    asyncio.get_event_loop().run_until_complete(
+        mtaos.cmd_exitControl.start(data, timeout=1.0))
+
 
 def _getComCamSensorNameList():
 
