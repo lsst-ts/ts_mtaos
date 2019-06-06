@@ -22,6 +22,7 @@
 import os
 import shutil
 import unittest
+import numpy as np
 
 from lsst.ts.wep.Utility import runProgram, FilterType, CamType
 from lsst.ts.ofc.Utility import InstName
@@ -135,13 +136,17 @@ class TestMTAOS(unittest.TestCase):
         self.mtaos.wavefrontError = wavefrontData
 
         # Calculate the DOF
-        self.mtaos._calcCorrection(fieldFilter, cameraRotation, 1, [])
+        userGain = 1
+        listOfFWHMSensorData = []
+        self.mtaos._calcCorrection(fieldFilter, cameraRotation, userGain,
+                                   listOfFWHMSensorData)
 
         ofc = self.mtaos.getOfc()
         aggregatedDoF = ofc.getStateAggregated()
 
-        self.assertEqual(len(aggregatedDoF), 50)
-        self.assertNotEqual(aggregatedDoF[0], 0)
+        numOfDof = self.mtaos.getNumOfDof()
+        self.assertEqual(len(aggregatedDoF), numOfDof)
+        self.assertNotEqual(np.sum(np.abs(aggregatedDoF)), 0)
 
     def _ingestCalibs(self):
 
