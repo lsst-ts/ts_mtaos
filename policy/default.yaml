@@ -3,8 +3,12 @@
 # Default setting
 
 # Type of camera for wavefront estimation pipeline (WEP) to use
+# (lsstCam, lsstFamCam, comcam)
+camera: comcam
 
 # Type of instrument for optical feedback control (OFC) to use
+# (lsst, comcam, sh, cmos)
+instrument: comcam
 
 # Number of annularZernike polynomial
 annularZernikePolyCount: 19

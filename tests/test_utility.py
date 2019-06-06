@@ -22,7 +22,11 @@
 import os
 import unittest
 
-from lsst.ts.MTAOS.Utility import getModulePath, getConfigDir, getIsrDirPath
+from lsst.ts.wep.Utility import CamType
+from lsst.ts.ofc.Utility import InstName
+
+from lsst.ts.MTAOS.Utility import getModulePath, getConfigDir, getIsrDirPath, \
+    getCamType, getInstName
 
 
 class TestUtility(unittest.TestCase):
@@ -47,6 +51,23 @@ class TestUtility(unittest.TestCase):
         self.assertEqual(isrDir, ISRDIRPATH)
 
         os.environ.pop("ISRDIRPATH")
+
+    def testGetCamType(self):
+
+        self.assertEqual(getCamType("lsstCam"), CamType.LsstCam)
+        self.assertEqual(getCamType("lsstFamCam"), CamType.LsstFamCam)
+        self.assertEqual(getCamType("comcam"), CamType.ComCam)
+
+        self.assertRaises(ValueError, getCamType, "wrongType")
+
+    def testGetInst(self):
+
+        self.assertEqual(getInstName("lsst"), InstName.LSST)
+        self.assertEqual(getInstName("comcam"), InstName.COMCAM)
+        self.assertEqual(getInstName("sh"), InstName.SH)
+        self.assertEqual(getInstName("cmos"), InstName.CMOS)
+
+        self.assertRaises(ValueError, getInstName, "wrongName")
 
 
 if __name__ == "__main__":

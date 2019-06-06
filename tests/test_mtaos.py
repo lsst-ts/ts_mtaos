@@ -23,7 +23,8 @@ import os
 import shutil
 import unittest
 
-from lsst.ts.wep.Utility import runProgram, FilterType
+from lsst.ts.wep.Utility import runProgram, FilterType, CamType
+from lsst.ts.ofc.Utility import InstName
 
 from lsst.ts.MTAOS import MTAOS
 from lsst.ts.MTAOS.Utility import getModulePath
@@ -70,6 +71,16 @@ class TestMTAOS(unittest.TestCase):
 
         numOfZk = self.mtaos.getNumOfZk()
         self.assertEqual(numOfZk, 19)
+
+    def testGetCamType(self):
+
+        camType = self.mtaos.getCamType()
+        self.assertEqual(camType, CamType.ComCam)
+
+    def testGetInstName(self):
+
+        instName = self.mtaos.getInstName()
+        self.assertEqual(instName, InstName.COMCAM)
 
     def testGetIsrDirByPathVar(self):
 
@@ -130,6 +141,7 @@ class TestMTAOS(unittest.TestCase):
         aggregatedDoF = ofc.getStateAggregated()
 
         self.assertEqual(len(aggregatedDoF), 50)
+        self.assertNotEqual(aggregatedDoF[0], 0)
 
     def _ingestCalibs(self):
 

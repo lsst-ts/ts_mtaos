@@ -34,12 +34,9 @@ import SALPY_MTAOS
 import SALPY_MTM1M3
 import SALPY_MTM2
 
-from lsst.ts.MTAOS.Utility import getModulePath, getConfigDir, getIsrDirPath
-
-from lsst.ts.wep.Utility import FilterType, CamType
+from lsst.ts.wep.Utility import FilterType
 from lsst.ts.wep.ParamReader import ParamReader
 
-from lsst.ts.ofc.Utility import InstName
 from lsst.ts.ofc.ctrlIntf.CameraHexapodCorrection import CameraHexapodCorrection
 from lsst.ts.ofc.ctrlIntf.M1M3Correction import M1M3Correction
 from lsst.ts.ofc.ctrlIntf.M2Correction import M2Correction
@@ -48,6 +45,9 @@ from lsst.ts.ofc.ctrlIntf.OFCCalculationFactory import OFCCalculationFactory
 from lsst.ts.ofc.ctrlIntf.SensorWavefrontError import SensorWavefrontError
 from lsst.ts.wep.ctrlIntf.RawExpData import RawExpData
 from lsst.ts.wep.ctrlIntf.WEPCalculationFactory import WEPCalculationFactory
+
+from lsst.ts.MTAOS.Utility import getModulePath, getConfigDir, getIsrDirPath, \
+    getCamType, getInstName
 
 
 class WEPWarning(enum.Enum):
@@ -102,13 +102,14 @@ class MTAOS(salobj.BaseCsc):
         self.m2Correction = M2Correction(np.zeros(72))
         self.m2HexapodCorrection = M2HexapodCorrection(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
-        self.camera = CamType.ComCam
-        self.instrument = InstName.COMCAM
         self.numberOfWEPProcessors = 1
 
+        camType = self.getCamType()
         isrDir = self.getIsrDir()
-        self.wep = WEPCalculationFactory.getCalculator(self.camera, isrDir)
-        self.ofc = OFCCalculationFactory.getCalculator(self.instrument)
+        self.wep = WEPCalculationFactory.getCalculator(camType, isrDir)
+
+        instName = self.getInstName()
+        self.ofc = OFCCalculationFactory.getCalculator(instName)
 
         print("READY")
 
@@ -133,6 +134,32 @@ class MTAOS(salobj.BaseCsc):
         """
 
         return int(self.settingFile.getSetting("annularZernikePolyCount"))
+
+    def getCamType(self):
+        """Get the enum of camera type.
+
+        Returns
+        -------
+        enum 'CamType' in lsst.ts.wep.Utility
+            Camera type.
+        """
+
+        camera = self.settingFile.getSetting("camera")
+
+        return getCamType(camera)
+
+    def getInstName(self):
+        """Get the enum of instrument name.
+
+        Returns
+        -------
+        enum 'InstName' in lsst.ts.ofc.Utility
+            Instrument name.
+        """
+
+        instName = self.settingFile.getSetting("instrument")
+
+        return getInstName(instName)
 
     def getIsrDir(self):
         """Get the instrument signature removal (ISR) directory.

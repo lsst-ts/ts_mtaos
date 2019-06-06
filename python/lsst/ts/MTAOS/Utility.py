@@ -22,6 +22,9 @@
 import os
 from lsst.utils import getPackageDir
 
+from lsst.ts.wep.Utility import CamType
+from lsst.ts.ofc.Utility import InstName
+
 
 def getModulePath():
     """Get the path of module.
@@ -65,6 +68,66 @@ def getIsrDirPath(isrDirPathVar="ISRDIRPATH"):
         return os.environ[isrDirPathVar]
     except KeyError:
         return None
+
+
+def getCamType(camera):
+    """Get the enum of camera type.
+
+    Parameters
+    ----------
+    camera : str
+        Camera ("lsstCam", "lsstFamCam", or "comcam").
+
+    Returns
+    -------
+    enum 'CamType' in lsst.ts.wep.Utility
+        Camera type.
+
+    Raises
+    ------
+    ValueError
+        The camera is not supported.
+    """
+
+    if (camera == "lsstCam"):
+        return CamType.LsstCam
+    elif (camera == "lsstFamCam"):
+        return CamType.LsstFamCam
+    elif (camera == "comcam"):
+        return CamType.ComCam
+    else:
+        raise ValueError("The camera (%s) is not supported." % camera)
+
+
+def getInstName(instName):
+    """Get the enum of instrument name.
+
+    Parameters
+    ----------
+    instName : str
+        Instrument name.
+
+    Returns
+    -------
+    enum 'InstName' in lsst.ts.ofc.Utility
+        Instrument name.
+
+    Raises
+    ------
+    ValueError
+        This instrument is not supported.
+    """
+
+    if (instName == "lsst"):
+        return InstName.LSST
+    elif (instName == "comcam"):
+        return InstName.COMCAM
+    elif (instName == "sh"):
+        return InstName.SH
+    elif (instName == "cmos"):
+        return InstName.CMOS
+    else:
+        raise ValueError("This instrument (%s) is not supported." % instName)
 
 
 if __name__ == "__main__":
