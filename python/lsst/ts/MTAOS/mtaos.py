@@ -21,7 +21,6 @@
 
 __all__ = ["MTAOS"]
 
-import os
 import enum
 import warnings
 import numpy as np
@@ -53,7 +52,8 @@ from lsst.ts.MTAOS.Utility import getModulePath, getConfigDir, getIsrDirPath, \
 class WEPWarning(enum.Enum):
     NoWarning = SALPY_MTAOS.MTAOS_shared_WEPWarning_NoWarning
     InvalidSensorId = SALPY_MTAOS.MTAOS_shared_WEPWarning_InvalidSensorId
-    InvalidAnnularZernikePoly = SALPY_MTAOS.MTAOS_shared_WEPWarning_InvalidAnnularZernikePoly
+    InvalidAnnularZernikePoly = \
+        SALPY_MTAOS.MTAOS_shared_WEPWarning_InvalidAnnularZernikePoly
 
 
 class OFCWarning(enum.Enum):
@@ -68,7 +68,7 @@ class MTAOS(salobj.BaseCsc):
                          initial_simulation_mode=initial_simulation_mode)
 
         # Read the configuration file
-        settingFilePath = os.path.join(getConfigDir(), settingFileName)
+        settingFilePath = getConfigDir().joinpath(settingFileName)
         self.settingFile = ParamReader(filePath=settingFilePath)
 
         self.telemetry_period = 0.05
@@ -88,8 +88,10 @@ class MTAOS(salobj.BaseCsc):
 
         self.bypassWavefrontErrorCheck = True
 
-        self.cameraHexapodAlignment = CameraHexapodCorrection(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-        self.m2HexapodAlignment = M2HexapodCorrection(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        self.cameraHexapodAlignment = CameraHexapodCorrection(
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        self.m2HexapodAlignment = M2HexapodCorrection(
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
         self.wavefrontError = []
 
@@ -97,10 +99,12 @@ class MTAOS(salobj.BaseCsc):
         self.aggregatedDoF = np.zeros(numOfDOf)
         self.visitDoF = np.zeros(numOfDOf)
 
-        self.cameraHexapodCorrection = CameraHexapodCorrection(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        self.cameraHexapodCorrection = CameraHexapodCorrection(
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         self.m1m3Correction = M1M3Correction(np.zeros(156))
         self.m2Correction = M2Correction(np.zeros(72))
-        self.m2HexapodCorrection = M2HexapodCorrection(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        self.m2HexapodCorrection = M2HexapodCorrection(
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
         self.numberOfWEPProcessors = 1
 
@@ -122,7 +126,7 @@ class MTAOS(salobj.BaseCsc):
             Number of DOF.
         """
 
-        return int(self.settingFile.getSetting("numOfDOf"))
+        return int(self.settingFile.getSetting("numOfDof"))
 
     def getNumOfZk(self):
         """Get the number of annular Zernike polynomial.
@@ -178,8 +182,9 @@ class MTAOS(salobj.BaseCsc):
             isrDir = self.settingFile.getSetting("defaultIsrDir")
             warnings.warn("No 'ISRDIRPATH' assigned. Use %s instead." % isrDir,
                           category=UserWarning)
-
-        return isrDir
+            return isrDir
+        else:
+            return isrDir.as_posix()
 
     def getDefaultSkyFile(self):
         """Get the default sky file path.
@@ -188,14 +193,14 @@ class MTAOS(salobj.BaseCsc):
 
         Returns
         -------
-        str or None
+        pathlib.PosixPath or None
             Get the default sky file path. Return None if there is no such
             setting.
         """
 
         try:
             relativePath = self.settingFile.getSetting("defaultSkyFilePath")
-            return os.path.join(getModulePath(), relativePath)
+            return getModulePath().joinpath(relativePath)
         except KeyError:
             return None
 
@@ -232,9 +237,11 @@ class MTAOS(salobj.BaseCsc):
         Parameters
         ----------
         id_data.data.bypassCameraHexapod : bool
-            If True the MTAOS will not issue the positionSet command to the Camera Hexapod.
+            If True the MTAOS will not issue the positionSet command to the
+            Camera Hexapod.
         id_data.data.bypassM2Hexapod : bool
-            If True the MTAOS will not issue the positionSet command to the M2 Hexapod.
+            If True the MTAOS will not issue the positionSet command to the M2
+            Hexapod.
         """
 
         bypassCameraHexapod = id_data.data.bypassCameraHexapod
@@ -242,18 +249,21 @@ class MTAOS(salobj.BaseCsc):
 
         if not bypassCameraHexapod:
             data = self.mtcamerahexapod.cmd_positionSet.DataType()
-            data.x, data.y, data.z, data.u, data.v, data.w = self.cameraHexapodAlignment.getCorrection()
+            data.x, data.y, data.z, data.u, data.v, data.w = \
+                self.cameraHexapodAlignment.getCorrection()
             data.sync = True
             await self.mtcamerahexapod.cmd_positionSet.start(data, timeout=1.0)
 
         if not bypassM2Hexapod:
             data = self.mtm2hexapod.cmd_positionSet.DataType()
-            data.x, data.y, data.z, data.u, data.v, data.w = self.m2HexapodAlignment.getCorrection()
+            data.x, data.y, data.z, data.u, data.v, data.w = \
+                self.m2HexapodAlignment.getCorrection()
             data.sync = True
             await self.mtm2hexapod.cmd_positionSet.start(data, timeout=1.0)
 
     def do_resetWavefrontCorrection(self, id_data):
-        """Commands the MTAOS to reset the current wavefront error calculations.
+        """Commands the MTAOS to reset the current wavefront error
+        calculations.
 
         When resetting the wavefront corrections it is recommended that the
         issueWavefrontCorrection command be sent to push the cleared wavefront
@@ -262,8 +272,8 @@ class MTAOS(salobj.BaseCsc):
 
         timestamp = time.time()
 
-        self.cameraHexapodCorrection, self.m2HexapodCorrection, self.m1m3Correction, self.m2Correction \
-            = self.ofc.resetOfcState()
+        self.cameraHexapodCorrection, self.m2HexapodCorrection, self.m1m3Correction, self.m2Correction = \
+            self.ofc.resetOfcState()
         self.aggregatedDoF = self.ofc.getStateAggregated()
         self.visitDoF = self.ofc.getStateCorrectionFromLastVisit()
 
@@ -281,13 +291,16 @@ class MTAOS(salobj.BaseCsc):
         Parameters
         ----------
         id_data.data.bypassCameraHexapod : bool
-            If True the MTAOS will not issue the offset command to the Camera Hexapod.
+            If True the MTAOS will not issue the offset command to the Camera
+            Hexapod.
         id_data.data.bypassM1M3 : bool
-            If True the MTAOS will not issue the applyActiveOpticForces command to the M1M3.
+            If True the MTAOS will not issue the applyActiveOpticForces
+            command to the M1M3.
         id_data.data.bypassM2 : bool
             If True the MTAOS will not issue the applyForce command to the M2.
         id_data.data.bypassM2Hexapod : bool
-            If True the MTAOS will not issue the offset command to the M2 Hexapod.
+            If True the MTAOS will not issue the offset command to the M2
+            Hexapod.
         """
 
         bypassCameraHexapod = id_data.data.bypassCameraHexapod
@@ -297,7 +310,8 @@ class MTAOS(salobj.BaseCsc):
 
         if not bypassCameraHexapod:
             data = self.mtcamerahexapod.cmd_offset.DataType()
-            data.x, data.y, data.z, data.u, data.v, data.w = self.cameraHexapodCorrection.getCorrection()
+            data.x, data.y, data.z, data.u, data.v, data.w = \
+                self.cameraHexapodCorrection.getCorrection()
             data.sync = True
             await self.mtcamerahexapod.cmd_offset.start(data, timeout=1.0)
 
@@ -317,7 +331,8 @@ class MTAOS(salobj.BaseCsc):
 
         if not bypassM2Hexapod:
             data = self.mtm2hexapod.cmd_offset.DataType()
-            data.x, data.y, data.z, data.u, data.v, data.w = self.m2HexapodCorrection.getCorrection()
+            data.x, data.y, data.z, data.u, data.v, data.w = \
+                self.m2HexapodCorrection.getCorrection()
             data.sync = True
             await self.mtm2hexapod.cmd_offset.start(data, timeout=1.0)
 
@@ -626,10 +641,12 @@ class MTAOS(salobj.BaseCsc):
                 valid = False
                 print(f"Invalid annular zernike polynomial length {len(annularZernikePoly)}. "
                       "Must be {numOfZk}.")
-                self.logEvent_wepWarning(timestamp, WEPWarning.InvalidAnnularZernikePoly)
+                self.logEvent_wepWarning(
+                    timestamp, WEPWarning.InvalidAnnularZernikePoly)
                 annularZernikePoly = [0.0] * 19
 
-            wavefrontError.append(SensorWavefrontError(sensorId, annularZernikePoly))
+            wavefrontError.append(SensorWavefrontError(
+                sensorId, annularZernikePoly))
         return (valid or self.bypassWavefrontErrorCheck), wavefrontError
 
     def runOFC(self, timestamp, fieldFilter, cameraRotation, userGain,
@@ -680,9 +697,12 @@ class MTAOS(salobj.BaseCsc):
             self.logEvent_m2Correction(timestamp)
             self.logEvent_m2HexapodCorrection(timestamp)
         else:
-            self.logEvent_rejectedDegreeOfFreedom(timestamp, aggregatedDoF, visitDoF)
-            self.logEvent_rejectedCameraHexapodCorrection(timestamp, cameraHexapodCorrection)
-            self.logEvent_rejectedM2HexapodCorrection(timestamp, m2HexapodCorrection)
+            self.logEvent_rejectedDegreeOfFreedom(
+                timestamp, aggregatedDoF, visitDoF)
+            self.logEvent_rejectedCameraHexapodCorrection(
+                timestamp, cameraHexapodCorrection)
+            self.logEvent_rejectedM2HexapodCorrection(
+                timestamp, m2HexapodCorrection)
             self.logEvent_rejectedM1M3Correction(timestamp, m1m3Correction)
             self.logEvent_rejectedM2Correction(timestamp, m2Correction)
 
@@ -730,8 +750,8 @@ class MTAOS(salobj.BaseCsc):
         return self.ofc.calculateCorrections(self.wavefrontError)
 
     def logEvent_cameraHexapodCorrection(self, timestamp):
-        """Publishes the Camera Hexapod correction that would be commanded if the
-        issueWavefrontCorrection command was sent.
+        """Publishes the Camera Hexapod correction that would be commanded if
+        the issueWavefrontCorrection command was sent.
 
         Parameters
         ----------
@@ -740,25 +760,30 @@ class MTAOS(salobj.BaseCsc):
         """
 
         x, y, z, u, v, w = self.cameraHexapodCorrection.getCorrection()
-        self.evt_cameraHexapodCorrection.set_put(timestamp=timestamp, x=x, y=y, z=z, u=u, v=v, w=w)
+        self.evt_cameraHexapodCorrection.set_put(
+            timestamp=timestamp, x=x, y=y, z=z, u=u, v=v, w=w)
 
-    def logEvent_rejectedCameraHexapodCorrection(self, timestamp, rejectedCameraHexapodCorrection):
-        """Publishes the rejected Camera Hexapod correction that would be commanded if the
-        issueWavefrontCorrection command was sent.
+    def logEvent_rejectedCameraHexapodCorrection(
+            self, timestamp, rejectedCameraHexapodCorrection):
+        """Publishes the rejected Camera Hexapod correction that would be
+        commanded if the issueWavefrontCorrection command was sent.
 
         Parameters
         ----------
         timestamp : float
             The timestamp of the calculation.
-        rejectedCameraHexapodCorrection : lsst.ts.ofc.ctrlIntf.CameraHexapodCorrection
+        rejectedCameraHexapodCorrection :
+            lsst.ts.ofc.ctrlIntf.CameraHexapodCorrection
             The rejected correction.
         """
 
         x, y, z, u, v, w = rejectedCameraHexapodCorrection.getCorrection()
-        self.evt_rejectedCameraHexapodCorrection.set_put(timestamp=timestamp, x=x, y=y, z=z, u=u, v=v, w=w)
+        self.evt_rejectedCameraHexapodCorrection.set_put(
+            timestamp=timestamp, x=x, y=y, z=z, u=u, v=v, w=w)
 
     def logEvent_degreeOfFreedom(self, timestamp):
-        """Publishes the degree of freedom arrays generated by the OFC calculation.
+        """Publishes the degree of freedom arrays generated by the OFC
+        calculation.
 
         Parameters
         ----------
@@ -771,8 +796,10 @@ class MTAOS(salobj.BaseCsc):
             aggregatedDoF=np.array(self.aggregatedDoF),
             visitDoF=np.array(self.visitDoF))
 
-    def logEvent_rejectedDegreeOfFreedom(self, timestamp, rejectedAggregatedDoF, rejectedVisitDoF):
-        """Publishes the rejected degree of freedom arrays generated by the OFC calculation.
+    def logEvent_rejectedDegreeOfFreedom(
+            self, timestamp, rejectedAggregatedDoF, rejectedVisitDoF):
+        """Publishes the rejected degree of freedom arrays generated by the OFC
+        calculation.
 
         Parameters
         ----------
@@ -800,11 +827,12 @@ class MTAOS(salobj.BaseCsc):
         """
 
         zForces = self.m1m3Correction.getZForces()
-        self.evt_m1m3Correction.set_put(timestamp=timestamp, zForces=np.array(zForces))
+        self.evt_m1m3Correction.set_put(
+            timestamp=timestamp, zForces=np.array(zForces))
 
     def logEvent_rejectedM1M3Correction(self, timestamp, rejectedM1M3Correction):
-        """Publishes the rejected M1M3 correction that would be commanded if the
-        issueWavefrontCorrection command was sent.
+        """Publishes the rejected M1M3 correction that would be commanded if
+        the issueWavefrontCorrection command was sent.
 
         Parameters
         ----------
@@ -815,7 +843,8 @@ class MTAOS(salobj.BaseCsc):
         """
 
         zForces = rejectedM1M3Correction.getZForces()
-        self.evt_rejectedM1M3Correction.set_put(timestamp=timestamp, zForces=np.array(zForces))
+        self.evt_rejectedM1M3Correction.set_put(
+            timestamp=timestamp, zForces=np.array(zForces))
 
     def logEvent_m2Correction(self, timestamp):
         """Publishes the M2 correction that would be commanded if the
@@ -828,7 +857,8 @@ class MTAOS(salobj.BaseCsc):
         """
 
         zForces = self.m2Correction.getZForces()
-        self.evt_m2Correction.set_put(timestamp=timestamp, zForces=np.array(zForces))
+        self.evt_m2Correction.set_put(
+            timestamp=timestamp, zForces=np.array(zForces))
 
     def logEvent_rejectedM2Correction(self, timestamp, rejectedM2Correction):
         """Publishes the rejected M2 correction that would be commanded if the
@@ -843,7 +873,8 @@ class MTAOS(salobj.BaseCsc):
         """
 
         zForces = rejectedM2Correction.getZForces()
-        self.evt_rejectedM2Correction.set_put(timestamp=timestamp, zForces=np.array(zForces))
+        self.evt_rejectedM2Correction.set_put(
+            timestamp=timestamp, zForces=np.array(zForces))
 
     def logEvent_m2HexapodCorrection(self, timestamp):
         """Publishes the M2 Hexapod correction that would be commanded if the
@@ -856,11 +887,13 @@ class MTAOS(salobj.BaseCsc):
         """
 
         x, y, z, u, v, w = self.m2HexapodCorrection.getCorrection()
-        self.evt_m2HexapodCorrection.set_put(timestamp=timestamp, x=x, y=y, z=z, u=u, v=v, w=w)
+        self.evt_m2HexapodCorrection.set_put(
+            timestamp=timestamp, x=x, y=y, z=z, u=u, v=v, w=w)
 
-    def logEvent_rejectedM2HexapodCorrection(self, timestamp, rejectedM2HexapodCorrection):
-        """Publishes the rejected M2 Hexapod correction that would be commanded if the
-        issueWavefrontCorrection command was sent.
+    def logEvent_rejectedM2HexapodCorrection(
+            self, timestamp, rejectedM2HexapodCorrection):
+        """Publishes the rejected M2 Hexapod correction that would be
+        commanded if the issueWavefrontCorrection command was sent.
 
         Parameters
         ----------
@@ -871,7 +904,8 @@ class MTAOS(salobj.BaseCsc):
         """
 
         x, y, z, u, v, w = rejectedM2HexapodCorrection.getCorrection()
-        self.evt_rejectedM2HexapodCorrection.set_put(timestamp=timestamp, x=x, y=y, z=z, u=u, v=v, w=w)
+        self.evt_rejectedM2HexapodCorrection.set_put(
+            timestamp=timestamp, x=x, y=y, z=z, u=u, v=v, w=w)
 
     def logEvent_ofcWarning(self, timestamp, warning):
         """Publishes a warning generated during the OFC calculations.

@@ -22,6 +22,7 @@
 import os
 import asyncio
 import time
+from pathlib import Path
 
 from lsst.ts.wep.Utility import runProgram
 from lsst.ts.MTAOS.Utility import getModulePath, getIsrDirPath
@@ -108,23 +109,26 @@ def main():
     mtaos.evt_cameraHexapodCorrection.flush()
     mtaos.evt_m2HexapodCorrection.flush()
 
+    # Make the ISR directory
+    isrDir = getIsrDirPath()
+    _makeDir(isrDir)
+
     # Make the calibration products
     sensorNameList = _getComCamSensorNameList()
-    testDataDir = os.path.split(getIsrDirPath())[0]
-    fakeFlatDir = _makeCalibs(testDataDir, sensorNameList)
+    fakeFlatDir = _makeCalibs(isrDir, sensorNameList)
 
     data = mtaos.cmd_processCalibrationProducts.DataType()
-    data.directoryPath = fakeFlatDir
+    data.directoryPath = fakeFlatDir.as_posix()
     asyncio.get_event_loop().run_until_complete(
         mtaos.cmd_processCalibrationProducts.start(data, timeout=60.0))
 
-    rawImgDir = os.path.join(getModulePath(), "tests", "testData",
-                             "phosimOutput", "realComCam")
+    rawImgDir = getModulePath().joinpath(
+        "tests", "testData", "phosimOutput", "realComCam")
     data = mtaos.cmd_processIntraExtraWavefrontError.DataType()
     data.intraVisit = 9006002
     data.extraVisit = 9006001
-    data.intraDirectoryPath = os.path.join(rawImgDir, "intra")
-    data.extraDirectoryPath = os.path.join(rawImgDir, "extra")
+    data.intraDirectoryPath = rawImgDir.joinpath("intra").as_posix()
+    data.extraDirectoryPath = rawImgDir.joinpath("extra").as_posix()
     data.fieldRA = 0.0
     data.fieldDEC = 0.0
     data.filter = 7
@@ -185,7 +189,7 @@ def _getComCamSensorNameList():
 def _makeCalibs(outputDir, sensorNameList):
 
     fakeFlatDirName = "fake_flats"
-    fakeFlatDir = os.path.join(outputDir, fakeFlatDirName)
+    fakeFlatDir = Path(outputDir).joinpath(fakeFlatDirName)
     _makeDir(fakeFlatDir)
 
     detector = " ".join(sensorNameList)
@@ -196,8 +200,7 @@ def _makeCalibs(outputDir, sensorNameList):
 
 def _makeDir(directory):
 
-    if (not os.path.exists(directory)):
-        os.makedirs(directory)
+    Path(directory).mkdir(parents=True, exist_ok=True)
 
 
 def _genFakeFlat(fakeFlatDir, detector):
@@ -217,9 +220,6 @@ def _makeFakeFlat(detector):
 
 
 if __name__ == "__main__":
-
-    # Make the ISR directory
-    _makeDir(getIsrDirPath())
 
     # Run the test script
     main()

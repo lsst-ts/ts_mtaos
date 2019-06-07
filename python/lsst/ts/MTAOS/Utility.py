@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
+from pathlib import Path
 from lsst.utils import getPackageDir
 
 from lsst.ts.wep.Utility import CamType
@@ -31,11 +32,11 @@ def getModulePath():
 
     Returns
     -------
-    str
+    pathlib.PosixPath
         Directory path of module.
     """
 
-    return getPackageDir("ts_MTAOS")
+    return Path(getPackageDir("ts_MTAOS"))
 
 
 def getConfigDir():
@@ -43,11 +44,11 @@ def getConfigDir():
 
     Returns
     -------
-    str
+    pathlib.PosixPath
         Directory of configuration files.
     """
 
-    return os.path.join(getModulePath(), "policy")
+    return getModulePath().joinpath("policy")
 
 
 def getIsrDirPath(isrDirPathVar="ISRDIRPATH"):
@@ -60,12 +61,12 @@ def getIsrDirPath(isrDirPathVar="ISRDIRPATH"):
 
     Returns
     -------
-    str or None
+    pathlib.PosixPath or None
         ISR directory path. Return None if the path variable is not defined.
     """
 
     try:
-        return os.environ[isrDirPathVar]
+        return Path(os.environ[isrDirPathVar])
     except KeyError:
         return None
 

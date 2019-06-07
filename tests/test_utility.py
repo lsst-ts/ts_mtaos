@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
+from pathlib import Path
 import unittest
 
 from lsst.ts.wep.Utility import CamType
@@ -34,7 +35,7 @@ class TestUtility(unittest.TestCase):
 
     def testGetConfigDir(self):
 
-        ansConfigDir = os.path.join(getModulePath(), "policy")
+        ansConfigDir = getModulePath().joinpath("policy")
         self.assertEqual(getConfigDir(), ansConfigDir)
 
     def testGetIsrDirPathNotAssigned(self):
@@ -48,7 +49,7 @@ class TestUtility(unittest.TestCase):
         os.environ["ISRDIRPATH"] = ISRDIRPATH
 
         isrDir = getIsrDirPath()
-        self.assertEqual(isrDir, ISRDIRPATH)
+        self.assertEqual(isrDir, Path(ISRDIRPATH))
 
         os.environ.pop("ISRDIRPATH")
 

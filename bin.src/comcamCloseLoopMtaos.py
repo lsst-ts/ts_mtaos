@@ -5,6 +5,7 @@ import asyncio
 import time
 import argparse
 import numpy as np
+from pathlib import Path
 
 from lsst.ts import salobj
 import SALPY_MTAOS
@@ -29,6 +30,8 @@ def main(phosimDir, numPro, iterNum, baseOutputDir):
     # Make the ISR directory, need to check the directory authority issue here
     # if the docker image is used and the container has the mount volumn with
     # the outside.
+    # I put this with 'export ISRDIRPATH=/home/lsst/output/input' in the
+    # container for the server and controller sides
     _makeDir(getIsrDirPath())
 
     # Test star magnitude
@@ -47,7 +50,7 @@ def main(phosimDir, numPro, iterNum, baseOutputDir):
 
     # Ingest the calibration products
     data = mtaos.cmd_processCalibrationProducts.DataType()
-    data.directoryPath = fakeFlatDir
+    data.directoryPath = fakeFlatDir.as_posix()
     asyncio.get_event_loop().run_until_complete(
         mtaos.cmd_processCalibrationProducts.start(data, timeout=60.0))
 
@@ -64,7 +67,7 @@ def main(phosimDir, numPro, iterNum, baseOutputDir):
     iterDefaultDirName = "iter"
     dofInUmFileName = "dofPertInNextIter.mat"
     skyInfoFileName = "skyComCamInfo.txt"
-    userGain = 0.6
+    userGain = 0.4
     for iterCount in range(iterNum):
 
         # Set the observation Id
@@ -176,7 +179,7 @@ def _getComCamSensorNameList():
 def _makeCalibs(outputDir, sensorNameList):
 
     fakeFlatDirName = "fake_flats"
-    fakeFlatDir = os.path.join(outputDir, fakeFlatDirName)
+    fakeFlatDir = Path(outputDir).joinpath(fakeFlatDirName)
     _makeDir(fakeFlatDir)
 
     detector = " ".join(sensorNameList)
@@ -187,8 +190,7 @@ def _makeCalibs(outputDir, sensorNameList):
 
 def _makeDir(directory):
 
-    if (not os.path.exists(directory)):
-        os.makedirs(directory)
+    Path(directory).mkdir(parents=True, exist_ok=True)
 
 
 def _genFakeFlat(fakeFlatDir, detector):
@@ -292,6 +294,6 @@ if __name__ == "__main__":
         outputDir = getAoclcOutputPath()
     else:
         outputDir = args.output
-    os.makedirs(outputDir, exist_ok=True)
+    _makeDir(outputDir)
 
     main(phosimDir, args.numOfProc, args.iterNum, outputDir)

@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
+from pathlib import Path
 import shutil
 import unittest
 import numpy as np
@@ -41,14 +42,13 @@ class TestMTAOS(unittest.TestCase):
 
     def _makeDir(self, directory):
 
-        if (not os.path.exists(directory)):
-            os.makedirs(directory)
+        Path(directory).mkdir(parents=True, exist_ok=True)
 
     @classmethod
     def setUpClass(cls):
 
-        cls.dataDir = os.path.join(getModulePath(), "tests", "tmp")
-        cls.isrDir = os.path.join(cls.dataDir, "input")
+        cls.dataDir = getModulePath().joinpath("tests", "tmp")
+        cls.isrDir = cls.dataDir.joinpath("input").as_posix()
 
         # Let the MTAOS to set WEP based on this path variable
         os.environ["ISRDIRPATH"] = cls.isrDir
@@ -99,9 +99,9 @@ class TestMTAOS(unittest.TestCase):
 
         defaultSkyFilePath = self.mtaos.getDefaultSkyFile()
 
-        ansSkyFilePath = os.path.join(getModulePath(), "tests", "testData",
-                                      "phosimOutput", "realComCam",
-                                      "skyComCamInfo.txt")
+        ansSkyFilePath = getModulePath().joinpath(
+            "tests", "testData", "phosimOutput", "realComCam",
+            "skyComCamInfo.txt")
         self.assertEqual(defaultSkyFilePath, ansSkyFilePath)
 
     def testRunWepAndOfc(self):
@@ -112,10 +112,10 @@ class TestMTAOS(unittest.TestCase):
         intraVisit = 9006002
         extraVisit = 9006001
 
-        rawImgDir = os.path.join(getModulePath(), "tests", "testData",
-                                 "phosimOutput", "realComCam")
-        intraRawDir = os.path.join(rawImgDir, "intra")
-        extraRawDir = os.path.join(rawImgDir, "extra")
+        rawImgDir = getModulePath().joinpath(
+            "tests", "testData", "phosimOutput", "realComCam")
+        intraRawDir = rawImgDir.joinpath("intra").as_posix()
+        extraRawDir = rawImgDir.joinpath("extra").as_posix()
         intraExposureData, extraExposureData = self.mtaos._collectRawExpData(
             intraVisit, intraRawDir, secondaryVisit=extraVisit,
             secondaryDirectory=extraRawDir)
@@ -151,7 +151,7 @@ class TestMTAOS(unittest.TestCase):
     def _ingestCalibs(self):
 
         # Make fake gain images
-        fakeFlatDir = os.path.join(self.dataDir, "fake_flats")
+        fakeFlatDir = self.dataDir.joinpath("fake_flats")
         self._makeDir(fakeFlatDir)
 
         sensorNameList = self._getComCamSensorNameList()
