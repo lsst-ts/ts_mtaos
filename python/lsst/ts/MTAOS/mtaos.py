@@ -461,7 +461,8 @@ class MTAOS(salobj.BaseCsc):
     def runWEP(self, timestamp, fieldRA, fieldDEC, fieldFilter,
                cameraRotation, primaryVisit, primaryDirectory,
                secondaryVisit=None, secondaryDirectory=None):
-        """
+        """Run the wavefront estimation pipeline (WEP) to estimate the
+        wavefront error.
 
         Parameters
         ----------
@@ -651,7 +652,8 @@ class MTAOS(salobj.BaseCsc):
 
     def runOFC(self, timestamp, fieldFilter, cameraRotation, userGain,
                listOfFWHMSensorData):
-        """
+        """Run the optical feedback control (OFC) to estimate the hexapod
+        position and mirror bending mode.
 
         Parameters
         ----------

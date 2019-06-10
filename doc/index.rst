@@ -6,12 +6,15 @@
 lsst.ts.MTAOS
 ########################
 
-ts_MTAOS contains the `MTAOSCsc` and suport code.
+Main telescope active optics system (MTAOS) is responsible for making the closed-loop optical system. It is a control system with the data distribution service (DDS) communication. The backbone of control system is ts_salobj, which is a high-level class to use the service abstraction layer (SAL).
 
 .. _lsst.ts.MTAOS-using:
 
 Using lsst.ts.MTAOS
 ==============================
+
+.. toctree::
+   :maxdepth: 1
 
 ts_MTAOS requires the following SALPY libraries:
 
@@ -20,24 +23,9 @@ ts_MTAOS requires the following SALPY libraries:
 * SALPY_MTM2MS
 * SALPY_Hexapod
 
-You can setup and build this package using eups and sconsUtils.
-After setting up the package you can build it and run unit tests by typing ``scons``.
-Building it merely copies ``bin.src/runMTAOS.py`` into ``bin/`` after tweaking the ``#!`` line.
+Important class:
 
-To run the `MTAOS` CSC type ``runMTAOS.py``
-
-.. _lsst.ts.MTAOS-contributing:
-
-Contributing
-============
-
-``lsst.ts.MTAOS`` is developed at https://github.com/lsst-ts/ts_MTAOS.
-You can find Jira issues for this module under the `ts_MTAOS <https://jira.lsstcorp.org/issues/?jql=project%20%3D%20DM%20AND%20component%20%3D%20ts_MTAOS>`_ component.
-
-.. If there are topics related to developing this module (rather than using it), link to this from a toctree placed here.
-
-.. .. toctree::
-..    :maxdepth: 1
+* `MTAOS` is a commandable SAL component (CSC) class inherits from the BaseCsc in ts_salobj. This class integrates with the wavefront estimation pipeline (WEP) and optical feedback control (OFC) to do the wavefront analysis and correct the hexapod position and mirror bending mode.
 
 .. _lsst.ts.MTAOS-pyapi:
 
@@ -45,5 +33,29 @@ Python API reference
 ====================
 
 .. automodapi:: lsst.ts.MTAOS
-   :no-main-docstr:
-   :no-inheritance-diagram:
+    :no-inheritance-diagram:
+
+.. _lsst.ts.MTAOS-content:
+
+Content
+====================
+
+.. toctree::
+
+   content
+
+.. _lsst.ts.MTAOS-contributing:
+
+Contributing
+============
+
+``lsst.ts.MTAOS`` is developed at https://github.com/lsst-ts/ts_MTAOS.
+
+.. _lsst.ts.MTAOS-version:
+
+Version
+====================
+
+.. toctree::
+
+   versionHistory
