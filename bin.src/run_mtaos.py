@@ -1,4 +1,4 @@
 #!/usr/bin/env python
-from lsst.ts import MTAOS
+from lsst.ts.MTAOS import MTAOS
 
-MTAOS.MTAOS.main(index=None)
+MTAOS.main(None, run_loop=True)

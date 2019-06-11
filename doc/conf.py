@@ -11,3 +11,9 @@ _g = globals()
 _g.update(build_package_configs(
     project_name='ts_MTAOS',
     version=lsst.ts.MTAOS.version.__version__))
+
+# Support the sphinx extension of plantuml
+extensions.append('sphinxcontrib.plantuml')
+
+# Put the path to plantuml.jar
+plantuml = 'java -jar /home/lsst/plantuml.jar'
