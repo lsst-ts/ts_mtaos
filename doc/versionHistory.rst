@@ -6,6 +6,14 @@
 Version History
 ##################
 
+.. _lsst.ts.MTAOS-0.3.1:
+
+-------------
+0.3.1
+-------------
+
+Workaround the Jenkins permission in Jenkinsfile.
+
 .. _lsst.ts.MTAOS-0.3.0:
 
 -------------
