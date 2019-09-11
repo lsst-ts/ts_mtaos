@@ -5,7 +5,6 @@ pipeline {
     agent {
         // Use the docker to assign the Python version.
         // Use the label to assign the node to run the test.
-        // The nodes in T&S teams is 'jenkins-el7-1'.
         // It is recommended by SQUARE team do not add the label.
         docker {
             image 'lsstts/mtaos_dev:v0.3'
@@ -73,9 +72,19 @@ pipeline {
                 }
             }
         }
+
+        stage('Change Ownership to Jenkins') {
+            steps {
+                // Change the ownership of workspace to Jenkins for the clean up
+                // This is a "work around" method
+                withEnv(["HOME=${env.WORKSPACE}"]) {
+                    sh 'chown -R 1003:1003 ${HOME}/'
+                }
+            }
+        }
     }
 
-    post {        
+    post {
         always {
             // The path of xml needed by JUnit is relative to
             // the workspace.
@@ -95,6 +104,6 @@ pipeline {
         cleanup {
             // clean up the workspace
             deleteDir()
-        }  
+        }
     }
 }
