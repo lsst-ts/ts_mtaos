@@ -13,9 +13,6 @@ instrument: comcam
 # Number of annularZernike polynomial
 annularZernikePolyCount: 19
 
-# Number of degree of freedom (DOF)
-numOfDof: 50
-
 # Default instrument signature removal (ISR) directory
 # This setting will be override by the 'ISRDIRPATH' path variable.
 defaultIsrDir: /home/lsst/input

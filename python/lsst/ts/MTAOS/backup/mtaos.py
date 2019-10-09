@@ -28,10 +28,10 @@ import time
 import traceback
 
 from lsst.ts import salobj
-import SALPY_Hexapod
-import SALPY_MTAOS
-import SALPY_MTM1M3
-import SALPY_MTM2
+# import SALPY_Hexapod
+# import SALPY_MTAOS
+# import SALPY_MTM1M3
+# import SALPY_MTM2
 
 from lsst.ts.wep.Utility import FilterType
 from lsst.ts.wep.ParamReader import ParamReader
