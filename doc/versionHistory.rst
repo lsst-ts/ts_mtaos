@@ -6,6 +6,14 @@
 Version History
 ##################
 
+.. _lsst.ts.MTAOS-0.3.2:
+
+-------------
+0.3.2
+-------------
+
+Add the model class and related test cases.
+
 .. _lsst.ts.MTAOS-0.3.1:
 
 -------------

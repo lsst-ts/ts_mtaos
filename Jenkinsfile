@@ -72,20 +72,15 @@ pipeline {
                 }
             }
         }
-
-        stage('Change Ownership to Jenkins') {
-            steps {
-                // Change the ownership of workspace to Jenkins for the clean up
-                // This is a "work around" method
-                withEnv(["HOME=${env.WORKSPACE}"]) {
-                    sh 'chown -R 1003:1003 ${HOME}/'
-                }
-            }
-        }
     }
 
     post {
         always {
+            // Change the ownership of workspace to Jenkins for the clean up
+            // This is a "work around" method
+            withEnv(["HOME=${env.WORKSPACE}"]) {
+                sh 'chown -R 1003:1003 ${HOME}/'
+            }
             // The path of xml needed by JUnit is relative to
             // the workspace.
             junit "${env.XML_REPORT}"
@@ -98,7 +93,7 @@ pipeline {
                 reportDir: 'htmlcov',
                 reportFiles: 'index.html',
                 reportName: "Coverage Report"
-              ])
+            ])
         }
 
         cleanup {
