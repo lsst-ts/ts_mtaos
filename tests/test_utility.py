@@ -27,7 +27,7 @@ from lsst.ts.wep.Utility import CamType
 from lsst.ts.ofc.Utility import InstName
 
 from lsst.ts.MTAOS.Utility import getModulePath, getConfigDir, getIsrDirPath, \
-    getCamType, getInstName
+    getCamType, getInstName, getSchemaDir, getCscName
 
 
 class TestUtility(unittest.TestCase):
@@ -37,6 +37,11 @@ class TestUtility(unittest.TestCase):
 
         ansConfigDir = getModulePath().joinpath("policy")
         self.assertEqual(getConfigDir(), ansConfigDir)
+
+    def testGetSchemaDir(self):
+
+        ansSchemaDir = getModulePath().joinpath("schema")
+        self.assertEqual(getSchemaDir(), ansSchemaDir)
 
     def testGetIsrDirPathNotAssigned(self):
 
@@ -69,6 +74,11 @@ class TestUtility(unittest.TestCase):
         self.assertEqual(getInstName("cmos"), InstName.CMOS)
 
         self.assertRaises(ValueError, getInstName, "wrongName")
+
+    def testGetCscName(self):
+
+        cscName = getCscName()
+        self.assertEqual(cscName, "MTAOS")
 
 
 if __name__ == "__main__":

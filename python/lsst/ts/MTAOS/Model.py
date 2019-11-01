@@ -19,11 +19,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from pathlib import Path
-import warnings
 import numpy as np
 
-from lsst.ts.wep.ParamReader import ParamReader
 from lsst.ts.ofc.ctrlIntf.M2HexapodCorrection import M2HexapodCorrection
 from lsst.ts.ofc.ctrlIntf.CameraHexapodCorrection import CameraHexapodCorrection
 from lsst.ts.ofc.ctrlIntf.M1M3Correction import M1M3Correction
@@ -34,39 +31,45 @@ from lsst.ts.ofc.ctrlIntf.FWHMSensorData import FWHMSensorData
 from lsst.ts.wep.ctrlIntf.RawExpData import RawExpData
 from lsst.ts.wep.Utility import FilterType
 
-from lsst.ts.MTAOS.Utility import getModulePath, getIsrDirPath, getCamType, \
-    getInstName
+from lsst.ts.MTAOS.CalcTime import CalcTime
 
 
 class Model(object):
 
-    def __init__(self, settingFilePath):
-        """Initialize the model class of MTAOS.
-
-        MTAOS: Main telescope active optics system.
+    def __init__(self, config):
+        """Initialize the model class.
 
         Parameters
         ----------
-        settingFilePath : pathlib.PosixPath or str
-            Configuration setting file.
+        config : ConfigByFile or ConfigByObj
+            Configuration.
         """
 
-        # Configuration setting file
-        self.settingFile = ParamReader(filePath=settingFilePath)
+        # Configuration
+        self._config = config
 
         # List of wavefront error
         self.listOfWfErr = []
 
+        # List of rejected wavefront error
+        self.listOfWfErrRej = []
+
         # List of FWHM (full width at half maximum) sensor data
         self.listOfFWHMSensorData = []
 
+        # Calculation time of WEP
+        self.calcTimeWep = CalcTime()
+
+        # Calculation time of OFC
+        self.calcTimeOfc = CalcTime()
+
         # Wavefront estimation pipeline
-        camType = self._getCamType()
-        isrDir = self._getIsrDir()
+        camType = self._config.getCamTypeInConfig()
+        isrDir = self._config.getIsrDir()
         self.wep = WEPCalculationFactory.getCalculator(camType, isrDir)
 
         # Optical feedback control
-        instName = self._getInstName()
+        instName = self._config.getInstNameInConfig()
         self.ofc = OFCCalculationFactory.getCalculator(instName)
 
         # M2 hexapod correction
@@ -85,64 +88,16 @@ class Model(object):
         self.m2Correction = M2Correction(np.zeros(
             M2Correction.NUM_OF_ACT))
 
-    def getSettingFilePath(self):
-        """Get the setting file path.
+    def getConfig(self):
+        """Get the configuration.
 
         Returns
         -------
-        pathlib.PosixPath
-            Setting file path.
+        ConfigByFile or ConfigByObj
+            Configuration.
         """
 
-        return Path(self.settingFile.getFilePath())
-
-    def _getCamType(self):
-        """Get the enum of camera type.
-
-        Returns
-        -------
-        enum 'CamType' in lsst.ts.wep.Utility
-            Camera type.
-        """
-
-        camera = self.settingFile.getSetting("camera")
-
-        return getCamType(camera)
-
-    def _getIsrDir(self):
-        """Get the ISR directory.
-
-        ISR: Instrument signature removal.
-        This directory will have the input and output that the data butler
-        needs.
-
-        Returns
-        -------
-        str
-            ISR directory.
-        """
-
-        isrDir = getIsrDirPath()
-        if (isrDir is None):
-            isrDir = self.settingFile.getSetting("defaultIsrDir")
-            warnings.warn("No 'ISRDIRPATH' assigned. Use %s instead." % isrDir,
-                          category=UserWarning)
-            return isrDir
-        else:
-            return isrDir.as_posix()
-
-    def _getInstName(self):
-        """Get the enum of instrument name.
-
-        Returns
-        -------
-        enum 'InstName' in lsst.ts.ofc.Utility
-            Instrument name.
-        """
-
-        instName = self.settingFile.getSetting("instrument")
-
-        return getInstName(instName)
+        return self._config
 
     def getListOfWavefrontError(self):
         """Get the list of wavefront error.
@@ -154,6 +109,17 @@ class Model(object):
         """
 
         return self.listOfWfErr
+
+    def getListOfWavefrontErrorRej(self):
+        """Get the list of rejected wavefront error.
+
+        Returns
+        -------
+        list[lsst.ts.wep.ctrlIntf.SensorWavefrontData]
+            List of rejected wavefront error data.
+        """
+
+        return self.listOfWfErrRej
 
     def getListOfFWHMSensorData(self):
         """Get the list of FWHM sensor data.
@@ -246,6 +212,20 @@ class Model(object):
 
         return self.ofc.getStateCorrectionFromLastVisit()
 
+    def rejCorrection(self):
+        """Reject the correction of subsystems."""
+
+        ztaac = self.ofc.ztaac
+
+        dataShare = ztaac.dataShare
+        dofIdx = dataShare.getDofIdx()
+
+        dofVisit = self.getDofVisit()
+
+        ztaac.aggState(-dofVisit[dofIdx])
+
+        self.ofc._initDofFromLastVisit()
+
     def resetWavefrontCorrection(self):
         """Reset the current calculation contains the wavefront error and
         subsystem corrections to be empty.
@@ -254,6 +234,8 @@ class Model(object):
         """
 
         self.listOfWfErr = []
+        self.listOfWfErrRej = []
+
         self.m2HexapodCorrection, self.cameraHexapodCorrection, self.m1m3Correction, self.m2Correction = \
             self.ofc.resetOfcState()
 
@@ -365,23 +347,15 @@ class Model(object):
         extraRawExpData = self._collectRawExpData(secVisit, secDir)
 
         filterType = FilterType(aFilter)
-        listOfWfErr = self._calcWavefrontError(
-            raInDeg, decInDeg, filterType, rotAngInDeg, intraRawExpData,
-            extraRawExpData=extraRawExpData)
 
-        # Need to add a step of checking the calculated wavefront error
-        # in the future
-        self.listOfWfErr = listOfWfErr
+        # Do WEP and record time
+        self.calcTimeWep.evalCalcTimeAndPutRecord(
+            self._calcWavefrontError, raInDeg, decInDeg, filterType, rotAngInDeg,
+            intraRawExpData, extraRawExpData)
 
-        m2HexapodCorrection, cameraHexapodCorrection, m1m3Correction, m2Correction = \
-            self._calcCorrection(filterType, rotAngInDeg, userGain)
-
-        # Need to add a step of checking the calculated correction
-        # in the future
-        self.m2HexapodCorrection = m2HexapodCorrection
-        self.cameraHexapodCorrection = cameraHexapodCorrection
-        self.m1m3Correction = m1m3Correction
-        self.m2Correction = m2Correction
+        # Do OFC and record time
+        self.calcTimeOfc.evalCalcTimeAndPutRecord(
+            self._calcCorrection, filterType, rotAngInDeg, userGain)
 
     def _collectRawExpData(self, visit, imgDir):
         """Collect the raw exposure data.
@@ -428,11 +402,6 @@ class Model(object):
         extraRawExpData : lsst.ts.wep.ctrlIntf.RawExpData, optional
             This is the extra-focal raw exposure data if not None. (the default
             is None.)
-
-        Returns
-        -------
-        list[lsst.ts.wep.ctrlIntf.SensorWavefrontData]
-            List of SensorWavefrontData object.
         """
 
         # Set the default sky file for the test
@@ -446,7 +415,7 @@ class Model(object):
         listOfWfErr = self.wep.calculateWavefrontErrors(
             rawExpData, extraRawExpData=extraRawExpData)
 
-        return listOfWfErr
+        self._rejWavefrontErrorUnreasonable(listOfWfErr)
 
     def _setSkyFile(self):
         """Set the sky file for the test.
@@ -454,27 +423,23 @@ class Model(object):
         This function will be removed in the final.
         """
 
-        skyFile = self._getDefaultSkyFile()
+        skyFile = self._config.getDefaultSkyFileInConfig()
         if (skyFile is not None):
             self.wep.setSkyFile(skyFile.as_posix())
 
-    def _getDefaultSkyFile(self):
-        """Get the default sky file path.
+    def _rejWavefrontErrorUnreasonable(self, listOfWfErr):
+        """Reject the wavefront error that is unreasonable.
 
-        This is for the test only.
-
-        Returns
-        -------
-        pathlib.PosixPath or None
-            Get the default sky file path. Return None if there is no such
-            setting.
+        Parameters
+        ----------
+        listOfWfErr : list[lsst.ts.wep.ctrlIntf.SensorWavefrontData]
+            List of wavefront error data.
         """
 
-        try:
-            relativePath = self.settingFile.getSetting("defaultSkyFilePath")
-            return getModulePath().joinpath(relativePath)
-        except KeyError:
-            return None
+        # Need to have the algorithm to analyze the wavefront error is
+        # reasonable or not.
+        self.listOfWfErr = listOfWfErr
+        self.listOfWfErrRej = []
 
     def _calcCorrection(self, filterType, rotAngInDeg, userGain):
         """Calculate the correction of subsystems.
@@ -488,17 +453,6 @@ class Model(object):
         userGain : float
             The gain requested by the user. A value of -1 means don't use user
             gain.
-
-        Returns
-        -------
-        lsst.ts.ofc.ctrlIntf.M2HexapodCorrection
-            The position offset for the MT M2 hexapod.
-        lsst.ts.ofc.ctrlIntf.CameraHexapodCorrection
-            The position offset for the MT camera hexapod.
-        lsst.ts.ofc.ctrlIntf.M1M3Correction
-            The figure offset for the MT M1M3.
-        lsst.ts.ofc.ctrlIntf.M2Correction
-            The figure offset for the MT M2.
 
         Raises
         ------
@@ -517,7 +471,41 @@ class Model(object):
         else:
             self.ofc.setGainByUser(userGain)
 
-        return self.ofc.calculateCorrections(self.listOfWfErr)
+        m2HexapodCorrection, cameraHexapodCorrection, m1m3Correction, m2Correction = \
+            self.ofc.calculateCorrections(self.listOfWfErr)
+
+        # Need to add a step of checking the calculated correction
+        # in the future
+        self.m2HexapodCorrection = m2HexapodCorrection
+        self.cameraHexapodCorrection = cameraHexapodCorrection
+        self.m1m3Correction = m1m3Correction
+        self.m2Correction = m2Correction
+
+    def getAvgCalcTimeWep(self):
+        """Get the average of calculation time of WEP.
+
+        WEP: Wavefront estimation pipeline.
+
+        Returns
+        -------
+        float
+            Average of calculation time in second.
+        """
+
+        return self.calcTimeWep.getAvgTime()
+
+    def getAvgCalcTimeOfc(self):
+        """Get the average of calculation time of OFC.
+
+        OFC: Optical feedback control.
+
+        Returns
+        -------
+        float
+            Average of calculation time in second.
+        """
+
+        return self.calcTimeOfc.getAvgTime()
 
 
 if __name__ == "__main__":
