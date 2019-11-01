@@ -6,6 +6,14 @@
 Version History
 ##################
 
+.. _lsst.ts.MTAOS-0.3.3:
+
+-------------
+0.3.3
+-------------
+
+Support the configurable CSC and simulation mode.
+
 .. _lsst.ts.MTAOS-0.3.2:
 
 -------------

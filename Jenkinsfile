@@ -67,7 +67,7 @@ pipeline {
                         source ${SAL_REPOS}/ts_sal/setup.env
                         cd ${HOME}
                         setup -k -r .
-                        pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT} tests/
+                        pytest --ignore=tests/test_mtaosCsc.py --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT} tests/
                     """
                 }
             }

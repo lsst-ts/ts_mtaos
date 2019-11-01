@@ -1,4 +1,9 @@
 @startuml
-class OFCWarning
-MTAOS ..> WEPWarning
+ConfigDefault <|-- ConfigByFile
+ConfigDefault <|-- ConfigByObj
+Model <|-- ModelSim
+Model *-- ConfigDefault
+Model "1" *-- "2" CalcTime
+MtaosCsc *-- Model
+MtaosCsc ..> ConfigByObj
 @enduml
