@@ -20,11 +20,23 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
+from enum import Enum, auto
 from pathlib import Path
 from lsst.utils import getPackageDir
 
 from lsst.ts.wep.Utility import CamType
 from lsst.ts.ofc.Utility import InstName
+
+
+class WEPWarning(Enum):
+    NoWarning = 0
+    InvalidSensorId = auto()
+    InvalidAnnularZernikePoly = auto()
+
+
+class OFCWarning(Enum):
+    NoWarning = 0
+    NoEnoughAnnularZernikePoly = auto()
 
 
 def getModulePath():
@@ -49,6 +61,18 @@ def getConfigDir():
     """
 
     return getModulePath().joinpath("policy")
+
+
+def getSchemaDir():
+    """Get the directory of schema files.
+
+    Returns
+    -------
+    pathlib.PosixPath
+        Directory of schema files.
+    """
+
+    return getModulePath().joinpath("schema")
 
 
 def getIsrDirPath(isrDirPathVar="ISRDIRPATH"):
@@ -129,6 +153,16 @@ def getInstName(instName):
         return InstName.CMOS
     else:
         raise ValueError("This instrument (%s) is not supported." % instName)
+
+
+def getCscName():
+    """Get the CSC name.
+
+    CSC: Configurable SAL component.
+    SAL: Service abstraction layer.
+    """
+
+    return "MTAOS"
 
 
 if __name__ == "__main__":

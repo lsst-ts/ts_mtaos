@@ -1,0 +1,20 @@
+---
+
+# Default setting
+
+# Type of camera for wavefront estimation pipeline (WEP) to use
+# (lsstCam, lsstFamCam, comcam)
+camera: comcam
+
+# Type of instrument for optical feedback control (OFC) to use
+# (lsst, comcam, sh, cmos)
+instrument: comcam
+
+# Default instrument signature removal (ISR) directory
+# This setting will be override by the 'ISRDIRPATH' path variable.
+defaultIsrDir: /home/lsst/input
+
+# Default sky file path relative to the root of ts_MTAOS module
+# This is for the test only
+# Comment this if use the bright star catalog instead
+defaultSkyFilePath: tests/testData/phosimOutput/realComCam/skyComCamInfo.txt
