@@ -33,7 +33,7 @@ from lsst.ts.MTAOS.ModelSim import ModelSim
 from lsst.ts.MTAOS.Utility import getModulePath, getCscName
 
 # standard command timeout (sec)
-STD_TIMEOUT = 10
+STD_TIMEOUT = 60
 
 
 class Harness(object):
@@ -157,8 +157,11 @@ class TestMtaosCsc(asynctest.TestCase):
 
             with self.assertRaises(salobj.AckTimeoutError):
                 with self.assertWarns(UserWarning):
+                    # timeout value here can not be longer than the default
+                    # value in the Model. Otherwise, the salobj.AckTimeoutError
+                    # will not be raised.
                     await harness.remote.cmd_issueWavefrontCorrection.set_start(
-                        timeout=STD_TIMEOUT, value=True)
+                        timeout=10.0, value=True)
 
             dof = await harness.remote.evt_rejectedDegreeOfFreedom.next(
                 flush=False, timeout=STD_TIMEOUT)
@@ -189,9 +192,9 @@ class TestMtaosCsc(asynctest.TestCase):
         async with Harness() as harness:
 
             await self._startCsc(harness)
-            # Set the timeout to be 20 seconds for the long calculation time
+            # Set the timeout > 20 seconds for the long calculation time
             await harness.remote.cmd_processIntraExtraWavefrontError.set_start(
-                timeout=20, intraVisit=0, extraVisit=1,
+                timeout=2*STD_TIMEOUT, intraVisit=0, extraVisit=1,
                 intraDirectoryPath="intraDir", extraDirectoryPath="extraDir",
                 fieldRA=0.0, fieldDEC=0.0, filter=7, cameraRotation=0.0,
                 userGain=1)
