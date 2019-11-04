@@ -10,14 +10,11 @@ camera: comcam
 # (lsst, comcam, sh, cmos)
 instrument: comcam
 
-# Number of annularZernike polynomial
-annularZernikePolyCount: 19
-
 # Default instrument signature removal (ISR) directory
 # This setting will be override by the 'ISRDIRPATH' path variable.
 defaultIsrDir: /home/lsst/input
 
-# Default sky file path relative to the root of module
+# Default sky file path relative to the root of ts_MTAOS module
 # This is for the test only
 # Comment this if use the bright star catalog instead
 defaultSkyFilePath: tests/testData/phosimOutput/realComCam/skyComCamInfo.txt

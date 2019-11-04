@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # This file is part of ts_MTAOS.
 #
 # Developed for the LSST Telescope and Site Systems.
@@ -21,8 +19,41 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio
+from lsst.ts.MTAOS.ConfigDefault import ConfigDefault
 
-from lsst.ts.MTAOS.MtaosCsc import MtaosCsc
 
-asyncio.run(MtaosCsc.amain(0))
+class ConfigByObj(ConfigDefault):
+
+    def __init__(self, config):
+        """Initialize the configuration by object class.
+
+        Parameters
+        ----------
+        config : object
+            Configuration object.
+        """
+
+        self.configObj = config
+
+    def _getCamType(self):
+
+        return self.configObj.camera
+
+    def _getInstName(self):
+
+        return self.configObj.instrument
+
+    def _getIsrDir(self):
+
+        return self.configObj.defaultIsrDir
+
+    def _getDefaultSkyFile(self):
+
+        try:
+            return self.configObj.defaultSkyFilePath
+        except AttributeError:
+            return None
+
+
+if __name__ == "__main__":
+    pass

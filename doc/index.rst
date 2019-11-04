@@ -6,7 +6,7 @@
 lsst.ts.MTAOS
 ########################
 
-Main telescope active optics system (MTAOS) is responsible for making the closed-loop optical system. It is a control system with the data distribution service (DDS) communication. The backbone of control system is ts_salobj, which is a high-level class to use the service abstraction layer (SAL).
+Main telescope active optical system (MTAOS) is responsible for making the closed-loop optical system. It is a control system with the data distribution service (DDS) communication. The backbone of control system is ts_salobj, which is a high-level module to provide the state machine and use DDS.
 
 .. _lsst.ts.MTAOS-using:
 
@@ -16,16 +16,9 @@ Using lsst.ts.MTAOS
 .. toctree::
    :maxdepth: 1
 
-ts_MTAOS requires the following SALPY libraries:
-
-* SALPY_MTAOS
-* SALPY_MTM1M3
-* SALPY_MTM2MS
-* SALPY_Hexapod
-
 Important class:
 
-* `MTAOS` is a commandable SAL component (CSC) class inherits from the BaseCsc in ts_salobj. This class integrates with the wavefront estimation pipeline (WEP) and optical feedback control (OFC) to do the wavefront analysis and correct the hexapod position and mirror bending mode.
+* `MtaosCsc` is a commandable SAL component (CSC) class inherits from the ConfigurableCsc in ts_salobj. This class integrates with the wavefront estimation pipeline (WEP) and optical feedback control (OFC) to do the wavefront analysis and correct the hexapod position and mirror bending mode.
 
 .. _lsst.ts.MTAOS-pyapi:
 

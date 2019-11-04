@@ -16,4 +16,4 @@ _g.update(build_package_configs(
 extensions.append('sphinxcontrib.plantuml')
 
 # Put the path to plantuml.jar
-plantuml = 'java -jar /home/lsst/plantuml.jar'
+plantuml = 'java -jar /home/saluser/plantuml.jar'

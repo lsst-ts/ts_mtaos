@@ -33,6 +33,7 @@ from lsst.ts.ofc.ctrlIntf.M2Correction import M2Correction
 
 from lsst.ts.MTAOS.Utility import getModulePath
 from lsst.ts.MTAOS.Model import Model
+from lsst.ts.MTAOS.ConfigByFile import ConfigByFile
 
 
 class TestModel(unittest.TestCase):
@@ -47,8 +48,10 @@ class TestModel(unittest.TestCase):
         # Let the MTAOS to set WEP based on this path variable
         os.environ["ISRDIRPATH"] = cls.isrDir.as_posix()
 
-        cls.settingFilePath = getModulePath().joinpath("policy", "default.yaml")
-        cls.model = Model(cls.settingFilePath)
+        settingFilePath = getModulePath().joinpath("tests", "testData",
+                                                   "default.yaml")
+        config = ConfigByFile(settingFilePath)
+        cls.model = Model(config)
 
     def setUp(self):
         os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
@@ -80,16 +83,20 @@ class TestModel(unittest.TestCase):
         ofc = self.model.ofc
         self.assertTrue(isinstance(ofc, OFCCalculationOfComCam))
 
-    def testGetSettingFilePath(self):
+    def testGetConfig(self):
 
-        settingFilePath = self.model.getSettingFilePath()
-
-        self.assertEqual(settingFilePath, self.settingFilePath)
+        config = self.model.getConfig()
+        self.assertTrue(isinstance(config, ConfigByFile))
 
     def testGetListOfWavefrontError(self):
 
         listOfWfErr = self.model.getListOfWavefrontError()
         self.assertEqual(listOfWfErr, [])
+
+    def testGetListOfWavefrontErrorRej(self):
+
+        listOfWfErrRej = self.model.getListOfWavefrontErrorRej()
+        self.assertEqual(listOfWfErrRej, [])
 
     def testGetListOfFWHMSensorData(self):
 
@@ -127,28 +134,23 @@ class TestModel(unittest.TestCase):
         listOfFWHMSensorData = self.model.getListOfFWHMSensorData()
         self.assertEqual(listOfFWHMSensorData, [])
 
-    def testGetSettingFilePathStr(self):
-
-        self.modelTemp = Model(self.settingFilePath.as_posix())
-
-        filePathInModel = self.modelTemp.getSettingFilePath()
-        self.assertTrue(isinstance(filePathInModel, Path))
-        self.assertFalse(isinstance(filePathInModel, str))
-
     def testGetDofAggr(self):
 
-        dofAggr = self.model.getDofAggr()
+        dofAggr = self._getDofAggr()
         self.assertEqual(len(dofAggr), 50)
+
+    def _getDofAggr(self):
+
+        return self.model.getDofAggr()
 
     def testGetDofVisit(self):
 
-        dofVisit = self.model.getDofVisit()
+        dofVisit = self._getDofVisit()
         self.assertEqual(len(dofVisit), 50)
 
-    def testGetDefaultSkyFile(self):
+    def _getDofVisit(self):
 
-        filePath = self.model._getDefaultSkyFile()
-        self.assertEqual(filePath.name, "skyComCamInfo.txt")
+        return self.model.getDofVisit()
 
     def testGetM2HexCorr(self):
 
@@ -203,10 +205,10 @@ class TestModel(unittest.TestCase):
 
         self.assertEqual(len(self.model.getListOfWavefrontError()), 9)
 
-        dofAggr = self.model.getDofAggr()
+        dofAggr = self._getDofAggr()
         self.assertNotEqual(np.sum(np.abs(dofAggr)), 0)
 
-        dofVisit = self.model.getDofVisit()
+        dofVisit = self._getDofVisit()
         self.assertNotEqual(np.sum(np.abs(dofVisit)), 0)
 
         xM2, yM2, zM2, uM2, vM2, wM2 = self.model.getM2HexCorr()
@@ -230,6 +232,20 @@ class TestModel(unittest.TestCase):
 
         actCorrM2 = self.model.getM2ActCorr()
         self.assertNotEqual(np.sum(np.abs(actCorrM2)), 0)
+
+        calcTimeWep = self.model.getAvgCalcTimeWep()
+        self.assertGreater(calcTimeWep, 0.0)
+
+        calcTimeOfc = self.model.getAvgCalcTimeOfc()
+        self.assertGreater(calcTimeOfc, 0.0)
+
+        self.model.rejCorrection()
+
+        dofAggr = self._getDofAggr()
+        self.assertEqual(np.sum(np.abs(dofAggr)), 0)
+
+        dofVisit = self._getDofVisit()
+        self.assertEqual(np.sum(np.abs(dofVisit)), 0)
 
     def _ingestCalibs(self):
 

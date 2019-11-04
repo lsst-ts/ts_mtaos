@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # This file is part of ts_MTAOS.
 #
 # Developed for the LSST Telescope and Site Systems.
@@ -21,8 +19,44 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio
 
-from lsst.ts.MTAOS.MtaosCsc import MtaosCsc
+from lsst.ts.wep.ParamReader import ParamReader
 
-asyncio.run(MtaosCsc.amain(0))
+from lsst.ts.MTAOS.ConfigDefault import ConfigDefault
+
+
+class ConfigByFile(ConfigDefault):
+
+    def __init__(self, config):
+        """Initialize the configuration by file class.
+
+        Parameters
+        ----------
+        config : pathlib.PosixPath or str
+            Configuration setting file.
+        """
+
+        self.settingFile = ParamReader(filePath=config)
+
+    def _getCamType(self):
+
+        return self.settingFile.getSetting("camera")
+
+    def _getInstName(self):
+
+        return self.settingFile.getSetting("instrument")
+
+    def _getIsrDir(self):
+
+        return self.settingFile.getSetting("defaultIsrDir")
+
+    def _getDefaultSkyFile(self):
+
+        try:
+            return self.settingFile.getSetting("defaultSkyFilePath")
+        except ValueError:
+            return None
+
+
+if __name__ == "__main__":
+    pass
