@@ -99,6 +99,20 @@ class TestMtaosCsc(asynctest.TestCase):
     async def _startCsc(self, harness):
         await harness.remote.cmd_start.set_start(
             timeout=STD_TIMEOUT, settingsToApply="default")
+        await harness.remote.cmd_enable.set_start(
+            timeout=STD_TIMEOUT)
+
+    async def testCommandsWrongState(self):
+        async with Harness() as harness:
+
+            funcNames = ["resetWavefrontCorrection", "issueWavefrontCorrection",
+                         "processCalibrationProducts",
+                         "processIntraExtraWavefrontError"]
+
+            for funcName in funcNames:
+                cmdObj = getattr(harness.remote, f"cmd_{funcName}")
+                with self.assertRaises(salobj.AckError):
+                    await cmdObj.set_start(timeout=5)
 
     async def testDo_resetWavefrontCorrection(self):
         async with Harness() as harness:

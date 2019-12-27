@@ -38,7 +38,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
     DEFAULT_TIMEOUT = 10.0
 
-    def __init__(self, config_dir=None, debug_level="NOTSET",
+    def __init__(self, config_dir=None, debug_level=None,
                  initial_simulation_mode=0):
         """Initialize the MTAOS CSC class.
 
@@ -52,9 +52,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             Directory of configuration files, or None for the standard
             configuration directory (obtained from get_default_config_dir()).
             This is provided for unit testing. (the default is None.)
-        debug_level : str
+        debug_level : str or None
             Debug level ("NOTSET", "DEBUG", "INFO", "WARNING", "ERROR",
-            "CRITICAL"). (the default is "NOTSET".)
+            "CRITICAL"). (the default is None.)
         initial_simulation_mode : int, optional
             Initial simulation mode. This is provided for unit testing, as real
             CSCs should start up not simulating, the default. Use 0 for the
@@ -70,7 +70,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         # Information log
         self.infoLog = InfoLog(log=self.log)
-        if (debug_level != "NOTSET"):
+        if (debug_level is not None):
             self.infoLog.setLogFile(cscName, fileDir=getLogDir())
             self.infoLog.setLevel(debug_level)
 
@@ -106,6 +106,12 @@ class MtaosCsc(salobj.ConfigurableCsc):
             self.model = ModelSim(configByObj)
             self.infoLog.info("Configurate MTAOS CSC in the simuation mode.")
 
+    def _logExecFunc(self):
+        """Log the executed function."""
+
+        funcName = inspect.stack()[1].function
+        self.infoLog.info(f"Execute {funcName}().")
+
     def _isNormalMode(self):
         """Is the normal operation mode or not.
 
@@ -115,6 +121,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
             True if normal operation. False if simulation.
         """
 
+        # Simulation_mode comes from the upstream property function of BaseCsc.
         if (self.simulation_mode == 0):
             return True
         else:
@@ -124,12 +131,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
     def get_config_pkg():
 
         return "ts_config_mttcs"
-
-    def _logExecFunc(self):
-        """Log the executed function."""
-
-        funcName = inspect.stack()[1].function
-        self.infoLog.info(f"Execute {funcName}().")
 
     async def start(self):
 
@@ -180,6 +181,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         """
 
         self._logExecFunc()
+        self._checkEnabledState()
 
         try:
             timestamp = self._getTimestamp()
@@ -194,6 +196,16 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         except Exception as e:
             self.infoLog.exception(e)
+
+    def _checkEnabledState(self):
+        """Check the system is in the Enabled state."""
+
+        action = inspect.stack()[1].function
+        try:
+            super().assert_enabled(action)
+        except Exception as e:
+            self.infoLog.exception(e)
+            raise
 
     def _getTimestamp(self):
         """Get the timestamp.
@@ -217,6 +229,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         """
 
         self._logExecFunc()
+        self._checkEnabledState()
 
         timestamp = self._getTimestamp()
         sync = True
@@ -353,6 +366,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         """
 
         self._logExecFunc()
+        self._checkEnabledState()
 
         try:
             calibsDir = data.directoryPath
@@ -409,6 +423,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         """
 
         self._logExecFunc()
+        self._checkEnabledState()
 
         try:
             timestamp = self._getTimestamp()
@@ -782,11 +797,11 @@ class MtaosCsc(salobj.ConfigurableCsc):
         super(MtaosCsc, cls).add_arguments(parser)
         parser.add_argument("-s", "--simulate", action="store_true",
                             help="Run in simuation mode?")
-        parser.add_argument("-d", "--debugLevel", type=str, default="WARNING",
+        parser.add_argument("-d", "--debugLevel", type=str,
                             help="""
                             Debug level ('DEBUG', 'INFO', 'WARNING', 'ERROR',
-                            'CRITICAL'). Default is 'WARNING'. The log files
-                            will be in logs directory.
+                            'CRITICAL'). The log files will be in logs
+                            directory.
                             """)
 
     @classmethod
