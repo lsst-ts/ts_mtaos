@@ -24,3 +24,4 @@ MTAOS
 * **CanfigByObj**: Configuration by object class as a child class of ConfigDefault class. Get the configuration details from the object provided by ts_salobj. This is for the production environment.
 * **Model**: Model class that contains the wavefront estimation pipeline (WEP) and optical feedback control (OFC).
 * **ModelSim**: Simulation model class inherits from the Model class to support the simulation mode needed in the MtaosCsc class.
+* **InfoLog**: Information log class that records the messages.

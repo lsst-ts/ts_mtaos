@@ -57,7 +57,7 @@ export ISRDIRPATH=$path_to_isr_directory
 
 ## 6. Command Line Task
 
-- **run_mtaos.py**: Run the MTAOS as a control server. User can pass `-s` as the argument to run the simulation mode.
+- **run_mtaos.py**: Run the MTAOS as a control server. Use `-h` to get the further information.
 
 ## 7. Build the Document
 

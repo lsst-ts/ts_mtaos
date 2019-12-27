@@ -5,5 +5,6 @@ Model <|-- ModelSim
 Model *-- ConfigDefault
 Model "1" *-- "2" CalcTime
 MtaosCsc *-- Model
+MtaosCsc *-- InfoLog
 MtaosCsc ..> ConfigByObj
 @enduml
