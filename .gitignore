@@ -5,6 +5,7 @@ config.log
 *.pyc
 bin/*
 ospl-*.log
+logs/
 
 # Built by sconsUtils
 version.py

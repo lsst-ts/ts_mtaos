@@ -26,8 +26,8 @@ import unittest
 from lsst.ts.wep.Utility import CamType
 from lsst.ts.ofc.Utility import InstName
 
-from lsst.ts.MTAOS.Utility import getModulePath, getConfigDir, getIsrDirPath, \
-    getCamType, getInstName, getSchemaDir, getCscName
+from lsst.ts.MTAOS.Utility import getModulePath, getConfigDir, getLogDir, \
+    getIsrDirPath, getCamType, getInstName, getSchemaDir, getCscName
 
 
 class TestUtility(unittest.TestCase):
@@ -42,6 +42,11 @@ class TestUtility(unittest.TestCase):
 
         ansSchemaDir = getModulePath().joinpath("schema")
         self.assertEqual(getSchemaDir(), ansSchemaDir)
+
+    def testGetLogDir(self):
+
+        ansLogDir = getModulePath().joinpath("logs")
+        self.assertEqual(getLogDir(), ansLogDir)
 
     def testGetIsrDirPathNotAssigned(self):
 

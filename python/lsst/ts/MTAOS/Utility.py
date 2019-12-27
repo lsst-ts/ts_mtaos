@@ -75,6 +75,18 @@ def getSchemaDir():
     return getModulePath().joinpath("schema")
 
 
+def getLogDir():
+    """Get the directory of log files.
+
+    Returns
+    -------
+    pathlib.PosixPath
+        Directory of log files.
+    """
+
+    return getModulePath().joinpath("logs")
+
+
 def getIsrDirPath(isrDirPathVar="ISRDIRPATH"):
     """Get the instrument signature removal (ISR) directory path.
 
