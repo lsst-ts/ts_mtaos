@@ -74,7 +74,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
             self.infoLog.setLogFile(cscName, fileDir=getLogDir())
             self.infoLog.setLevel(debug_level)
 
-        self.infoLog.critical("Prepare MTAOS CSC.")
+        self.infoLog.info("Prepare MTAOS CSC.")
 
         # CSC of M2 hexapod
         self._cscM2Hex = salobj.Remote(self.domain, "Hexapod", index=2)
@@ -91,20 +91,20 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # Model class to do the real data processing
         self.model = None
 
-        self.infoLog.critical("MTAOS CSC is ready.")
+        self.infoLog.info("MTAOS CSC is ready.")
 
     async def configure(self, config):
 
         self._logExecFunc()
-        self.infoLog.critical("Begin to configurate MTAOS CSC.")
+        self.infoLog.info("Begin to configurate MTAOS CSC.")
 
         configByObj = ConfigByObj(config)
         if self._isNormalMode():
             self.model = Model(configByObj)
-            self.infoLog.critical("Configurate MTAOS CSC in the normal operation mode.")
+            self.infoLog.info("Configurate MTAOS CSC in the normal operation mode.")
         else:
             self.model = ModelSim(configByObj)
-            self.infoLog.critical("Configurate MTAOS CSC in the simuation mode.")
+            self.infoLog.info("Configurate MTAOS CSC in the simuation mode.")
 
     def _isNormalMode(self):
         """Is the normal operation mode or not.
