@@ -38,7 +38,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
     DEFAULT_TIMEOUT = 10.0
 
-    def __init__(self, config_dir=None, debug_level=None,
+    def __init__(self, config_dir=None, verbose=False,
                  initial_simulation_mode=0):
         """Initialize the MTAOS CSC class.
 
@@ -52,9 +52,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             Directory of configuration files, or None for the standard
             configuration directory (obtained from get_default_config_dir()).
             This is provided for unit testing. (the default is None.)
-        debug_level : str or None
-            Debug level ("NOTSET", "DEBUG", "INFO", "WARNING", "ERROR",
-            "CRITICAL"). (the default is None.)
+        verbose : bool
+            Explain what is being done. The output log files will be in logs
+            directory. (the default is False.)
         initial_simulation_mode : int, optional
             Initial simulation mode. This is provided for unit testing, as real
             CSCs should start up not simulating, the default. Use 0 for the
@@ -68,13 +68,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
                          initial_state=salobj.State.STANDBY,
                          initial_simulation_mode=int(initial_simulation_mode))
 
-        # Information log
-        self.infoLog = InfoLog(log=self.log)
-        if (debug_level is not None):
-            self.infoLog.setLogFile(cscName, fileDir=getLogDir())
-            self.infoLog.setLevel(debug_level)
-
-        self.infoLog.info("Prepare MTAOS CSC.")
+        # Logger attribute comes from the upstream Controller class
+        self.log = self._addLogWithFileHandlerIfDebug(
+            cscName, outputLogFile=verbose)
+        self.log.info("Prepare MTAOS CSC.")
 
         # CSC of M2 hexapod
         self._cscM2Hex = salobj.Remote(self.domain, "Hexapod", index=2)
@@ -91,26 +88,52 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # Model class to do the real data processing
         self.model = None
 
-        self.infoLog.info("MTAOS CSC is ready.")
+        self.log.info("MTAOS CSC is ready.")
+
+    def _addLogWithFileHandlerIfDebug(self, logFileName, outputLogFile=False):
+        """Add the internal logger with file handler if doing the debug.
+
+        Parameters
+        ----------
+        logFileName : str
+            Log file name.
+        outputLogFile : bool
+            Output the log file or not.
+
+        Returns
+        -------
+        logging.Logger
+            Logger object.
+        """
+
+        if outputLogFile:
+            infoLog = InfoLog(log=self.log)
+            infoLog.setLogFile(logFileName, fileDir=getLogDir())
+            infoLog.setLevel("DEBUG")
+            log = infoLog.getLogger()
+        else:
+            log = self.log
+
+        return log
 
     async def configure(self, config):
 
         self._logExecFunc()
-        self.infoLog.info("Begin to configurate MTAOS CSC.")
+        self.log.info("Begin to configurate MTAOS CSC.")
 
         configByObj = ConfigByObj(config)
         if self._isNormalMode():
             self.model = Model(configByObj)
-            self.infoLog.info("Configurate MTAOS CSC in the normal operation mode.")
+            self.log.info("Configurate MTAOS CSC in the normal operation mode.")
         else:
             self.model = ModelSim(configByObj)
-            self.infoLog.info("Configurate MTAOS CSC in the simuation mode.")
+            self.log.info("Configurate MTAOS CSC in the simuation mode.")
 
     def _logExecFunc(self):
         """Log the executed function."""
 
         funcName = inspect.stack()[1].function
-        self.infoLog.info(f"Execute {funcName}().")
+        self.log.info(f"Execute {funcName}().")
 
     def _isNormalMode(self):
         """Is the normal operation mode or not.
@@ -121,7 +144,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
             True if normal operation. False if simulation.
         """
 
-        # Simulation_mode comes from the upstream property function of BaseCsc.
+        # Simulation_mode comes from the upstream property function of BaseCsc
+        # class.
         if (self.simulation_mode == 0):
             return True
         else:
@@ -161,17 +185,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         return self.model
 
-    def getInfoLog(self):
-        """Get the information log.
-
-        Returns
-        -------
-        InfoLog
-            Information log object.
-        """
-
-        return self.infoLog
-
     async def do_resetWavefrontCorrection(self, data):
         """Command to reset the current wavefront error calculations.
 
@@ -195,16 +208,17 @@ class MtaosCsc(salobj.ConfigurableCsc):
             self.pubEvent_m2Correction(timestamp)
 
         except Exception as e:
-            self.infoLog.exception(e)
+            self.log.exception(e)
 
     def _checkEnabledState(self):
         """Check the system is in the Enabled state."""
 
-        action = inspect.stack()[1].function
+        funcName = inspect.stack()[1].function
+        action = funcName + "()"
         try:
             super().assert_enabled(action)
         except Exception as e:
-            self.infoLog.exception(e)
+            self.log.exception(e)
             raise
 
     def _getTimestamp(self):
@@ -245,7 +259,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
             self.model.rejCorrection()
 
         except Exception as e:
-            self.infoLog.exception(e)
+            self.log.exception(e)
 
     async def _issueCorrM2Hex(self, timestamp, sync):
         """Issue the correction of M2 hexapod.
@@ -271,10 +285,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
             await self._cscM2Hex.cmd_move.set_start(
                 timeout=self.DEFAULT_TIMEOUT, state=True)
 
-            self.infoLog.info("Issue the M2 hexapod correction successfully.")
+            self.log.info("Issue the M2 hexapod correction successfully.")
 
         except (salobj.AckError, salobj.AckTimeoutError):
-            self.infoLog.warning("M2 hexapod failed the correction command.")
+            self.log.warning("M2 hexapod failed the correction command.")
             self.pubEvent_rejectedM2HexapodCorrection(timestamp)
             raise
 
@@ -302,10 +316,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
             await self._cscCamHex.cmd_move.set_start(
                 timeout=self.DEFAULT_TIMEOUT, state=True)
 
-            self.infoLog.info("Issue the camera hexapod correction successfully.")
+            self.log.info("Issue the camera hexapod correction successfully.")
 
         except (salobj.AckError, salobj.AckTimeoutError):
-            self.infoLog.warning("Camera hexapod failed the correction command.")
+            self.log.warning("Camera hexapod failed the correction command.")
             self.pubEvent_rejectedCameraHexapodCorrection(timestamp)
             raise
 
@@ -324,10 +338,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
             await self._cscM1M3.cmd_applyActiveOpticForces.set_start(
                 timeout=self.DEFAULT_TIMEOUT, zForces=zForces)
 
-            self.infoLog.info("Issue the M1M3 correction successfully.")
+            self.log.info("Issue the M1M3 correction successfully.")
 
         except (salobj.AckError, salobj.AckTimeoutError):
-            self.infoLog.warning("M1M3 failed the correction command.")
+            self.log.warning("M1M3 failed the correction command.")
             self.pubEvent_rejectedM1M3Correction(timestamp)
             raise
 
@@ -349,10 +363,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
             await self._cscM2.cmd_applyForce.set_start(
                 timeout=self.DEFAULT_TIMEOUT, forceSetPoint=zForces)
 
-            self.infoLog.info("Issue the M2 correction successfully.")
+            self.log.info("Issue the M2 correction successfully.")
 
         except (salobj.AckError, salobj.AckTimeoutError):
-            self.infoLog.warning("M2 failed the correction command.")
+            self.log.warning("M2 failed the correction command.")
             self.pubEvent_rejectedM2Correction(timestamp)
             raise
 
@@ -373,10 +387,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
             await self._runTaskInNewEventLoop(self.model.procCalibProducts,
                                               calibsDir)
 
-            self.infoLog.info("Process the calibration products successfully.")
+            self.log.info("Process the calibration products successfully.")
 
         except Exception as e:
-            self.infoLog.exception(e)
+            self.log.exception(e)
 
     async def _runTaskInNewEventLoop(self, func, *args):
         """Run the task in the new event loop.
@@ -441,7 +455,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
                 self.model.procIntraExtraWavefrontError, raInDeg, decInDeg, aFilter,
                 rotAngInDeg, priVisit, priDir, secVisit, secDir, userGain)
 
-            self.infoLog.info("Process the intra- and extra-focal images successfully.")
+            self.log.info("Process the intra- and extra-focal images successfully.")
 
             self.pubEvent_wepWarning(timestamp, WEPWarning.NoWarning)
             self.pubEvent_wavefrontError(timestamp)
@@ -459,7 +473,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
             self.pubTel_ofcDuration(timestamp)
 
         except Exception as e:
-            self.infoLog.exception(e)
+            self.log.exception(e)
 
     async def do_processShWavefrontError(self, data):
         """Command to process an intra/extra wavefront data collection by the
@@ -797,18 +811,17 @@ class MtaosCsc(salobj.ConfigurableCsc):
         super(MtaosCsc, cls).add_arguments(parser)
         parser.add_argument("-s", "--simulate", action="store_true",
                             help="Run in simuation mode?")
-        parser.add_argument("-d", "--debugLevel", type=str,
+        parser.add_argument("-v", "--verbose", action="store_true",
                             help="""
-                            Debug level ('DEBUG', 'INFO', 'WARNING', 'ERROR',
-                            'CRITICAL'). The log files will be in logs
-                            directory.
+                            Explain what is being done. The output log files
+                            will be in logs directory.
                             """)
 
     @classmethod
     def add_kwargs_from_args(cls, args, kwargs):
         super(MtaosCsc, cls).add_kwargs_from_args(args, kwargs)
         kwargs["initial_simulation_mode"] = 1 if args.simulate else 0
-        kwargs["debug_level"] = args.debugLevel
+        kwargs["verbose"] = args.verbose
 
 
 if __name__ == "__main__":
