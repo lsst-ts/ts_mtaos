@@ -29,9 +29,8 @@ from lsst.ts import salobj
 from lsst.ts.MTAOS.ConfigByObj import ConfigByObj
 from lsst.ts.MTAOS.Model import Model
 from lsst.ts.MTAOS.ModelSim import ModelSim
-from lsst.ts.MTAOS.InfoLog import InfoLog
 from lsst.ts.MTAOS.Utility import getSchemaDir, getCscName, WEPWarning, \
-    OFCWarning, getLogDir
+    OFCWarning, getLogDir, addRotFileHandler
 
 
 class MtaosCsc(salobj.ConfigurableCsc):
@@ -69,8 +68,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
                          initial_simulation_mode=int(initial_simulation_mode))
 
         # Logger attribute comes from the upstream Controller class
-        self.log = self._addLogWithFileHandlerIfDebug(
-            cscName, outputLogFile=verbose)
+        self.log = self._addLogWithFileHandlerIfDebug(outputLogFile=verbose)
         self.log.info("Prepare MTAOS CSC.")
 
         # CSC of M2 hexapod
@@ -90,13 +88,13 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self.log.info("MTAOS CSC is ready.")
 
-    def _addLogWithFileHandlerIfDebug(self, logFileName, outputLogFile=False):
+    def _addLogWithFileHandlerIfDebug(self, outputLogFile=False):
         """Add the internal logger with file handler if doing the debug.
+
+        Note: This logger attribute comes from the upstream Controller class.
 
         Parameters
         ----------
-        logFileName : str
-            Log file name.
         outputLogFile : bool
             Output the log file or not.
 
@@ -107,14 +105,11 @@ class MtaosCsc(salobj.ConfigurableCsc):
         """
 
         if outputLogFile:
-            infoLog = InfoLog(log=self.log)
-            infoLog.setLogFile(logFileName, fileDir=getLogDir())
-            infoLog.setLevel("DEBUG")
-            log = infoLog.getLogger()
-        else:
-            log = self.log
+            fileDir = getLogDir()
+            filePath = fileDir.joinpath("MTAOS.log")
+            addRotFileHandler(self.log, filePath)
 
-        return log
+        return self.log
 
     async def configure(self, config):
 

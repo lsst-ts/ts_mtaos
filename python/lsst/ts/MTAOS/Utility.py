@@ -20,6 +20,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
+import logging
+from logging.handlers import RotatingFileHandler
 from enum import Enum, auto
 from pathlib import Path
 from lsst.utils import getPackageDir
@@ -175,6 +177,42 @@ def getCscName():
     """
 
     return "MTAOS"
+
+
+def addRotFileHandler(log, filePath, maxBytes=1e6, backupCount=5):
+    """Add a rotating file handler to a logger.
+
+    Note: The input log object will be updated directly.
+
+    Parameters
+    ----------
+    log : logging.Logger
+        Logger.
+    filePath : pathlib.PosixPath
+        File path.
+    maxBytes : int, optional
+        Maximum file size in bytes for each file. (the default is 1e6.)
+    backupCount : int, optional
+        Number of log files to retain. (the default is 5.)
+
+    Returns
+    -------
+    fileHandler : logging.RotatingFileHandler
+        The file handler added.
+    """
+
+    fileHandler = RotatingFileHandler(
+        filename=filePath, mode="a", maxBytes=int(maxBytes),
+        backupCount=int(backupCount))
+
+    logFormat = logging.Formatter(fmt="%(asctime)s - %(levelname)s - %(message)s")
+    fileHandler.setFormatter(logFormat)
+
+    fileHandler.setLevel(logging.DEBUG)
+
+    log.addHandler(fileHandler)
+
+    return fileHandler
 
 
 if __name__ == "__main__":

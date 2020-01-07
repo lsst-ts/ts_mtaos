@@ -20,6 +20,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
+import logging
+import shutil
+import time
 from pathlib import Path
 import unittest
 
@@ -27,11 +30,25 @@ from lsst.ts.wep.Utility import CamType
 from lsst.ts.ofc.Utility import InstName
 
 from lsst.ts.MTAOS.Utility import getModulePath, getConfigDir, getLogDir, \
-    getIsrDirPath, getCamType, getInstName, getSchemaDir, getCscName
+    getIsrDirPath, getCamType, getInstName, getSchemaDir, getCscName, \
+    addRotFileHandler
 
 
 class TestUtility(unittest.TestCase):
     """Test the Utility functions."""
+
+    def setUp(self):
+
+        self.dataDir = getModulePath().joinpath("tests", "tmp")
+        self._makeDir(self.dataDir)
+
+    def _makeDir(self, directory):
+
+        Path(directory).mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+
+        shutil.rmtree(self.dataDir)
 
     def testGetConfigDir(self):
 
@@ -84,6 +101,28 @@ class TestUtility(unittest.TestCase):
 
         cscName = getCscName()
         self.assertEqual(cscName, "MTAOS")
+
+    def testAddRotFileHandler(self):
+
+        log = logging.Logger("test")
+        filePath = self.dataDir.joinpath("test.log")
+        addRotFileHandler(log, filePath, maxBytes=1e3, backupCount=5)
+
+        self.assertTrue(log.hasHandlers())
+
+        for counter in range(20):
+            log.critical("Test file rotation.")
+            time.sleep(0.2)
+
+        numOfFile = self._getNumOfFileInFolder(self.dataDir)
+        self.assertEqual(numOfFile, 2)
+
+    def _getNumOfFileInFolder(self, folder):
+
+        items = Path(folder).glob("*")
+        files = [aItem for aItem in items if aItem.is_file()]
+
+        return len(files)
 
 
 if __name__ == "__main__":
