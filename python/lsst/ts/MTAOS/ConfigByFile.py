@@ -19,13 +19,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+__all__ = ["ConfigByFile"]
 
 from lsst.ts.wep.ParamReader import ParamReader
 
-from lsst.ts.MTAOS.ConfigDefault import ConfigDefault
+from lsst.ts import MTAOS
 
 
-class ConfigByFile(ConfigDefault):
+class ConfigByFile(MTAOS.ConfigDefault):
 
     def __init__(self, config):
         """Initialize the configuration by file class.

@@ -22,7 +22,7 @@
 import time
 import unittest
 
-from lsst.ts.MTAOS.CalcTime import CalcTime
+from lsst.ts import MTAOS
 
 
 class TestCalcTime(unittest.TestCase):
@@ -30,7 +30,7 @@ class TestCalcTime(unittest.TestCase):
 
     def setUp(self):
 
-        self.calcTime = CalcTime()
+        self.calcTime = MTAOS.CalcTime()
 
     def testPutRecord(self):
 

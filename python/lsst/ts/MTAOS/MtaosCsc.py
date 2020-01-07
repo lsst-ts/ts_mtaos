@@ -19,18 +19,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+__all__ = ["MtaosCsc"]
+
 import time
 import inspect
 import asyncio
 import concurrent
 
 from lsst.ts import salobj
-
-from lsst.ts.MTAOS.ConfigByObj import ConfigByObj
-from lsst.ts.MTAOS.Model import Model
-from lsst.ts.MTAOS.ModelSim import ModelSim
-from lsst.ts.MTAOS.Utility import getSchemaDir, getCscName, WEPWarning, \
-    OFCWarning, getLogDir, addRotFileHandler
+from lsst.ts import MTAOS
 
 
 class MtaosCsc(salobj.ConfigurableCsc):
@@ -60,9 +57,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             nomal operation and 1 for the simulation. (the default is 0.)
         """
 
-        cscName = getCscName()
+        cscName = MTAOS.getCscName()
         index = 0
-        schemaPath = getSchemaDir().joinpath("MTAOS.yaml")
+        schemaPath = MTAOS.getSchemaDir().joinpath("MTAOS.yaml")
         super().__init__(cscName, index, schemaPath, config_dir=config_dir,
                          initial_state=salobj.State.STANDBY,
                          initial_simulation_mode=int(initial_simulation_mode))
@@ -105,9 +102,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         """
 
         if outputLogFile:
-            fileDir = getLogDir()
+            fileDir = MTAOS.getLogDir()
             filePath = fileDir.joinpath("MTAOS.log")
-            addRotFileHandler(self.log, filePath)
+            MTAOS.addRotFileHandler(self.log, filePath)
 
         return self.log
 
@@ -116,12 +113,12 @@ class MtaosCsc(salobj.ConfigurableCsc):
         self._logExecFunc()
         self.log.info("Begin to configurate MTAOS CSC.")
 
-        configByObj = ConfigByObj(config)
+        configByObj = MTAOS.ConfigByObj(config)
         if self._isNormalMode():
-            self.model = Model(configByObj)
+            self.model = MTAOS.Model(configByObj)
             self.log.info("Configurate MTAOS CSC in the normal operation mode.")
         else:
-            self.model = ModelSim(configByObj)
+            self.model = MTAOS.ModelSim(configByObj)
             self.log.info("Configurate MTAOS CSC in the simuation mode.")
 
     def _logExecFunc(self):
@@ -452,13 +449,13 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
             self.log.info("Process the intra- and extra-focal images successfully.")
 
-            self.pubEvent_wepWarning(timestamp, WEPWarning.NoWarning)
+            self.pubEvent_wepWarning(timestamp, MTAOS.WEPWarning.NoWarning)
             self.pubEvent_wavefrontError(timestamp)
             self.pubEvent_rejectedWavefrontError(timestamp)
 
             self.pubTel_wepDuration(timestamp)
 
-            self.pubEvent_ofcWarning(timestamp, OFCWarning.NoWarning)
+            self.pubEvent_ofcWarning(timestamp, MTAOS.OFCWarning.NoWarning)
             self.pubEvent_degreeOfFreedom(timestamp)
             self.pubEvent_m2HexapodCorrection(timestamp)
             self.pubEvent_cameraHexapodCorrection(timestamp)

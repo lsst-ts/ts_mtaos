@@ -19,10 +19,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+__all__ = ["ConfigDefault"]
+
 import warnings
 
-from lsst.ts.MTAOS.Utility import getIsrDirPath, getCamType, getInstName, \
-    getModulePath
+from lsst.ts import MTAOS
 
 
 class ConfigDefault(object):
@@ -55,7 +56,7 @@ class ConfigDefault(object):
         """
 
         camera = self._getCamType()
-        return getCamType(camera)
+        return MTAOS.getCamType(camera)
 
     def _getCamType(self):
         """Get the value of camera type in the configration.
@@ -82,7 +83,7 @@ class ConfigDefault(object):
         """
 
         instName = self._getInstName()
-        return getInstName(instName)
+        return MTAOS.getInstName(instName)
 
     def _getInstName(self):
         """Get the value of instrument name in the configration.
@@ -113,7 +114,7 @@ class ConfigDefault(object):
             ISR directory.
         """
 
-        isrDir = getIsrDirPath()
+        isrDir = MTAOS.getIsrDirPath()
         if (isrDir is None):
             isrDir = self._getIsrDir()
             warnings.warn("No 'ISRDIRPATH' assigned. Use %s instead." % isrDir,
@@ -156,7 +157,7 @@ class ConfigDefault(object):
         if (relativePath is None):
             return None
         else:
-            return getModulePath().joinpath(relativePath)
+            return MTAOS.getModulePath().joinpath(relativePath)
 
     def _getDefaultSkyFile(self):
         """Get the value of default sky file path in the configuration.

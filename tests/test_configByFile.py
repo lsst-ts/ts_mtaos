@@ -22,11 +22,10 @@
 import os
 import unittest
 
-from lsst.ts.MTAOS.ConfigByFile import ConfigByFile
-from lsst.ts.MTAOS.Utility import getModulePath
-
 from lsst.ts.wep.Utility import CamType
 from lsst.ts.ofc.Utility import InstName
+
+from lsst.ts import MTAOS
 
 
 class TestConfigByFile(unittest.TestCase):
@@ -36,8 +35,8 @@ class TestConfigByFile(unittest.TestCase):
 
         os.environ["ISRDIRPATH"] = os.path.join(os.sep, "isrDir")
 
-        config = getModulePath().joinpath("tests", "testData", "default.yaml")
-        self.configByFile = ConfigByFile(config)
+        config = MTAOS.getModulePath().joinpath("tests", "testData", "default.yaml")
+        self.configByFile = MTAOS.ConfigByFile(config)
 
     def tearDown(self):
 

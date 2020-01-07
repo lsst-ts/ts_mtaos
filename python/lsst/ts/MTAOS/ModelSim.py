@@ -19,17 +19,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+__all__ = ["ModelSim"]
+
 import time
 import numpy as np
-
-from lsst.ts.MTAOS.Model import Model
 
 from lsst.ts.wep.ctrlIntf.WEPCalculationOfComCam import WEPCalculationOfComCam
 from lsst.ts.wep.ctrlIntf.SensorWavefrontData import SensorWavefrontData
 from lsst.ts.wep.Utility import FilterType
 
+from lsst.ts import MTAOS
 
-class ModelSim(Model):
+
+class ModelSim(MTAOS.Model):
     """Simulation Model class"""
 
     def procCalibProducts(self, calibsDir):

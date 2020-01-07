@@ -22,10 +22,10 @@
 import os
 import unittest
 
-from lsst.ts.MTAOS.ConfigByObj import ConfigByObj
-
 from lsst.ts.wep.Utility import CamType
 from lsst.ts.ofc.Utility import InstName
+
+from lsst.ts import MTAOS
 
 
 class Config(object):
@@ -49,7 +49,7 @@ class TestConfigByObj(unittest.TestCase):
         os.environ["ISRDIRPATH"] = os.path.join(os.sep, "isrDir")
 
         config = Config()
-        self.configByObj = ConfigByObj(config)
+        self.configByObj = MTAOS.ConfigByObj(config)
 
     def tearDown(self):
 
@@ -90,7 +90,7 @@ class TestConfigByObj(unittest.TestCase):
     def testGetDefaultSkyFileNotInConfig(self):
 
         config = Config(hasSkyFile=False)
-        configByObj = ConfigByObj(config)
+        configByObj = MTAOS.ConfigByObj(config)
 
         skyFilePath = configByObj.getDefaultSkyFileInConfig()
         self.assertTrue(skyFilePath is None)

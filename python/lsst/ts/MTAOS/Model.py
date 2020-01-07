@@ -19,6 +19,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+__all__ = ["Model"]
+
 import numpy as np
 
 from lsst.ts.ofc.ctrlIntf.M2HexapodCorrection import M2HexapodCorrection
@@ -31,7 +33,7 @@ from lsst.ts.ofc.ctrlIntf.FWHMSensorData import FWHMSensorData
 from lsst.ts.wep.ctrlIntf.RawExpData import RawExpData
 from lsst.ts.wep.Utility import FilterType
 
-from lsst.ts.MTAOS.CalcTime import CalcTime
+from lsst.ts import MTAOS
 
 
 class Model(object):
@@ -58,10 +60,10 @@ class Model(object):
         self.listOfFWHMSensorData = []
 
         # Calculation time of WEP
-        self.calcTimeWep = CalcTime()
+        self.calcTimeWep = MTAOS.CalcTime()
 
         # Calculation time of OFC
-        self.calcTimeOfc = CalcTime()
+        self.calcTimeOfc = MTAOS.CalcTime()
 
         # Wavefront estimation pipeline
         camType = self._config.getCamTypeInConfig()

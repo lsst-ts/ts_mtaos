@@ -26,9 +26,7 @@ import time
 import numpy as np
 import unittest
 
-from lsst.ts.MTAOS.Utility import getModulePath
-from lsst.ts.MTAOS.ConfigByObj import ConfigByObj
-from lsst.ts.MTAOS.ModelSim import ModelSim
+from lsst.ts import MTAOS
 
 
 class Config(object):
@@ -47,14 +45,14 @@ class TestModelSim(unittest.TestCase):
 
     def setUp(self):
 
-        self.dataDir = getModulePath().joinpath("tests", "tmp")
+        self.dataDir = MTAOS.getModulePath().joinpath("tests", "tmp")
         self.isrDir = self.dataDir.joinpath("input")
         os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
         self._makeDir(self.isrDir)
 
         config = Config()
-        configByObj = ConfigByObj(config)
-        self.modelSim = ModelSim(configByObj)
+        configByObj = MTAOS.ConfigByObj(config)
+        self.modelSim = MTAOS.ModelSim(configByObj)
 
     def _makeDir(self, directory):
 
