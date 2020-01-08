@@ -23,10 +23,10 @@ __all__ = ["ConfigByFile"]
 
 from lsst.ts.wep.ParamReader import ParamReader
 
-from lsst.ts import MTAOS
+from .ConfigDefault import ConfigDefault
 
 
-class ConfigByFile(MTAOS.ConfigDefault):
+class ConfigByFile(ConfigDefault):
 
     def __init__(self, config):
         """Initialize the configuration by file class.

@@ -33,7 +33,7 @@ from lsst.ts.ofc.ctrlIntf.FWHMSensorData import FWHMSensorData
 from lsst.ts.wep.ctrlIntf.RawExpData import RawExpData
 from lsst.ts.wep.Utility import FilterType
 
-from lsst.ts import MTAOS
+from .CalcTime import CalcTime
 
 
 class Model(object):
@@ -60,10 +60,10 @@ class Model(object):
         self.listOfFWHMSensorData = []
 
         # Calculation time of WEP
-        self.calcTimeWep = MTAOS.CalcTime()
+        self.calcTimeWep = CalcTime()
 
         # Calculation time of OFC
-        self.calcTimeOfc = MTAOS.CalcTime()
+        self.calcTimeOfc = CalcTime()
 
         # Wavefront estimation pipeline
         camType = self._config.getCamTypeInConfig()

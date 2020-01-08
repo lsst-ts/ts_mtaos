@@ -28,10 +28,10 @@ from lsst.ts.wep.ctrlIntf.WEPCalculationOfComCam import WEPCalculationOfComCam
 from lsst.ts.wep.ctrlIntf.SensorWavefrontData import SensorWavefrontData
 from lsst.ts.wep.Utility import FilterType
 
-from lsst.ts import MTAOS
+from .Model import Model
 
 
-class ModelSim(MTAOS.Model):
+class ModelSim(Model):
     """Simulation Model class"""
 
     def procCalibProducts(self, calibsDir):

@@ -23,7 +23,7 @@ __all__ = ["ConfigDefault"]
 
 import warnings
 
-from lsst.ts import MTAOS
+from . import Utility
 
 
 class ConfigDefault(object):
@@ -56,7 +56,7 @@ class ConfigDefault(object):
         """
 
         camera = self._getCamType()
-        return MTAOS.getCamType(camera)
+        return Utility.getCamType(camera)
 
     def _getCamType(self):
         """Get the value of camera type in the configration.
@@ -83,7 +83,7 @@ class ConfigDefault(object):
         """
 
         instName = self._getInstName()
-        return MTAOS.getInstName(instName)
+        return Utility.getInstName(instName)
 
     def _getInstName(self):
         """Get the value of instrument name in the configration.
@@ -114,7 +114,7 @@ class ConfigDefault(object):
             ISR directory.
         """
 
-        isrDir = MTAOS.getIsrDirPath()
+        isrDir = Utility.getIsrDirPath()
         if (isrDir is None):
             isrDir = self._getIsrDir()
             warnings.warn("No 'ISRDIRPATH' assigned. Use %s instead." % isrDir,
@@ -157,7 +157,7 @@ class ConfigDefault(object):
         if (relativePath is None):
             return None
         else:
-            return MTAOS.getModulePath().joinpath(relativePath)
+            return Utility.getModulePath().joinpath(relativePath)
 
     def _getDefaultSkyFile(self):
         """Get the value of default sky file path in the configuration.

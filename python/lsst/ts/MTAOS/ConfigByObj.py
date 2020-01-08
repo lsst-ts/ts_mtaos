@@ -21,10 +21,10 @@
 
 __all__ = ["ConfigByObj"]
 
-from lsst.ts import MTAOS
+from .ConfigDefault import ConfigDefault
 
 
-class ConfigByObj(MTAOS.ConfigDefault):
+class ConfigByObj(ConfigDefault):
 
     def __init__(self, config):
         """Initialize the configuration by object class.

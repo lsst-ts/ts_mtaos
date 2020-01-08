@@ -26,14 +26,18 @@ import asyncio
 import concurrent
 
 from lsst.ts import salobj
-from lsst.ts import MTAOS
+
+from .ConfigByObj import ConfigByObj
+from .Model import Model
+from .ModelSim import ModelSim
+from . import Utility
 
 
 class MtaosCsc(salobj.ConfigurableCsc):
 
     DEFAULT_TIMEOUT = 10.0
 
-    def __init__(self, config_dir=None, verbose=False,
+    def __init__(self, config_dir=None, logToFile=False,
                  initial_simulation_mode=0):
         """Initialize the MTAOS CSC class.
 
@@ -47,24 +51,24 @@ class MtaosCsc(salobj.ConfigurableCsc):
             Directory of configuration files, or None for the standard
             configuration directory (obtained from get_default_config_dir()).
             This is provided for unit testing. (the default is None.)
-        verbose : bool
-            Explain what is being done. The output log files will be in logs
-            directory. (the default is False.)
+        logToFile : bool
+            Output the log to files. The files will be in logs directory. (the
+            default is False.)
         initial_simulation_mode : int, optional
             Initial simulation mode. This is provided for unit testing, as real
             CSCs should start up not simulating, the default. Use 0 for the
             nomal operation and 1 for the simulation. (the default is 0.)
         """
 
-        cscName = MTAOS.getCscName()
+        cscName = Utility.getCscName()
         index = 0
-        schemaPath = MTAOS.getSchemaDir().joinpath("MTAOS.yaml")
+        schemaPath = Utility.getSchemaDir().joinpath("MTAOS.yaml")
         super().__init__(cscName, index, schemaPath, config_dir=config_dir,
                          initial_state=salobj.State.STANDBY,
                          initial_simulation_mode=int(initial_simulation_mode))
 
         # Logger attribute comes from the upstream Controller class
-        self.log = self._addLogWithFileHandlerIfDebug(outputLogFile=verbose)
+        self.log = self._addLogWithFileHandlerIfDebug(outputLogFile=logToFile)
         self.log.info("Prepare MTAOS CSC.")
 
         # CSC of M2 hexapod
@@ -101,9 +105,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         """
 
         if outputLogFile:
-            fileDir = MTAOS.getLogDir()
+            fileDir = Utility.getLogDir()
             filePath = fileDir.joinpath("MTAOS.log")
-            MTAOS.addRotFileHandler(self.log, filePath)
+            Utility.addRotFileHandler(self.log, filePath)
 
         return self.log
 
@@ -112,12 +116,12 @@ class MtaosCsc(salobj.ConfigurableCsc):
         self._logExecFunc()
         self.log.info("Begin to configurate MTAOS CSC.")
 
-        configByObj = MTAOS.ConfigByObj(config)
+        configByObj = ConfigByObj(config)
         if self._isNormalMode():
-            self.model = MTAOS.Model(configByObj)
+            self.model = Model(configByObj)
             self.log.info("Configure MTAOS CSC in the normal operation mode.")
         else:
-            self.model = MTAOS.ModelSim(configByObj)
+            self.model = ModelSim(configByObj)
             self.log.info("Configure MTAOS CSC in the simuation mode.")
 
     def _logExecFunc(self):
@@ -445,13 +449,13 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
             self.log.info("Process the intra- and extra-focal images successfully.")
 
-            self.pubEvent_wepWarning(timestamp, MTAOS.WEPWarning.NoWarning)
+            self.pubEvent_wepWarning(timestamp, Utility.WEPWarning.NoWarning)
             self.pubEvent_wavefrontError(timestamp)
             self.pubEvent_rejectedWavefrontError(timestamp)
 
             self.pubTel_wepDuration(timestamp)
 
-            self.pubEvent_ofcWarning(timestamp, MTAOS.OFCWarning.NoWarning)
+            self.pubEvent_ofcWarning(timestamp, Utility.OFCWarning.NoWarning)
             self.pubEvent_degreeOfFreedom(timestamp)
             self.pubEvent_m2HexapodCorrection(timestamp)
             self.pubEvent_cameraHexapodCorrection(timestamp)
@@ -799,17 +803,17 @@ class MtaosCsc(salobj.ConfigurableCsc):
         super(MtaosCsc, cls).add_arguments(parser)
         parser.add_argument("-s", "--simulate", action="store_true",
                             help="Run in simuation mode?")
-        parser.add_argument("-v", "--verbose", action="store_true",
+        parser.add_argument("--logToFile", action="store_true",
                             help="""
-                            Explain what is being done. The output log files
-                            will be in logs directory.
+                            Output the log to files. The files will be in logs
+                            directory.
                             """)
 
     @classmethod
     def add_kwargs_from_args(cls, args, kwargs):
         super(MtaosCsc, cls).add_kwargs_from_args(args, kwargs)
         kwargs["initial_simulation_mode"] = 1 if args.simulate else 0
-        kwargs["verbose"] = args.verbose
+        kwargs["logToFile"] = args.logToFile
 
 
 if __name__ == "__main__":
