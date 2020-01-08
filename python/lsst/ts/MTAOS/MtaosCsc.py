@@ -115,10 +115,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
         configByObj = MTAOS.ConfigByObj(config)
         if self._isNormalMode():
             self.model = MTAOS.Model(configByObj)
-            self.log.info("Configurate MTAOS CSC in the normal operation mode.")
+            self.log.info("Configure MTAOS CSC in the normal operation mode.")
         else:
             self.model = MTAOS.ModelSim(configByObj)
-            self.log.info("Configurate MTAOS CSC in the simuation mode.")
+            self.log.info("Configure MTAOS CSC in the simuation mode.")
 
     def _logExecFunc(self):
         """Log the executed function."""
@@ -137,10 +137,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         # Simulation_mode comes from the upstream property function of BaseCsc
         # class.
-        if (self.simulation_mode == 0):
-            return True
-        else:
-            return False
+        return self.simulation_mode == 0
 
     @staticmethod
     def get_config_pkg():
