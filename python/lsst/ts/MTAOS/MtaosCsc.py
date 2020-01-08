@@ -21,7 +21,6 @@
 
 __all__ = ["MtaosCsc"]
 
-import time
 import inspect
 import asyncio
 import concurrent
@@ -199,8 +198,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
             self.pubEvent_m1m3Correction(timestamp)
             self.pubEvent_m2Correction(timestamp)
 
-        except Exception as e:
-            self.log.exception(e)
+        except Exception:
+            self.log.exception("Failed to reset wavefront correction.")
 
     def _checkEnabledState(self):
         """Check the system is in the Enabled state."""
@@ -209,8 +208,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
         action = funcName + "()"
         try:
             super().assert_enabled(action)
-        except Exception as e:
-            self.log.exception(e)
+        except Exception:
+            self.log.exception("Not the Enabled state.")
             raise
 
     def _getTimestamp(self):
@@ -222,7 +221,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
             Timestamp.
         """
 
-        return time.monotonic()
+        return salobj.current_tai()
 
     async def do_issueWavefrontCorrection(self, data):
         """Command to issue the wavefront corrections to the M2 hexapod, camera
@@ -250,8 +249,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
             self.pubEvent_rejectedDegreeOfFreedom(timestamp)
             self.model.rejCorrection()
 
-        except Exception as e:
-            self.log.exception(e)
+        except Exception:
+            self.log.exception("Failed to issue the wavefront correction.")
 
     async def _issueCorrM2Hex(self, timestamp, sync):
         """Issue the correction of M2 hexapod.
@@ -381,8 +380,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
             self.log.info("Process the calibration products successfully.")
 
-        except Exception as e:
-            self.log.exception(e)
+        except Exception:
+            self.log.exception("Failed to process the calibration products.")
 
     async def _runTaskInNewEventLoop(self, func, *args):
         """Run the task in the new event loop.
@@ -464,8 +463,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
             self.pubTel_ofcDuration(timestamp)
 
-        except Exception as e:
-            self.log.exception(e)
+        except Exception:
+            self.log.exception("Failed to process the intra- and extra-focal wavefront data.")
 
     async def do_processShWavefrontError(self, data):
         """Command to process an intra/extra wavefront data collection by the
