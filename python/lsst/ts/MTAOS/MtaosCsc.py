@@ -19,25 +19,26 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import time
-import warnings
+__all__ = ["MtaosCsc"]
+
+import inspect
 import asyncio
 import concurrent
 
 from lsst.ts import salobj
 
-from lsst.ts.MTAOS.ConfigByObj import ConfigByObj
-from lsst.ts.MTAOS.Model import Model
-from lsst.ts.MTAOS.ModelSim import ModelSim
-from lsst.ts.MTAOS.Utility import getSchemaDir, getCscName, WEPWarning, \
-    OFCWarning
+from .ConfigByObj import ConfigByObj
+from .Model import Model
+from .ModelSim import ModelSim
+from . import Utility
 
 
 class MtaosCsc(salobj.ConfigurableCsc):
 
     DEFAULT_TIMEOUT = 10.0
 
-    def __init__(self, config_dir=None, initial_simulation_mode=0):
+    def __init__(self, config_dir=None, logToFile=False,
+                 initial_simulation_mode=0):
         """Initialize the MTAOS CSC class.
 
         MTAOS: Main telescope active optical system.
@@ -50,18 +51,25 @@ class MtaosCsc(salobj.ConfigurableCsc):
             Directory of configuration files, or None for the standard
             configuration directory (obtained from get_default_config_dir()).
             This is provided for unit testing. (the default is None.)
+        logToFile : bool
+            Output the log to files. The files will be in logs directory. (the
+            default is False.)
         initial_simulation_mode : int, optional
             Initial simulation mode. This is provided for unit testing, as real
             CSCs should start up not simulating, the default. Use 0 for the
             nomal operation and 1 for the simulation. (the default is 0.)
         """
 
-        cscName = getCscName()
+        cscName = Utility.getCscName()
         index = 0
-        schemaPath = getSchemaDir().joinpath("MTAOS.yaml")
+        schemaPath = Utility.getSchemaDir().joinpath("MTAOS.yaml")
         super().__init__(cscName, index, schemaPath, config_dir=config_dir,
                          initial_state=salobj.State.STANDBY,
                          initial_simulation_mode=int(initial_simulation_mode))
+
+        # Logger attribute comes from the upstream Controller class
+        self.log = self._addLogWithFileHandlerIfDebug(outputLogFile=logToFile)
+        self.log.info("Prepare MTAOS CSC.")
 
         # CSC of M2 hexapod
         self._cscM2Hex = salobj.Remote(self.domain, "Hexapod", index=2)
@@ -78,13 +86,62 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # Model class to do the real data processing
         self.model = None
 
+        self.log.info("MTAOS CSC is ready.")
+
+    def _addLogWithFileHandlerIfDebug(self, outputLogFile=False):
+        """Add the internal logger with file handler if doing the debug.
+
+        Note: This logger attribute comes from the upstream Controller class.
+
+        Parameters
+        ----------
+        outputLogFile : bool
+            Output the log file or not.
+
+        Returns
+        -------
+        logging.Logger
+            Logger object.
+        """
+
+        if outputLogFile:
+            fileDir = Utility.getLogDir()
+            filePath = fileDir.joinpath("MTAOS.log")
+            Utility.addRotFileHandler(self.log, filePath)
+
+        return self.log
+
     async def configure(self, config):
 
+        self._logExecFunc()
+        self.log.info("Begin to configurate MTAOS CSC.")
+
         configByObj = ConfigByObj(config)
-        if (self.simulation_mode == 0):
+        if self._isNormalMode():
             self.model = Model(configByObj)
+            self.log.info("Configure MTAOS CSC in the normal operation mode.")
         else:
             self.model = ModelSim(configByObj)
+            self.log.info("Configure MTAOS CSC in the simuation mode.")
+
+    def _logExecFunc(self):
+        """Log the executed function."""
+
+        funcName = inspect.stack()[1].function
+        self.log.info(f"Execute {funcName}().")
+
+    def _isNormalMode(self):
+        """Is the normal operation mode or not.
+
+        Returns
+        -------
+        bool
+            True if normal operation. False if simulation.
+        """
+
+        # Simulation_mode comes from the upstream property function of BaseCsc
+        # class.
+        return self.simulation_mode == 0
 
     @staticmethod
     def get_config_pkg():
@@ -93,6 +150,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
     async def start(self):
 
+        self._logExecFunc()
+
         await asyncio.gather(self._cscM2Hex.start_task,
                              self._cscCamHex.start_task,
                              self._cscM1M3.start_task,
@@ -100,6 +159,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
         await super().start()
 
     async def implement_simulation_mode(self, simulation_mode):
+
+        self._logExecFunc()
 
         if simulation_mode not in (0, 1):
             raise salobj.ExpectedError(
@@ -111,7 +172,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         Returns
         -------
         Model or ModelSim
-            Model.
+            Model object.
         """
 
         return self.model
@@ -124,15 +185,33 @@ class MtaosCsc(salobj.ConfigurableCsc):
         corrections to the AOS (active optical system) subsystems.
         """
 
-        timestamp = self._getTimestamp()
-        self.model.resetWavefrontCorrection()
+        self._logExecFunc()
+        self._checkEnabledState()
 
-        self.pubEvent_degreeOfFreedom(timestamp)
+        try:
+            timestamp = self._getTimestamp()
+            self.model.resetWavefrontCorrection()
 
-        self.pubEvent_m2HexapodCorrection(timestamp)
-        self.pubEvent_cameraHexapodCorrection(timestamp)
-        self.pubEvent_m1m3Correction(timestamp)
-        self.pubEvent_m2Correction(timestamp)
+            self.pubEvent_degreeOfFreedom(timestamp)
+
+            self.pubEvent_m2HexapodCorrection(timestamp)
+            self.pubEvent_cameraHexapodCorrection(timestamp)
+            self.pubEvent_m1m3Correction(timestamp)
+            self.pubEvent_m2Correction(timestamp)
+
+        except Exception:
+            self.log.exception("Failed to reset wavefront correction.")
+
+    def _checkEnabledState(self):
+        """Check the system is in the Enabled state."""
+
+        funcName = inspect.stack()[1].function
+        action = funcName + "()"
+        try:
+            super().assert_enabled(action)
+        except Exception:
+            self.log.exception("Not the Enabled state.")
+            raise
 
     def _getTimestamp(self):
         """Get the timestamp.
@@ -143,7 +222,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
             Timestamp.
         """
 
-        return time.monotonic()
+        return salobj.current_tai()
 
     async def do_issueWavefrontCorrection(self, data):
         """Command to issue the wavefront corrections to the M2 hexapod, camera
@@ -155,6 +234,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             Data to put in the DDS (data distribution service) topic.
         """
 
+        self._logExecFunc()
+        self._checkEnabledState()
+
         timestamp = self._getTimestamp()
         sync = True
 
@@ -165,10 +247,11 @@ class MtaosCsc(salobj.ConfigurableCsc):
             await self._issueCorrM2(timestamp)
 
         except (salobj.AckError, salobj.AckTimeoutError):
-            warnings.warn("Some subsystems had failed the correction command.",
-                          category=UserWarning)
             self.pubEvent_rejectedDegreeOfFreedom(timestamp)
             self.model.rejCorrection()
+
+        except Exception:
+            self.log.exception("Failed to issue the wavefront correction.")
 
     async def _issueCorrM2Hex(self, timestamp, sync):
         """Issue the correction of M2 hexapod.
@@ -187,8 +270,17 @@ class MtaosCsc(salobj.ConfigurableCsc):
             await self._cscM2Hex.cmd_offset.set_start(
                 timeout=self.DEFAULT_TIMEOUT, x=x, y=y, z=z, u=u, v=v, w=w,
                 sync=sync)
+            # Not sure I need to use move or moveLUT command. Need to discuss
+            # with Bo. Another possible choice is to modify the hexapod wrapper
+            # code to keep the offset value and let the alignment system to
+            # to issue the moveLUT command.
+            await self._cscM2Hex.cmd_move.set_start(
+                timeout=self.DEFAULT_TIMEOUT, state=True)
+
+            self.log.info("Issue the M2 hexapod correction successfully.")
 
         except (salobj.AckError, salobj.AckTimeoutError):
+            self.log.warning("M2 hexapod failed the correction command.")
             self.pubEvent_rejectedM2HexapodCorrection(timestamp)
             raise
 
@@ -209,8 +301,17 @@ class MtaosCsc(salobj.ConfigurableCsc):
             await self._cscCamHex.cmd_offset.set_start(
                 timeout=self.DEFAULT_TIMEOUT, x=x, y=y, z=z, u=u, v=v, w=w,
                 sync=sync)
+            # Not sure I need to use move or moveLUT command. Need to discuss
+            # with Bo. Another possible choice is to modify the hexapod wrapper
+            # code to keep the offset value and let the alignment system to
+            # to issue the moveLUT command.
+            await self._cscCamHex.cmd_move.set_start(
+                timeout=self.DEFAULT_TIMEOUT, state=True)
+
+            self.log.info("Issue the camera hexapod correction successfully.")
 
         except (salobj.AckError, salobj.AckTimeoutError):
+            self.log.warning("Camera hexapod failed the correction command.")
             self.pubEvent_rejectedCameraHexapodCorrection(timestamp)
             raise
 
@@ -229,7 +330,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
             await self._cscM1M3.cmd_applyActiveOpticForces.set_start(
                 timeout=self.DEFAULT_TIMEOUT, zForces=zForces)
 
+            self.log.info("Issue the M1M3 correction successfully.")
+
         except (salobj.AckError, salobj.AckTimeoutError):
+            self.log.warning("M1M3 failed the correction command.")
             self.pubEvent_rejectedM1M3Correction(timestamp)
             raise
 
@@ -245,10 +349,16 @@ class MtaosCsc(salobj.ConfigurableCsc):
         zForces = self.model.getM2ActCorr()
 
         try:
+            # Not sure AOS can use applyForce command or not. AOS will not know
+            # the total force from M2 actually. Prefer to have the command of
+            # applyActiveOpticForces as M1M3. Need to discuss with Bo.
             await self._cscM2.cmd_applyForce.set_start(
                 timeout=self.DEFAULT_TIMEOUT, forceSetPoint=zForces)
 
+            self.log.info("Issue the M2 correction successfully.")
+
         except (salobj.AckError, salobj.AckTimeoutError):
+            self.log.warning("M2 failed the correction command.")
             self.pubEvent_rejectedM2Correction(timestamp)
             raise
 
@@ -261,8 +371,18 @@ class MtaosCsc(salobj.ConfigurableCsc):
             Data to put in the DDS (data distribution service) topic.
         """
 
-        calibsDir = data.directoryPath
-        await self._runTaskInNewEventLoop(self.model.procCalibProducts, calibsDir)
+        self._logExecFunc()
+        self._checkEnabledState()
+
+        try:
+            calibsDir = data.directoryPath
+            await self._runTaskInNewEventLoop(self.model.procCalibProducts,
+                                              calibsDir)
+
+            self.log.info("Process the calibration products successfully.")
+
+        except Exception:
+            self.log.exception("Failed to process the calibration products.")
 
     async def _runTaskInNewEventLoop(self, func, *args):
         """Run the task in the new event loop.
@@ -308,35 +428,44 @@ class MtaosCsc(salobj.ConfigurableCsc):
             Data to put in the DDS (data distribution service) topic.
         """
 
-        timestamp = self._getTimestamp()
+        self._logExecFunc()
+        self._checkEnabledState()
 
-        raInDeg = data.fieldRA
-        decInDeg = data.fieldDEC
-        aFilter = data.filter
-        rotAngInDeg = data.cameraRotation
-        priVisit = data.intraVisit
-        priDir = data.intraDirectoryPath
-        secVisit = data.extraVisit
-        secDir = data.extraDirectoryPath
-        userGain = data.userGain
-        await self._runTaskInNewEventLoop(
-            self.model.procIntraExtraWavefrontError, raInDeg, decInDeg, aFilter,
-            rotAngInDeg, priVisit, priDir, secVisit, secDir, userGain)
+        try:
+            timestamp = self._getTimestamp()
 
-        self.pubEvent_wepWarning(timestamp, WEPWarning.NoWarning)
-        self.pubEvent_wavefrontError(timestamp)
-        self.pubEvent_rejectedWavefrontError(timestamp)
+            raInDeg = data.fieldRA
+            decInDeg = data.fieldDEC
+            aFilter = data.filter
+            rotAngInDeg = data.cameraRotation
+            priVisit = data.intraVisit
+            priDir = data.intraDirectoryPath
+            secVisit = data.extraVisit
+            secDir = data.extraDirectoryPath
+            userGain = data.userGain
+            await self._runTaskInNewEventLoop(
+                self.model.procIntraExtraWavefrontError, raInDeg, decInDeg, aFilter,
+                rotAngInDeg, priVisit, priDir, secVisit, secDir, userGain)
 
-        self.pubTel_wepDuration(timestamp)
+            self.log.info("Process the intra- and extra-focal images successfully.")
 
-        self.pubEvent_ofcWarning(timestamp, OFCWarning.NoWarning)
-        self.pubEvent_degreeOfFreedom(timestamp)
-        self.pubEvent_m2HexapodCorrection(timestamp)
-        self.pubEvent_cameraHexapodCorrection(timestamp)
-        self.pubEvent_m1m3Correction(timestamp)
-        self.pubEvent_m2Correction(timestamp)
+            self.pubEvent_wepWarning(timestamp, Utility.WEPWarning.NoWarning)
+            self.pubEvent_wavefrontError(timestamp)
+            self.pubEvent_rejectedWavefrontError(timestamp)
 
-        self.pubTel_ofcDuration(timestamp)
+            self.pubTel_wepDuration(timestamp)
+
+            self.pubEvent_ofcWarning(timestamp, Utility.OFCWarning.NoWarning)
+            self.pubEvent_degreeOfFreedom(timestamp)
+            self.pubEvent_m2HexapodCorrection(timestamp)
+            self.pubEvent_cameraHexapodCorrection(timestamp)
+            self.pubEvent_m1m3Correction(timestamp)
+            self.pubEvent_m2Correction(timestamp)
+
+            self.pubTel_ofcDuration(timestamp)
+
+        except Exception:
+            self.log.exception("Failed to process the intra- and extra-focal wavefront data.")
 
     async def do_processShWavefrontError(self, data):
         """Command to process an intra/extra wavefront data collection by the
@@ -385,8 +514,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
-        listOfWfErr = self.model.getListOfWavefrontError()
+        self._logExecFunc()
 
+        listOfWfErr = self.model.getListOfWavefrontError()
         for wavefrontError in listOfWfErr:
             sensorId, zk = self._getIdAndZkFromWavefrontErr(wavefrontError)
             self.evt_wavefrontError.set_put(
@@ -426,8 +556,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
-        listOfWfErrRej = self.model.getListOfWavefrontErrorRej()
+        self._logExecFunc()
 
+        listOfWfErrRej = self.model.getListOfWavefrontErrorRej()
         for wavefrontError in listOfWfErrRej:
             sensorId, zk = self._getIdAndZkFromWavefrontErr(wavefrontError)
             self.evt_rejectedWavefrontError.set_put(
@@ -445,9 +576,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
+        self._logExecFunc()
+
         dofAggr = self.model.getDofAggr()
         dofVisit = self.model.getDofVisit()
-
         self.evt_degreeOfFreedom.set_put(
             timestamp=timestamp, aggregatedDoF=dofAggr, visitDoF=dofVisit,
             force_output=True)
@@ -464,9 +596,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
+        self._logExecFunc()
+
         dofAggr = self.model.getDofAggr()
         dofVisit = self.model.getDofVisit()
-
         self.evt_rejectedDegreeOfFreedom.set_put(
             timestamp=timestamp, aggregatedDoF=dofAggr, visitDoF=dofVisit,
             force_output=True)
@@ -481,8 +614,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
-        x, y, z, u, v, w = self.model.getM2HexCorr()
+        self._logExecFunc()
 
+        x, y, z, u, v, w = self.model.getM2HexCorr()
         self.evt_m2HexapodCorrection.set_put(
             timestamp=timestamp, x=x, y=y, z=z, u=u, v=v, w=w,
             force_output=True)
@@ -497,8 +631,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
-        x, y, z, u, v, w = self.model.getM2HexCorr()
+        self._logExecFunc()
 
+        x, y, z, u, v, w = self.model.getM2HexCorr()
         self.evt_rejectedM2HexapodCorrection.set_put(
             timestamp=timestamp, x=x, y=y, z=z, u=u, v=v, w=w,
             force_output=True)
@@ -513,8 +648,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
-        x, y, z, u, v, w = self.model.getCamHexCorr()
+        self._logExecFunc()
 
+        x, y, z, u, v, w = self.model.getCamHexCorr()
         self.evt_cameraHexapodCorrection.set_put(
             timestamp=timestamp, x=x, y=y, z=z, u=u, v=v, w=w,
             force_output=True)
@@ -529,8 +665,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
-        x, y, z, u, v, w = self.model.getCamHexCorr()
+        self._logExecFunc()
 
+        x, y, z, u, v, w = self.model.getCamHexCorr()
         self.evt_rejectedCameraHexapodCorrection.set_put(
             timestamp=timestamp, x=x, y=y, z=z, u=u, v=v, w=w,
             force_output=True)
@@ -545,8 +682,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
-        zForces = self.model.getM1M3ActCorr()
+        self._logExecFunc()
 
+        zForces = self.model.getM1M3ActCorr()
         self.evt_m1m3Correction.set_put(
             timestamp=timestamp, zForces=zForces, force_output=True)
 
@@ -560,8 +698,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
-        zForces = self.model.getM1M3ActCorr()
+        self._logExecFunc()
 
+        zForces = self.model.getM1M3ActCorr()
         self.evt_rejectedM1M3Correction.set_put(
             timestamp=timestamp, zForces=zForces, force_output=True)
 
@@ -575,8 +714,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
-        zForces = self.model.getM2ActCorr()
+        self._logExecFunc()
 
+        zForces = self.model.getM2ActCorr()
         self.evt_m2Correction.set_put(
             timestamp=timestamp, zForces=zForces, force_output=True)
 
@@ -590,8 +730,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
-        zForces = self.model.getM2ActCorr()
+        self._logExecFunc()
 
+        zForces = self.model.getM2ActCorr()
         self.evt_rejectedM2Correction.set_put(
             timestamp=timestamp, zForces=zForces, force_output=True)
 
@@ -607,6 +748,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         warning : enum 'WEPWarning'
             The warning encountered.
         """
+
+        self._logExecFunc()
+
         self.evt_wepWarning.set_put(timestamp=timestamp, warning=warning.value)
 
     def pubEvent_ofcWarning(self, timestamp, warning):
@@ -622,6 +766,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The warning encountered.
         """
 
+        self._logExecFunc()
+
         self.evt_ofcWarning.set_put(timestamp=timestamp, warning=warning.value)
 
     def pubTel_wepDuration(self, timestamp):
@@ -633,8 +779,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
-        duration = self.model.getAvgCalcTimeWep()
+        self._logExecFunc()
 
+        duration = self.model.getAvgCalcTimeWep()
         self.tel_wepDuration.set_put(timestamp=timestamp, duration=duration)
 
     def pubTel_ofcDuration(self, timestamp):
@@ -646,8 +793,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
             The timestamp of the calculation.
         """
 
-        duration = self.model.getAvgCalcTimeOfc()
+        self._logExecFunc()
 
+        duration = self.model.getAvgCalcTimeOfc()
         self.tel_ofcDuration.set_put(timestamp=timestamp, duration=duration)
 
     @classmethod
@@ -655,11 +803,17 @@ class MtaosCsc(salobj.ConfigurableCsc):
         super(MtaosCsc, cls).add_arguments(parser)
         parser.add_argument("-s", "--simulate", action="store_true",
                             help="Run in simuation mode?")
+        parser.add_argument("--logToFile", action="store_true",
+                            help="""
+                            Output the log to files. The files will be in logs
+                            directory.
+                            """)
 
     @classmethod
     def add_kwargs_from_args(cls, args, kwargs):
         super(MtaosCsc, cls).add_kwargs_from_args(args, kwargs)
         kwargs["initial_simulation_mode"] = 1 if args.simulate else 0
+        kwargs["logToFile"] = args.logToFile
 
 
 if __name__ == "__main__":

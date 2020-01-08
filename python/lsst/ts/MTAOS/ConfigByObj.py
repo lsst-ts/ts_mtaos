@@ -19,7 +19,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from lsst.ts.MTAOS.ConfigDefault import ConfigDefault
+__all__ = ["ConfigByObj"]
+
+from .ConfigDefault import ConfigDefault
 
 
 class ConfigByObj(ConfigDefault):

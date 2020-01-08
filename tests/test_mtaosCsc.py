@@ -27,10 +27,7 @@ from pathlib import Path
 from lsst.utils import getPackageDir
 
 from lsst.ts import salobj
-
-from lsst.ts.MTAOS.MtaosCsc import MtaosCsc
-from lsst.ts.MTAOS.ModelSim import ModelSim
-from lsst.ts.MTAOS.Utility import getModulePath, getCscName
+from lsst.ts import MTAOS
 
 # standard command timeout (sec)
 STD_TIMEOUT = 60
@@ -39,10 +36,10 @@ STD_TIMEOUT = 60
 class Harness(object):
 
     def __init__(self, config_dir=None):
-        self.csc = MtaosCsc(
+        self.csc = MTAOS.MtaosCsc(
             config_dir=config_dir,
             initial_simulation_mode=1)
-        self.remote = salobj.Remote(self.csc.domain, getCscName(), index=0)
+        self.remote = salobj.Remote(self.csc.domain, MTAOS.getCscName(), index=0)
 
     async def __aenter__(self):
         await self.csc.start_task
@@ -59,7 +56,7 @@ class TestMtaosCsc(asynctest.TestCase):
 
     def setUp(self):
 
-        self.dataDir = getModulePath().joinpath("tests", "tmp")
+        self.dataDir = MTAOS.getModulePath().joinpath("tests", "tmp")
         self.isrDir = self.dataDir.joinpath("input")
 
         # Let the MTAOS to set WEP based on this path variable
@@ -78,12 +75,12 @@ class TestMtaosCsc(asynctest.TestCase):
         async with Harness() as harness:
 
             configDir = Path(getPackageDir("ts_config_mttcs"))
-            configDir = configDir.joinpath(getCscName(), "v1")
+            configDir = configDir.joinpath(MTAOS.getCscName(), "v1")
             self.assertEqual(harness.csc.config_dir, configDir)
 
     async def testInitWithConfigDir(self):
 
-        configDir = getModulePath().joinpath("tests", "testData")
+        configDir = MTAOS.getModulePath().joinpath("tests", "testData")
         async with Harness(config_dir=configDir) as harness:
 
             self.assertEqual(harness.csc.config_dir, configDir)
@@ -94,11 +91,25 @@ class TestMtaosCsc(asynctest.TestCase):
             await self._startCsc(harness)
 
             model = harness.csc.getModel()
-            self.assertTrue(isinstance(model, ModelSim))
+            self.assertTrue(isinstance(model, MTAOS.ModelSim))
 
     async def _startCsc(self, harness):
         await harness.remote.cmd_start.set_start(
             timeout=STD_TIMEOUT, settingsToApply="default")
+        await harness.remote.cmd_enable.set_start(
+            timeout=STD_TIMEOUT)
+
+    async def testCommandsWrongState(self):
+        async with Harness() as harness:
+
+            funcNames = ["resetWavefrontCorrection", "issueWavefrontCorrection",
+                         "processCalibrationProducts",
+                         "processIntraExtraWavefrontError"]
+
+            for funcName in funcNames:
+                cmdObj = getattr(harness.remote, f"cmd_{funcName}")
+                with self.assertRaises(salobj.AckError):
+                    await cmdObj.set_start(timeout=5)
 
     async def testDo_resetWavefrontCorrection(self):
         async with Harness() as harness:

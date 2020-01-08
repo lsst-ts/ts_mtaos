@@ -31,9 +31,7 @@ from lsst.ts.ofc.ctrlIntf.OFCCalculationOfComCam import OFCCalculationOfComCam
 from lsst.ts.ofc.ctrlIntf.M1M3Correction import M1M3Correction
 from lsst.ts.ofc.ctrlIntf.M2Correction import M2Correction
 
-from lsst.ts.MTAOS.Utility import getModulePath
-from lsst.ts.MTAOS.Model import Model
-from lsst.ts.MTAOS.ConfigByFile import ConfigByFile
+from lsst.ts import MTAOS
 
 
 class TestModel(unittest.TestCase):
@@ -42,16 +40,16 @@ class TestModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
 
-        cls.dataDir = getModulePath().joinpath("tests", "tmp")
+        cls.dataDir = MTAOS.getModulePath().joinpath("tests", "tmp")
         cls.isrDir = cls.dataDir.joinpath("input")
 
         # Let the MTAOS to set WEP based on this path variable
         os.environ["ISRDIRPATH"] = cls.isrDir.as_posix()
 
-        settingFilePath = getModulePath().joinpath("tests", "testData",
-                                                   "default.yaml")
-        config = ConfigByFile(settingFilePath)
-        cls.model = Model(config)
+        settingFilePath = MTAOS.getModulePath().joinpath("tests", "testData",
+                                                         "default.yaml")
+        config = MTAOS.ConfigByFile(settingFilePath)
+        cls.model = MTAOS.Model(config)
 
     def setUp(self):
         os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
@@ -86,7 +84,7 @@ class TestModel(unittest.TestCase):
     def testGetConfig(self):
 
         config = self.model.getConfig()
-        self.assertTrue(isinstance(config, ConfigByFile))
+        self.assertTrue(isinstance(config, MTAOS.ConfigByFile))
 
     def testGetListOfWavefrontError(self):
 
@@ -194,7 +192,7 @@ class TestModel(unittest.TestCase):
         secVisit = 9006001
         userGain = 1
 
-        rawImgDir = getModulePath().joinpath(
+        rawImgDir = MTAOS.getModulePath().joinpath(
             "tests", "testData", "phosimOutput", "realComCam")
         priDir = rawImgDir.joinpath("intra").as_posix()
         secDir = rawImgDir.joinpath("extra").as_posix()

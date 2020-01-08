@@ -20,32 +20,56 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
+import logging
+import tempfile
+import shutil
+import time
 from pathlib import Path
+from logging.handlers import RotatingFileHandler
 import unittest
 
 from lsst.ts.wep.Utility import CamType
 from lsst.ts.ofc.Utility import InstName
 
-from lsst.ts.MTAOS.Utility import getModulePath, getConfigDir, getIsrDirPath, \
-    getCamType, getInstName, getSchemaDir, getCscName
+from lsst.ts import MTAOS
 
 
 class TestUtility(unittest.TestCase):
     """Test the Utility functions."""
 
+    def setUp(self):
+
+        self.dataDir = tempfile.TemporaryDirectory(
+            dir=MTAOS.getModulePath().joinpath("tests"))
+
+    def tearDown(self):
+
+        shutil.rmtree(self.dataDir.name)
+
+    def testGetModulePath(self):
+
+        modulePath = MTAOS.getModulePath()
+        self.assertTrue(modulePath.exists())
+        self.assertTrue("ts_MTAOS" in modulePath.name)
+
     def testGetConfigDir(self):
 
-        ansConfigDir = getModulePath().joinpath("policy")
-        self.assertEqual(getConfigDir(), ansConfigDir)
+        ansConfigDir = MTAOS.getModulePath().joinpath("policy")
+        self.assertEqual(MTAOS.getConfigDir(), ansConfigDir)
 
     def testGetSchemaDir(self):
 
-        ansSchemaDir = getModulePath().joinpath("schema")
-        self.assertEqual(getSchemaDir(), ansSchemaDir)
+        ansSchemaDir = MTAOS.getModulePath().joinpath("schema")
+        self.assertEqual(MTAOS.getSchemaDir(), ansSchemaDir)
+
+    def testGetLogDir(self):
+
+        ansLogDir = MTAOS.getModulePath().joinpath("logs")
+        self.assertEqual(MTAOS.getLogDir(), ansLogDir)
 
     def testGetIsrDirPathNotAssigned(self):
 
-        isrDir = getIsrDirPath()
+        isrDir = MTAOS.getIsrDirPath()
         self.assertEqual(isrDir, None)
 
     def testGetIsrDirPath(self):
@@ -53,32 +77,57 @@ class TestUtility(unittest.TestCase):
         ISRDIRPATH = "/path/to/isr/dir"
         os.environ["ISRDIRPATH"] = ISRDIRPATH
 
-        isrDir = getIsrDirPath()
+        isrDir = MTAOS.getIsrDirPath()
         self.assertEqual(isrDir, Path(ISRDIRPATH))
 
         os.environ.pop("ISRDIRPATH")
 
     def testGetCamType(self):
 
-        self.assertEqual(getCamType("lsstCam"), CamType.LsstCam)
-        self.assertEqual(getCamType("lsstFamCam"), CamType.LsstFamCam)
-        self.assertEqual(getCamType("comcam"), CamType.ComCam)
+        self.assertEqual(MTAOS.getCamType("lsstCam"), CamType.LsstCam)
+        self.assertEqual(MTAOS.getCamType("lsstFamCam"), CamType.LsstFamCam)
+        self.assertEqual(MTAOS.getCamType("comcam"), CamType.ComCam)
 
-        self.assertRaises(ValueError, getCamType, "wrongType")
+        self.assertRaises(ValueError, MTAOS.getCamType, "wrongType")
 
     def testGetInst(self):
 
-        self.assertEqual(getInstName("lsst"), InstName.LSST)
-        self.assertEqual(getInstName("comcam"), InstName.COMCAM)
-        self.assertEqual(getInstName("sh"), InstName.SH)
-        self.assertEqual(getInstName("cmos"), InstName.CMOS)
+        self.assertEqual(MTAOS.getInstName("lsst"), InstName.LSST)
+        self.assertEqual(MTAOS.getInstName("comcam"), InstName.COMCAM)
+        self.assertEqual(MTAOS.getInstName("sh"), InstName.SH)
+        self.assertEqual(MTAOS.getInstName("cmos"), InstName.CMOS)
 
-        self.assertRaises(ValueError, getInstName, "wrongName")
+        self.assertRaises(ValueError, MTAOS.getInstName, "wrongName")
 
     def testGetCscName(self):
 
-        cscName = getCscName()
+        cscName = MTAOS.getCscName()
         self.assertEqual(cscName, "MTAOS")
+
+    def testAddRotFileHandler(self):
+
+        log = logging.Logger("test")
+        dataDirPath = self.dataDir.name
+        filePath = Path(dataDirPath).joinpath("test.log")
+        MTAOS.addRotFileHandler(log, filePath, maxBytes=1e3, backupCount=5)
+
+        handlers = log.handlers
+        self.assertEqual(len(handlers), 1)
+        self.assertTrue(isinstance(handlers[0], RotatingFileHandler))
+
+        for counter in range(20):
+            log.critical("Test file rotation.")
+            time.sleep(0.2)
+
+        numOfFile = self._getNumOfFileInFolder(dataDirPath)
+        self.assertEqual(numOfFile, 2)
+
+    def _getNumOfFileInFolder(self, folder):
+
+        items = Path(folder).glob("*")
+        files = [aItem for aItem in items if aItem.is_file()]
+
+        return len(files)
 
 
 if __name__ == "__main__":

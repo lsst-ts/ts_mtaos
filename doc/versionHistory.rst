@@ -6,6 +6,22 @@
 Version History
 ##################
 
+.. _lsst.ts.MTAOS-0.3.5:
+
+-------------
+0.3.5
+-------------
+
+Restrict some commands can only be executed in the Enabled state.
+
+.. _lsst.ts.MTAOS-0.3.4:
+
+-------------
+0.3.4
+-------------
+
+Support the log file for debug.
+
 .. _lsst.ts.MTAOS-0.3.3:
 
 -------------
