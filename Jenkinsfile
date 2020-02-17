@@ -7,8 +7,8 @@ pipeline {
         // Use the label to assign the node to run the test.
         // It is recommended by SQUARE team do not add the label.
         docker {
-            image 'lsstts/mtaos_dev:v0.3'
-            args '-u root'
+            image 'lsstts/aos_aoclc:w_2020_06_sal'
+            args "-u root --entrypoint=''"
         }
     }
 
@@ -17,18 +17,12 @@ pipeline {
     }
 
     environment {
-        // Position of LSST stack directory
-        LSST_STACK="/opt/lsst/software/stack"
-        // AOS repositories directory
-        AOS_REPOS="/home/lsst/aos_repos"
+        //SAL user home
+        SAL_USERS_HOME="/home/saluser"
+        // SAL setup file
+        SAL_SETUP_FILE="/home/saluser/.setup.sh"
         // SAL-related repositories directory
-        SAL_REPOS="/home/lsst/repos"
-        // SAL-related environment variables
-        LSST_SDK_INSTALL="/home/lsst/repos/ts_sal"
-        OSPL_HOME="/home/lsst/repos/ts_opensplice/OpenSpliceDDS/V6.9.0/HDE/x86_64.linux-debug"
-        PYTHON_BUILD_VERSION="3.7m"
-        PYTHON_BUILD_LOCATION="/opt/lsst/software/stack/python/miniconda3-4.5.12/envs/lsst-scipipe-1172c30"
-        LSST_DDS_DOMAIN="mtaos"
+        SAL_REPOS="/home/saluser/repos"
         // XML report path
         XML_REPORT="jenkinsReport/report.xml"
         // Module name used in the pytest coverage analysis
@@ -36,6 +30,25 @@ pipeline {
     }
 
     stages {
+        stage ('Install Requirements') {
+            steps {
+                // When using the docker container, we need to change
+                // the HOME path to WORKSPACE to have the authority
+                // to install the packages.
+                // There is the workaround of MTM1M3 xml version here for the alias tag
+                withEnv(["HOME=${env.WORKSPACE}"]) {
+                    sh """
+                        git clone --branch develop https://github.com/lsst-ts/ts_config_mttcs
+                        cd ${env.SAL_USERS_HOME}
+                        source ${env.SAL_SETUP_FILE}
+                        cd ${env.SAL_REPOS}/ts_xml
+                        git checkout 74ded62 sal_interfaces/MTM1M3/MTM1M3_Commands.xml
+                        git checkout f57e9d1 sal_interfaces/MTM1M3/MTM1M3_Events.xml
+                        make_idl_files.py MTAOS Hexapod MTM1M3 MTM2
+                    """
+                }
+            }
+        }
 
         stage('Unit Tests and Coverage Analysis') { 
             steps {
@@ -44,30 +57,17 @@ pipeline {
                 // 'PATH' can only be updated in a single shell block.
                 // We can not update PATH in 'environment' block.
                 // Pytest needs to export the junit report. 
+                // Unset LSST_DDS_IP because Jenkins gives the value of '0'
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
-                        source /opt/rh/devtoolset-6/enable
-                        source ${env.LSST_STACK}/loadLSST.bash
-                        cd ${AOS_REPOS}/phosim_utils
-                        setup -k -r . -t sims_w_2019_20
-                        cd ${AOS_REPOS}/ts_wep
+                        cd ${env.SAL_USERS_HOME}
+                        source ${env.SAL_SETUP_FILE}
+                        cd ${env.WORKSPACE}/ts_config_mttcs
                         setup -k -r .
-                        cd ${AOS_REPOS}/ts_ofc
+                        cd ..
                         setup -k -r .
-                        cd ${SAL_REPOS}/ts_xml
-                        setup -k -r .
-                        cd ${SAL_REPOS}/ts_sal
-                        setup -k -r .
-                        cd ${SAL_REPOS}/ts_config_ocs
-                        setup -k -r .
-                        cd ${SAL_REPOS}/ts_config_mttcs
-                        setup -k -r .
-                        cd ${SAL_REPOS}/ts_salobj
-                        setup -k -r .
-                        source ${SAL_REPOS}/ts_sal/setup.env
-                        cd ${HOME}
-                        setup -k -r .
-                        pytest --ignore=tests/test_mtaosCsc.py --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT} tests/
+                        unset LSST_DDS_IP
+                        pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT} tests/
                     """
                 }
             }

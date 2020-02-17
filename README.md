@@ -10,21 +10,21 @@
 
 ## 2. Needed Package
 
-- *[ts_wep](https://github.com/lsst-ts/ts_wep) - master branch (commit: 5d20039)*
-- *[ts_ofc](https://github.com/lsst-ts/ts_ofc) - master branch (commit: e38c4e1)*
-- *[ts_sal](https://github.com/lsst-ts/ts_sal) - develop branch (commit: f330832)*
-- *[ts_xml](https://github.com/lsst-ts/ts_xml) - develop branch (commit: 22e2500)*
-- *[ts_opensplice](https://github.com/lsst-ts/ts_opensplice) - master branch (DDS v.6.9.0 is used)*
-- *[ts_config_mttcs](https://github.com/lsst-ts/ts_config_mttcs) - develop branch*
-- *[ts_salobj](https://github.com/lsst-ts/ts_salobj) - develop branch (commit: 82fa683)*
-- *[ts_phosim](https://github.com/lsst-ts/ts_phosim) - master branch (commit: a2a42f3) (optional)*
+- *[ts_wep](https://github.com/lsst-ts/ts_wep)*
+- *[ts_ofc](https://github.com/lsst-ts/ts_ofc)*
+- *[ts_sal](https://github.com/lsst-ts/ts_sal)*
+- *[ts_xml](https://github.com/lsst-ts/ts_xml)*
+- *[ts_opensplice](https://github.com/lsst-ts/ts_opensplice)*
+- *[ts_config_mttcs](https://github.com/lsst-ts/ts_config_mttcs)*
+- *[ts_salobj](https://github.com/lsst-ts/ts_salobj)*
+- *[ts_phosim](https://github.com/lsst-ts/ts_phosim) (optional)*
 - *[documenteer](https://github.com/lsst-sqre/documenteer) (optional)*
 - *[plantuml](http://plantuml.com) (optional)*
 - *[sphinxcontrib-plantuml](https://pypi.org/project/sphinxcontrib-plantuml/) (optional)*
 
 ## 3. Pull the Built Develop Image from Docker Hub
 
-*Pull the built develop docker image by `docker pull lsstts/aos_aoclc:w_2019_38_sal`. The scientific pipeline and lsst packages are installed already (except `ts_MTAOS` and `ts_config_mttcs`). For the details of docker image, please follow the [docker aos_aoclc image](https://hub.docker.com/r/lsstts/aos_aoclc).*
+*Pull the built develop docker image by `docker pull lsstts/aos_aoclc:w_2020_06_sal`. The scientific pipeline and lsst packages are installed already (except `ts_MTAOS` and `ts_config_mttcs`). For the details of docker image, please follow the [docker aos_aoclc image](https://hub.docker.com/r/lsstts/aos_aoclc).*
 
 ## 4. Generate the IDL Files
 
@@ -33,8 +33,6 @@
 ```bash
 make_idl_files.py MTAOS Hexapod MTM1M3 MTM2
 ```
-
-*2. Unset the LSST IP by `unset LSST_DDS_IP`. This is a bug in `ts_salobj` v5.0.0_RC2.*
 
 ## 5. Use of Module
 

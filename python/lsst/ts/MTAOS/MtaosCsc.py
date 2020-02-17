@@ -37,8 +37,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
     DEFAULT_TIMEOUT = 10.0
 
-    def __init__(self, config_dir=None, logToFile=False,
-                 initial_simulation_mode=0):
+    def __init__(self, config_dir=None, logToFile=False, simulation_mode=0):
         """Initialize the MTAOS CSC class.
 
         MTAOS: Main telescope active optical system.
@@ -54,10 +53,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
         logToFile : bool
             Output the log to files. The files will be in logs directory. (the
             default is False.)
-        initial_simulation_mode : int, optional
-            Initial simulation mode. This is provided for unit testing, as real
-            CSCs should start up not simulating, the default. Use 0 for the
-            nomal operation and 1 for the simulation. (the default is 0.)
+        simulation_mode : int, optional
+            Simulation mode. The default is 0: do not simulate.
         """
 
         cscName = Utility.getCscName()
@@ -65,7 +62,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         schemaPath = Utility.getSchemaDir().joinpath("MTAOS.yaml")
         super().__init__(cscName, index, schemaPath, config_dir=config_dir,
                          initial_state=salobj.State.STANDBY,
-                         initial_simulation_mode=int(initial_simulation_mode))
+                         simulation_mode=int(simulation_mode))
 
         # Logger attribute comes from the upstream Controller class
         self.log = self._addLogWithFileHandlerIfDebug(outputLogFile=logToFile)
@@ -782,7 +779,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         duration = self.model.getAvgCalcTimeWep()
-        self.tel_wepDuration.set_put(timestamp=timestamp, duration=duration)
+        self.tel_wepDuration.set_put(timestamp=timestamp, calcTime=duration)
 
     def pubTel_ofcDuration(self, timestamp):
         """Publish the duration of the OFC calculation as telemetry.
@@ -796,7 +793,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         duration = self.model.getAvgCalcTimeOfc()
-        self.tel_ofcDuration.set_put(timestamp=timestamp, duration=duration)
+        self.tel_ofcDuration.set_put(timestamp=timestamp, calcTime=duration)
 
     @classmethod
     def add_arguments(cls, parser):
@@ -812,7 +809,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
     @classmethod
     def add_kwargs_from_args(cls, args, kwargs):
         super(MtaosCsc, cls).add_kwargs_from_args(args, kwargs)
-        kwargs["initial_simulation_mode"] = 1 if args.simulate else 0
+        kwargs["simulation_mode"] = 1 if args.simulate else 0
         kwargs["logToFile"] = args.logToFile
 
 
