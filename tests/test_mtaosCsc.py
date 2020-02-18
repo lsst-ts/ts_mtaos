@@ -37,8 +37,7 @@ class Harness(object):
 
     def __init__(self, config_dir=None):
         self.csc = MTAOS.MtaosCsc(
-            config_dir=config_dir,
-            initial_simulation_mode=1)
+            config_dir=config_dir, simulation_mode=1)
         self.remote = salobj.Remote(self.csc.domain, MTAOS.getCscName(), index=0)
 
     async def __aenter__(self):
@@ -243,7 +242,7 @@ class TestMtaosCsc(asynctest.TestCase):
 
         durationWep = await harness.remote.tel_wepDuration.next(
             flush=False, timeout=STD_TIMEOUT)
-        self.assertGreater(durationWep.duration, 14)
+        self.assertGreater(durationWep.calcTime, 14)
 
     async def _checkOfcTopicsFromProcImg(self, harness):
 
@@ -264,7 +263,7 @@ class TestMtaosCsc(asynctest.TestCase):
 
         durationOfc = await harness.remote.tel_ofcDuration.next(
             flush=False, timeout=STD_TIMEOUT)
-        self.assertGreater(durationOfc.duration, 0)
+        self.assertGreater(durationOfc.calcTime, 0)
 
     async def _checkCorrNotZero(self, harness):
 

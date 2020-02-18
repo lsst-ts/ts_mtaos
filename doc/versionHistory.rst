@@ -6,6 +6,14 @@
 Version History
 ##################
 
+.. _lsst.ts.MTAOS-0.3.6:
+
+-------------
+0.3.6
+-------------
+
+Use calcTime instead of duration and simulation_mode instead of initial_simulation_mode.
+
 .. _lsst.ts.MTAOS-0.3.5:
 
 -------------
