@@ -264,15 +264,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         x, y, z, u, v, w = self.model.getM2HexCorr()
 
         try:
-            await self._cscM2Hex.cmd_offset.set_start(
+            await self._cscM2Hex.cmd_move.set_start(
                 timeout=self.DEFAULT_TIMEOUT, x=x, y=y, z=z, u=u, v=v, w=w,
                 sync=sync)
-            # Not sure I need to use move or moveLUT command. Need to discuss
-            # with Bo. Another possible choice is to modify the hexapod wrapper
-            # code to keep the offset value and let the alignment system to
-            # to issue the moveLUT command.
-            await self._cscM2Hex.cmd_move.set_start(
-                timeout=self.DEFAULT_TIMEOUT, state=True)
 
             self.log.info("Issue the M2 hexapod correction successfully.")
 
@@ -295,15 +289,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         x, y, z, u, v, w = self.model.getCamHexCorr()
 
         try:
-            await self._cscCamHex.cmd_offset.set_start(
+            await self._cscCamHex.cmd_move.set_start(
                 timeout=self.DEFAULT_TIMEOUT, x=x, y=y, z=z, u=u, v=v, w=w,
                 sync=sync)
-            # Not sure I need to use move or moveLUT command. Need to discuss
-            # with Bo. Another possible choice is to modify the hexapod wrapper
-            # code to keep the offset value and let the alignment system to
-            # to issue the moveLUT command.
-            await self._cscCamHex.cmd_move.set_start(
-                timeout=self.DEFAULT_TIMEOUT, state=True)
 
             self.log.info("Issue the camera hexapod correction successfully.")
 
@@ -346,9 +334,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
         zForces = self.model.getM2ActCorr()
 
         try:
-            # Not sure AOS can use applyForce command or not. AOS will not know
-            # the total force from M2 actually. Prefer to have the command of
-            # applyActiveOpticForces as M1M3. Need to discuss with Bo.
             await self._cscM2.cmd_applyForce.set_start(
                 timeout=self.DEFAULT_TIMEOUT, forceSetPoint=zForces)
 
