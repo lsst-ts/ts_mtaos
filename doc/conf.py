@@ -10,7 +10,7 @@ import lsst.ts.MTAOS
 _g = globals()
 _g.update(build_package_configs(
     project_name='ts_MTAOS',
-    version=lsst.ts.MTAOS.version.__version__))
+    version=lsst.ts.MTAOS.__version__))
 
 # Support the sphinx extension of plantuml
 extensions.append('sphinxcontrib.plantuml')
