@@ -6,6 +6,14 @@
 Version History
 ##################
 
+.. _lsst.ts.MTAOS-0.3.8:
+
+-------------
+0.3.8
+-------------
+
+Adapt to ts_xml v5.0.0. Add the logs directory. Support the change of debug level of log files. Use the CscTestCase from ts_salobj for CSC test. Remove the bin.src directory. Remove the dependency of version.py.
+
 .. _lsst.ts.MTAOS-0.3.7:
 
 -------------

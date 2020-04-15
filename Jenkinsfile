@@ -7,7 +7,7 @@ pipeline {
         // Use the label to assign the node to run the test.
         // It is recommended by SQUARE team do not add the label.
         docker {
-            image 'lsstts/aos_aoclc:w_2020_06_sal'
+            image 'lsstts/aos_aoclc:w_2020_14_sal'
             args "-u root --entrypoint=''"
         }
     }
@@ -30,25 +30,6 @@ pipeline {
     }
 
     stages {
-        stage ('Install Requirements') {
-            steps {
-                // When using the docker container, we need to change
-                // the HOME path to WORKSPACE to have the authority
-                // to install the packages.
-                // There is the workaround of MTM1M3 xml version here for the alias tag
-                withEnv(["HOME=${env.WORKSPACE}"]) {
-                    sh """
-                        git clone --branch develop https://github.com/lsst-ts/ts_config_mttcs
-                        cd ${env.SAL_USERS_HOME}
-                        source ${env.SAL_SETUP_FILE}
-                        cd ${env.SAL_REPOS}/ts_xml
-                        git checkout 74ded62 sal_interfaces/MTM1M3/MTM1M3_Commands.xml
-                        git checkout f57e9d1 sal_interfaces/MTM1M3/MTM1M3_Events.xml
-                        make_idl_files.py MTAOS Hexapod MTM1M3 MTM2
-                    """
-                }
-            }
-        }
 
         stage('Unit Tests and Coverage Analysis') { 
             steps {
@@ -60,13 +41,11 @@ pipeline {
                 // Unset LSST_DDS_IP because Jenkins gives the value of '0'
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
-                        cd ${env.SAL_USERS_HOME}
                         source ${env.SAL_SETUP_FILE}
-                        cd ${env.WORKSPACE}/ts_config_mttcs
+                        cd ${env.SAL_REPOS}/ts_config_mttcs
                         setup -k -r .
-                        cd ..
+                        cd ${env.WORKSPACE}
                         setup -k -r .
-                        unset LSST_DDS_IP
                         pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT} tests/
                     """
                 }

@@ -183,7 +183,7 @@ def getCscName():
     return "MTAOS"
 
 
-def addRotFileHandler(log, filePath, maxBytes=1e6, backupCount=5):
+def addRotFileHandler(log, filePath, debugLevel, maxBytes=1e6, backupCount=5):
     """Add a rotating file handler to a logger.
 
     Note: The input log object will be updated directly.
@@ -194,6 +194,8 @@ def addRotFileHandler(log, filePath, maxBytes=1e6, backupCount=5):
         Logger.
     filePath : pathlib.PosixPath
         File path.
+    debugLevel : int or str
+        Logging level of file handler.
     maxBytes : int, optional
         Maximum file size in bytes for each file. (the default is 1e6.)
     backupCount : int, optional
@@ -212,7 +214,7 @@ def addRotFileHandler(log, filePath, maxBytes=1e6, backupCount=5):
     logFormat = logging.Formatter(fmt="%(asctime)s - %(levelname)s - %(message)s")
     fileHandler.setFormatter(logFormat)
 
-    fileHandler.setLevel(logging.DEBUG)
+    fileHandler.setLevel(debugLevel)
 
     log.addHandler(fileHandler)
 

@@ -24,6 +24,7 @@ __all__ = ["MtaosCsc"]
 import inspect
 import asyncio
 import concurrent
+import logging
 
 from lsst.ts import salobj
 
@@ -36,8 +37,10 @@ from . import Utility
 class MtaosCsc(salobj.ConfigurableCsc):
 
     DEFAULT_TIMEOUT = 10.0
+    LOG_FILE_NAME = "MTAOS.log"
 
-    def __init__(self, config_dir=None, logToFile=False, simulation_mode=0):
+    def __init__(self, config_dir=None, log_to_file=False,
+                 debug_level=None, simulation_mode=0):
         """Initialize the MTAOS CSC class.
 
         MTAOS: Main telescope active optical system.
@@ -50,11 +53,15 @@ class MtaosCsc(salobj.ConfigurableCsc):
             Directory of configuration files, or None for the standard
             configuration directory (obtained from get_default_config_dir()).
             This is provided for unit testing. (the default is None.)
-        logToFile : bool
+        log_to_file : bool, optional
             Output the log to files. The files will be in logs directory. (the
             default is False.)
+        debug_level : int or str, optional
+            Logging level of file handler. It can be "DEBUG" (10), "INFO" (20),
+            "WARNING" (30), "ERROR" (40), or "CRITICAL" (50). (the default is
+            None.)
         simulation_mode : int, optional
-            Simulation mode. The default is 0: do not simulate.
+            Simulation mode. (the default is 0: do not simulate.)
         """
 
         cscName = Utility.getCscName()
@@ -65,7 +72,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
                          simulation_mode=int(simulation_mode))
 
         # Logger attribute comes from the upstream Controller class
-        self.log = self._addLogWithFileHandlerIfDebug(outputLogFile=logToFile)
+        if (debug_level is None):
+            debug_level = logging.DEBUG
+        self.log = self._addLogWithFileHandlerIfDebug(debug_level,
+                                                      outputLogFile=log_to_file)
         self.log.info("Prepare MTAOS CSC.")
 
         # CSC of M2 hexapod
@@ -85,15 +95,17 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self.log.info("MTAOS CSC is ready.")
 
-    def _addLogWithFileHandlerIfDebug(self, outputLogFile=False):
+    def _addLogWithFileHandlerIfDebug(self, debugLevel, outputLogFile=False):
         """Add the internal logger with file handler if doing the debug.
 
         Note: This logger attribute comes from the upstream Controller class.
 
         Parameters
         ----------
-        outputLogFile : bool
-            Output the log file or not.
+        debugLevel : int or str
+            Logging level of file handler.
+        outputLogFile : bool, optional
+            Output the log file or not. (the default is False.)
 
         Returns
         -------
@@ -103,8 +115,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         if outputLogFile:
             fileDir = Utility.getLogDir()
-            filePath = fileDir.joinpath("MTAOS.log")
-            Utility.addRotFileHandler(self.log, filePath)
+            filePath = fileDir.joinpath(self.LOG_FILE_NAME)
+            Utility.addRotFileHandler(self.log, filePath, debugLevel)
 
         return self.log
 
@@ -334,8 +346,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
         zForces = self.model.getM2ActCorr()
 
         try:
-            await self._cscM2.cmd_applyForce.set_start(
-                timeout=self.DEFAULT_TIMEOUT, forceSetPoint=zForces)
+            await self._cscM2.cmd_applyForces.set_start(
+                timeout=self.DEFAULT_TIMEOUT, axialForceSetPoints=zForces)
 
             self.log.info("Issue the M2 correction successfully.")
 
@@ -788,14 +800,21 @@ class MtaosCsc(salobj.ConfigurableCsc):
         parser.add_argument("--logToFile", action="store_true",
                             help="""
                             Output the log to files. The files will be in logs
-                            directory.
+                            directory. The default debug level is "DEBUG".
+                            """)
+        parser.add_argument("--debugLevel", type=int,
+                            help="""
+                            Debug level of log files. It can be "DEBUG" (10),
+                            "INFO" (20), "WARNING" (30), "ERROR" (40), or
+                            "CRITICAL" (50).
                             """)
 
     @classmethod
     def add_kwargs_from_args(cls, args, kwargs):
         super(MtaosCsc, cls).add_kwargs_from_args(args, kwargs)
         kwargs["simulation_mode"] = 1 if args.simulate else 0
-        kwargs["logToFile"] = args.logToFile
+        kwargs["log_to_file"] = args.logToFile
+        kwargs["debug_level"] = args.debugLevel
 
 
 if __name__ == "__main__":

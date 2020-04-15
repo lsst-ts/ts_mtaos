@@ -22,7 +22,6 @@
 import os
 import logging
 import tempfile
-import shutil
 import time
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
@@ -40,11 +39,11 @@ class TestUtility(unittest.TestCase):
     def setUp(self):
 
         self.dataDir = tempfile.TemporaryDirectory(
-            dir=MTAOS.getModulePath().joinpath("tests"))
+            dir=MTAOS.getModulePath().joinpath("tests").as_posix())
 
     def tearDown(self):
 
-        shutil.rmtree(self.dataDir.name)
+        self.dataDir.cleanup()
 
     def testGetModulePath(self):
 
@@ -61,11 +60,13 @@ class TestUtility(unittest.TestCase):
 
         ansSchemaDir = MTAOS.getModulePath().joinpath("schema")
         self.assertEqual(MTAOS.getSchemaDir(), ansSchemaDir)
+        self.assertTrue(ansSchemaDir.exists())
 
     def testGetLogDir(self):
 
         ansLogDir = MTAOS.getModulePath().joinpath("logs")
         self.assertEqual(MTAOS.getLogDir(), ansLogDir)
+        self.assertTrue(ansLogDir.exists())
 
     def testGetIsrDirPathNotAssigned(self):
 
@@ -109,7 +110,8 @@ class TestUtility(unittest.TestCase):
         log = logging.Logger("test")
         dataDirPath = self.dataDir.name
         filePath = Path(dataDirPath).joinpath("test.log")
-        MTAOS.addRotFileHandler(log, filePath, maxBytes=1e3, backupCount=5)
+        MTAOS.addRotFileHandler(log, filePath, logging.DEBUG, maxBytes=1e3,
+                                backupCount=5)
 
         handlers = log.handlers
         self.assertEqual(len(handlers), 1)

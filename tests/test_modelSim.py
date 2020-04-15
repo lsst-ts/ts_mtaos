@@ -20,9 +20,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
-from pathlib import Path
-import shutil
 import time
+import tempfile
 import numpy as np
 import unittest
 
@@ -36,8 +35,9 @@ class Config(object):
 
         self.camera = "comcam"
         self.instrument = "comcam"
-        self.defaultIsrDir = "/home/lsst/input"
-        self.defaultSkyFilePath = "tests/testData/phosimOutput/realComCam/skyComCamInfo.txt"
+        self.defaultIsrDir = os.path.join(os.sep, "home", "lsst", "input")
+        self.defaultSkyFilePath = os.path.join(
+            "tests", "testData", "phosimOutput", "realComCam", "skyComCamInfo.txt")
 
 
 class TestModelSim(unittest.TestCase):
@@ -45,25 +45,22 @@ class TestModelSim(unittest.TestCase):
 
     def setUp(self):
 
-        self.dataDir = MTAOS.getModulePath().joinpath("tests", "tmp")
-        self.isrDir = self.dataDir.joinpath("input")
-        os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
-        self._makeDir(self.isrDir)
+        testDir = MTAOS.getModulePath().joinpath("tests")
+        self.dataDir = tempfile.TemporaryDirectory(dir=testDir.as_posix())
+
+        self.isrDir = tempfile.TemporaryDirectory(dir=self.dataDir.name)
+        os.environ["ISRDIRPATH"] = self.isrDir.name
 
         config = Config()
         configByObj = MTAOS.ConfigByObj(config)
         self.modelSim = MTAOS.ModelSim(configByObj)
-
-    def _makeDir(self, directory):
-
-        Path(directory).mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
 
         self.modelSim.resetFWHMSensorData()
         self.modelSim.resetWavefrontCorrection()
 
-        shutil.rmtree(self.dataDir)
+        self.dataDir.cleanup()
         try:
             os.environ.pop("ISRDIRPATH")
         except KeyError:

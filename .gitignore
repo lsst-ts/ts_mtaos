@@ -3,7 +3,6 @@ config.log
 .sconf_temp
 *.cfgc
 *.pyc
-bin/*
 ospl-*.log
 logs/
 
