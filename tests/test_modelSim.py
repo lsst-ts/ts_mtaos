@@ -21,9 +21,10 @@
 
 import os
 import time
-import tempfile
 import numpy as np
 import unittest
+
+from lsst.ts.wep.ctrlIntf.SensorWavefrontData import SensorWavefrontData
 
 from lsst.ts import MTAOS
 
@@ -44,23 +45,22 @@ class TestModelSim(unittest.TestCase):
     """Test the ModelSim class."""
 
     def setUp(self):
+        os.environ["ISRDIRPATH"] = "ISRDIRPATH"
 
-        testDir = MTAOS.getModulePath().joinpath("tests")
-        self.dataDir = tempfile.TemporaryDirectory(dir=testDir.as_posix())
-
-        self.isrDir = tempfile.TemporaryDirectory(dir=self.dataDir.name)
-        os.environ["ISRDIRPATH"] = self.isrDir.name
+    @classmethod
+    def setUpClass(cls):
 
         config = Config()
         configByObj = MTAOS.ConfigByObj(config)
-        self.modelSim = MTAOS.ModelSim(configByObj)
+        cls.modelSim = MTAOS.ModelSim(configByObj)
 
     def tearDown(self):
 
         self.modelSim.resetFWHMSensorData()
         self.modelSim.resetWavefrontCorrection()
+        self.modelSim.calcTimeWep.resetRecord()
+        self.modelSim.calcTimeOfc.resetRecord()
 
-        self.dataDir.cleanup()
         try:
             os.environ.pop("ISRDIRPATH")
         except KeyError:
@@ -77,37 +77,103 @@ class TestModelSim(unittest.TestCase):
     def testProcIntraExtraWavefrontError(self):
 
         self.assertEqual(self._getAvgCalcTimeWep(), 0.0)
-        self.assertEqual(self._getAvgCalcTimeOfc(), 0.0)
 
-        raInDeg = 0.0
-        decInDeg = 0.0
-        aFilter = 7
-        rotAngInDeg = 0.0
-        priVisit = 9006002
-        priDir = "priDir"
-        secVisit = 9006001
-        secDir = "secDir"
-        userGain = 1
-        self.modelSim.procIntraExtraWavefrontError(
-            raInDeg, decInDeg, aFilter, rotAngInDeg, priVisit, priDir,
-            secVisit, secDir, userGain)
+        aFilter = 3
+        rotAngInDeg = 10.0
+        userGain = 0.8
+        self._procIntraExtraWavefrontError(aFilter, rotAngInDeg, userGain)
 
         listOfWfErr = self.modelSim.getListOfWavefrontError()
         self.assertEqual(len(listOfWfErr), 9)
 
-        dofAggr = self.modelSim.getDofAggr()
-        self.assertNotEqual(np.sum(np.abs(dofAggr)), 0)
+        wep = self.modelSim.wep
+        self.assertEqual(wep.getFilter().value, aFilter)
+        self.assertEqual(wep.getRotAng(), rotAngInDeg)
+        self.assertEqual(self.modelSim.userGain, userGain)
 
         self.assertGreater(self._getAvgCalcTimeWep(), 14.0)
-        self.assertGreater(self._getAvgCalcTimeOfc(), 0.0)
+
+    def _procIntraExtraWavefrontError(self, aFilter, rotAngInDeg, userGain):
+
+        raInDeg = 0.0
+        decInDeg = 0.0
+        priVisit = 9006002
+        priDir = "priDir"
+        secVisit = 9006001
+        secDir = "secDir"
+        self.modelSim.procIntraExtraWavefrontError(
+            raInDeg, decInDeg, aFilter, rotAngInDeg, priVisit, priDir,
+            secVisit, secDir, userGain)
 
     def _getAvgCalcTimeWep(self):
 
         return self.modelSim.getAvgCalcTimeWep()
 
+    def testCalcCorrectionFromAvgWfErr(self):
+
+        self.assertEqual(self._getAvgCalcTimeOfc(), 0.0)
+
+        aFilter = 3
+        rotAngInDeg = 10.0
+        userGain = 0.8
+        self._procIntraExtraWavefrontError(aFilter, rotAngInDeg, userGain)
+
+        # Mimic the publish of event of MtaosCsc
+        self.modelSim.getListOfWavefrontError()
+
+        self.modelSim.calcCorrectionFromAvgWfErr()
+
+        dofAggr = self.modelSim.getDofAggr()
+        self.assertNotEqual(np.sum(np.abs(dofAggr)), 0)
+
+        self.assertGreater(self._getAvgCalcTimeOfc(), 0.0)
+
     def _getAvgCalcTimeOfc(self):
 
         return self.modelSim.getAvgCalcTimeOfc()
+
+    def testCalcCorrectionFromAvgWfErrException(self):
+
+        self.assertRaisesRegex(RuntimeError,
+                               "No data in the collection of taken data.",
+                               self.modelSim.calcCorrectionFromAvgWfErr)
+
+        sensorWavefrontData = SensorWavefrontData()
+        sensorWavefrontData.setSensorId(96)
+        sensorWavefrontData.setAnnularZernikePoly(np.random.rand(19))
+        self.modelSim.collectionOfListOfWfErr.append([sensorWavefrontData])
+
+        # Mimic the publish of event of MtaosCsc
+        self.modelSim.getListOfWavefrontError()
+
+        self.assertRaisesRegex(RuntimeError,
+                               "Equation number < variable number.",
+                               self.modelSim.calcCorrectionFromAvgWfErr)
+
+    def testCalcCorrectionFromAvgWfErrMultiExp(self):
+
+        aFilter = 3
+        rotAngInDeg = 10.0
+        userGain = 0.8
+        for idx in range(2):
+            self._procIntraExtraWavefrontError(aFilter, rotAngInDeg, userGain)
+
+        self.assertEqual(self.modelSim.collectionOfListOfWfErr.getNumOfData(), 2)
+        self.assertEqual(self.modelSim.collectionOfListOfWfErr.getNumOfDataTaken(), 0)
+
+        # Mimic the publish of event of MtaosCsc
+        for idx in range(2):
+            self.modelSim.getListOfWavefrontError()
+
+        self.assertEqual(self.modelSim.collectionOfListOfWfErr.getNumOfData(), 0)
+        self.assertEqual(self.modelSim.collectionOfListOfWfErr.getNumOfDataTaken(), 2)
+
+        self.modelSim.calcCorrectionFromAvgWfErr()
+
+        dofAggr = self.modelSim.getDofAggr()
+        self.assertNotEqual(np.sum(np.abs(dofAggr)), 0)
+
+        self.assertGreater(self._getAvgCalcTimeOfc(), 0.0)
 
 
 if __name__ == "__main__":

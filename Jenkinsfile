@@ -7,7 +7,7 @@ pipeline {
         // Use the label to assign the node to run the test.
         // It is recommended by SQUARE team do not add the label.
         docker {
-            image 'lsstts/aos_aoclc:w_2020_14_sal'
+            image 'lsstts/aos_aoclc:w_2020_15_sal'
             args "-u root --entrypoint=''"
         }
     }
