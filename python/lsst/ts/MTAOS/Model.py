@@ -34,9 +34,13 @@ from lsst.ts.wep.ctrlIntf.RawExpData import RawExpData
 from lsst.ts.wep.Utility import FilterType
 
 from .CalcTime import CalcTime
+from .CollOfListOfWfErr import CollOfListOfWfErr
 
 
 class Model(object):
+
+    # Maximum length of queue for wavefront error
+    MAX_LEN_QUEUE = 10
 
     def __init__(self, config):
         """Initialize the model class.
@@ -50,11 +54,15 @@ class Model(object):
         # Configuration
         self._config = config
 
-        # List of wavefront error
-        self.listOfWfErr = []
+        # Collection of calculated list of wavefront error
+        self.collectionOfListOfWfErr = CollOfListOfWfErr(self.MAX_LEN_QUEUE)
 
-        # List of rejected wavefront error
-        self.listOfWfErrRej = []
+        # Collection of calculated list of rejected wavefront error
+        self.collectionOfListOfWfErrRej = CollOfListOfWfErr(self.MAX_LEN_QUEUE)
+
+        # Gain value between 0 and 1. Set to -1 to ignore user gain. In this
+        # case, the gain value will be dicided by PSSN
+        self.userGain = -1
 
         # List of FWHM (full width at half maximum) sensor data
         self.listOfFWHMSensorData = []
@@ -102,7 +110,10 @@ class Model(object):
         return self._config
 
     def getListOfWavefrontError(self):
-        """Get the list of wavefront error.
+        """Get the list of wavefront error from the collection.
+
+        This is to let MtaosCsc to publish the latest calculated wavefront
+        error.
 
         Returns
         -------
@@ -110,10 +121,13 @@ class Model(object):
             List of wavefront error data.
         """
 
-        return self.listOfWfErr
+        return self.collectionOfListOfWfErr.pop()
 
     def getListOfWavefrontErrorRej(self):
-        """Get the list of rejected wavefront error.
+        """Get the list of rejected wavefront error from the collection.
+
+        This is to let MtaosCsc to publish the latest rejected wavefront
+        error.
 
         Returns
         -------
@@ -121,7 +135,7 @@ class Model(object):
             List of rejected wavefront error data.
         """
 
-        return self.listOfWfErrRej
+        return self.collectionOfListOfWfErrRej.pop()
 
     def getListOfFWHMSensorData(self):
         """Get the list of FWHM sensor data.
@@ -217,7 +231,7 @@ class Model(object):
     def rejCorrection(self):
         """Reject the correction of subsystems."""
 
-        ztaac = self.ofc.ztaac
+        ztaac = self.ofc.getZtaac()
 
         dataShare = ztaac.dataShare
         dofIdx = dataShare.getDofIdx()
@@ -235,11 +249,16 @@ class Model(object):
         This function is needed for the long slew angle of telescope.
         """
 
-        self.listOfWfErr = []
-        self.listOfWfErrRej = []
-
+        self._clearCollectionsOfWfErr()
         self.m2HexapodCorrection, self.cameraHexapodCorrection, self.m1m3Correction, self.m2Correction = \
             self.ofc.resetOfcState()
+
+    def _clearCollectionsOfWfErr(self):
+        """Clear the collections of wavefront error contain the rejected one.
+        """
+
+        self.collectionOfListOfWfErr.clear()
+        self.collectionOfListOfWfErrRej.clear()
 
     def getM2HexCorr(self):
         """Get the M2 hexapod correction.
@@ -348,6 +367,7 @@ class Model(object):
         intraRawExpData = self._collectRawExpData(priVisit, priDir)
         extraRawExpData = self._collectRawExpData(secVisit, secDir)
 
+        # Get the filter type as the enum
         filterType = FilterType(aFilter)
 
         # Do WEP and record time
@@ -355,9 +375,8 @@ class Model(object):
             self._calcWavefrontError, raInDeg, decInDeg, filterType, rotAngInDeg,
             intraRawExpData, extraRawExpData)
 
-        # Do OFC and record time
-        self.calcTimeOfc.evalCalcTimeAndPutRecord(
-            self._calcCorrection, filterType, rotAngInDeg, userGain)
+        # Record the user gain value for OFC to use
+        self.userGain = userGain
 
     def _collectRawExpData(self, visit, imgDir):
         """Collect the raw exposure data.
@@ -416,8 +435,11 @@ class Model(object):
 
         listOfWfErr = self.wep.calculateWavefrontErrors(
             rawExpData, extraRawExpData=extraRawExpData)
+        listOfWfErrRej = self.rejWavefrontErrorUnreasonable(listOfWfErr)
 
-        self._rejWavefrontErrorUnreasonable(listOfWfErr)
+        # Collect the data
+        self.collectionOfListOfWfErr.append(listOfWfErr)
+        self.collectionOfListOfWfErrRej.append(listOfWfErrRej)
 
     def _setSkyFile(self):
         """Set the sky file for the test.
@@ -429,8 +451,11 @@ class Model(object):
         if (skyFile is not None):
             self.wep.setSkyFile(skyFile.as_posix())
 
-    def _rejWavefrontErrorUnreasonable(self, listOfWfErr):
+    def rejWavefrontErrorUnreasonable(self, listOfWfErr):
         """Reject the wavefront error that is unreasonable.
+
+        The input listOfWfErr might be updated after calling this function.
+        Some elements might be pop out for the bad values.
 
         Parameters
         ----------
@@ -439,11 +464,30 @@ class Model(object):
         """
 
         # Need to have the algorithm to analyze the wavefront error is
-        # reasonable or not.
-        self.listOfWfErr = listOfWfErr
-        self.listOfWfErrRej = []
+        # reasonable or not. At this moment, just assume everything is good.
 
-    def _calcCorrection(self, filterType, rotAngInDeg, userGain):
+        return []
+
+    def calcCorrectionFromAvgWfErr(self):
+        """Calculate the correction of subsystems based on the average
+        wavefront error of multiple exposure images in a single visit."""
+
+        filterType = self.wep.getFilter()
+        rotAngInDeg = self.wep.getRotAng()
+
+        # Use the try loop to enforce to clear the collection of wavefront
+        # error to avoid the mistakes in the next visit
+        try:
+            # Do OFC and record time
+            self.calcTimeOfc.evalCalcTimeAndPutRecord(
+                self._calcCorrection, filterType, rotAngInDeg)
+        except Exception:
+            raise
+        finally:
+            # Clear the queue
+            self._clearCollectionsOfWfErr()
+
+    def _calcCorrection(self, filterType, rotAngInDeg):
         """Calculate the correction of subsystems.
 
         Parameters
@@ -452,9 +496,6 @@ class Model(object):
             The new filter configuration to use for OFC data processing.
         rotAngInDeg : float
             The camera rotation angle in degree (-90 to 90).
-        userGain : float
-            The gain requested by the user. A value of -1 means don't use user
-            gain.
 
         Raises
         ------
@@ -464,17 +505,18 @@ class Model(object):
 
         self.ofc.setFilter(filterType)
         self.ofc.setRotAng(rotAngInDeg)
-        if (userGain == -1):
+        if (self.userGain == -1):
             if (len(self.listOfFWHMSensorData) == 0):
                 raise RuntimeError("No FWHM sensor data to use.")
             else:
                 self.ofc.setGainByPSSN()
                 self.ofc.setFWHMSensorDataOfCam(self.listOfFWHMSensorData)
         else:
-            self.ofc.setGainByUser(userGain)
+            self.ofc.setGainByUser(self.userGain)
 
+        listOfWfErrAvg = self.collectionOfListOfWfErr.getListOfWavefrontErrorAvgInTakenData()
         m2HexapodCorrection, cameraHexapodCorrection, m1m3Correction, m2Correction = \
-            self.ofc.calculateCorrections(self.listOfWfErr)
+            self.ofc.calculateCorrections(listOfWfErrAvg)
 
         # Need to add a step of checking the calculated correction
         # in the future

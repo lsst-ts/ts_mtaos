@@ -24,6 +24,7 @@ from .CalcTime import *
 from .ConfigDefault import *
 from .ConfigByObj import *
 from .ConfigByFile import *
+from .CollOfListOfWfErr import *
 from .Model import *
 from .ModelSim import *
 from .MtaosCsc import *

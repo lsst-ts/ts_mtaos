@@ -247,6 +247,23 @@ class MtaosCsc(salobj.ConfigurableCsc):
         self._checkEnabledState()
 
         timestamp = self._getTimestamp()
+
+        try:
+            self.model.calcCorrectionFromAvgWfErr()
+            self.log.info("Calculate the subsystem correction successfully.")
+
+            self.pubEvent_ofcWarning(timestamp, Utility.OFCWarning.NoWarning)
+            self.pubEvent_degreeOfFreedom(timestamp)
+            self.pubEvent_m2HexapodCorrection(timestamp)
+            self.pubEvent_cameraHexapodCorrection(timestamp)
+            self.pubEvent_m1m3Correction(timestamp)
+            self.pubEvent_m2Correction(timestamp)
+
+            self.pubTel_ofcDuration(timestamp)
+
+        except Exception:
+            self.log.exception("Failed to calculate the subsystem correction.")
+
         sync = True
 
         try:
@@ -448,15 +465,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
             self.pubEvent_rejectedWavefrontError(timestamp)
 
             self.pubTel_wepDuration(timestamp)
-
-            self.pubEvent_ofcWarning(timestamp, Utility.OFCWarning.NoWarning)
-            self.pubEvent_degreeOfFreedom(timestamp)
-            self.pubEvent_m2HexapodCorrection(timestamp)
-            self.pubEvent_cameraHexapodCorrection(timestamp)
-            self.pubEvent_m1m3Correction(timestamp)
-            self.pubEvent_m2Correction(timestamp)
-
-            self.pubTel_ofcDuration(timestamp)
 
         except Exception:
             self.log.exception("Failed to process the intra- and extra-focal wavefront data.")
