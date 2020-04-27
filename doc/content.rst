@@ -19,6 +19,7 @@ MTAOS
 
 * **MtaosCsc**: Commandable SAL component (CSC) class inherits from the ConfigurableCsc in ts_salobj.
 * **CalcTime**: Calculation time class to collect and analyze the calculation time of time-consuming jobs.
+* **CollOfListOfWfErr**: Collection of list of wavefront sensor data.
 * **ConfigDefault**: Configuration default class as a parent class to define the funtions to get the configuration details.
 * **ConfigByFile**: Configuration by file class as a child class of ConfigDefault class. Get the configuration details from the file. This is for the test to use.
 * **CanfigByObj**: Configuration by object class as a child class of ConfigDefault class. Get the configuration details from the object provided by ts_salobj. This is for the production environment.
