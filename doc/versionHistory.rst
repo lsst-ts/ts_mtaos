@@ -6,6 +6,14 @@
 Version History
 ##################
 
+.. _lsst.ts.MTAOS-0.3.9:
+
+-------------
+0.3.9
+-------------
+
+Add the CollOfListOfWfErr class to support the multiple exposures in a single visit. Use the scientific pipeline w_2020_15.
+
 .. _lsst.ts.MTAOS-0.3.8:
 
 -------------

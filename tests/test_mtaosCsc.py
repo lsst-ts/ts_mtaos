@@ -232,18 +232,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             self.assertEqual(corrM2Hex.v, 0)
             self.assertEqual(corrM2Hex.w, 0)
 
-    async def testProcessCalibrationProducts(self):
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None,
-            simulation_mode=1
-        ):
-            await self._startCsc()
-
-            remote = self._getRemote()
-            await remote.cmd_processCalibrationProducts.set_start(
-                timeout=STD_TIMEOUT, directoryPath="calibsDir")
-
-    async def testProcessIntraExtraWavefrontError(self):
+    async def testIssueWavefrontCorrectionWithWfErr(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None,
             simulation_mode=1
@@ -258,41 +247,15 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                 fieldRA=0.0, fieldDEC=0.0, filter=7, cameraRotation=0.0,
                 userGain=1)
 
-            csc = self._getCsc()
-            await self._checkWepTopicsFromProcImg(remote, csc)
+            with self.assertRaises(salobj.AckTimeoutError):
+                with self.assertWarns(UserWarning):
+                    # timeout value here can not be longer than the default
+                    # value in the Model. Otherwise, the salobj.AckTimeoutError
+                    # will not be raised.
+                    await remote.cmd_issueWavefrontCorrection.set_start(
+                        timeout=10.0, value=True)
+
             await self._checkOfcTopicsFromProcImg(remote)
-
-    async def _checkWepTopicsFromProcImg(self, remote, csc):
-
-        warningWep = await remote.evt_wepWarning.next(
-            flush=False, timeout=STD_TIMEOUT)
-        self.assertEqual(warningWep.warning, 0)
-
-        numOfWfErr = len(csc.getModel().getListOfWavefrontError())
-        self.assertEqual(numOfWfErr, 9)
-
-        for counter in range(numOfWfErr):
-            wfErr = await remote.evt_wavefrontError.next(
-                flush=False, timeout=STD_TIMEOUT)
-            self.assertNotEqual(wfErr.sensorId, 0)
-
-            zk = wfErr.annularZernikePoly
-            self.assertEqual(len(zk), 19)
-            self.assertNotEqual(np.sum(np.abs(zk)), 0)
-
-        numOfWfErrRej = len(csc.getModel().getListOfWavefrontErrorRej())
-        for counter in range(numOfWfErrRej):
-            wfErr = await remote.evt_rejectedWavefrontError.next(
-                flush=False, timeout=STD_TIMEOUT)
-            self.assertNotEqual(wfErr.sensorId, 0)
-
-            zk = wfErr.annularZernikePoly
-            self.assertEqual(len(zk), 19)
-            self.assertNotEqual(np.sum(np.abs(zk)), 0)
-
-        durationWep = await remote.tel_wepDuration.next(
-            flush=False, timeout=STD_TIMEOUT)
-        self.assertGreater(durationWep.calcTime, 14)
 
     async def _checkOfcTopicsFromProcImg(self, remote):
 
@@ -346,6 +309,70 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         actForcesM2 = corrM2.zForces
         self.assertEqual(len(actForcesM2), 72)
         self.assertNotEqual(np.sum(np.abs(actForcesM2)), 0)
+
+    async def testProcessCalibrationProducts(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=None,
+            simulation_mode=1
+        ):
+            await self._startCsc()
+
+            remote = self._getRemote()
+            await remote.cmd_processCalibrationProducts.set_start(
+                timeout=STD_TIMEOUT, directoryPath="calibsDir")
+
+    async def testProcessIntraExtraWavefrontError(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=None,
+            simulation_mode=1
+        ):
+            await self._startCsc()
+
+            # Set the timeout > 20 seconds for the long calculation time
+            remote = self._getRemote()
+            await remote.cmd_processIntraExtraWavefrontError.set_start(
+                timeout=2*STD_TIMEOUT, intraVisit=0, extraVisit=1,
+                intraDirectoryPath="intraDir", extraDirectoryPath="extraDir",
+                fieldRA=0.0, fieldDEC=0.0, filter=7, cameraRotation=0.0,
+                userGain=1)
+
+            csc = self._getCsc()
+            await self._checkWepTopicsFromProcImg(remote, csc)
+
+    async def _checkWepTopicsFromProcImg(self, remote, csc):
+
+        warningWep = await remote.evt_wepWarning.next(
+            flush=False, timeout=STD_TIMEOUT)
+        self.assertEqual(warningWep.warning, 0)
+
+        # The value here should be 0 because the wavefront error is published
+        # already
+        numOfWfErr = len(csc.getModel().getListOfWavefrontError())
+        self.assertEqual(numOfWfErr, 0)
+
+        # Check the published wavefront error
+        for counter in range(9):
+            wfErr = await remote.evt_wavefrontError.next(
+                flush=False, timeout=STD_TIMEOUT)
+            self.assertNotEqual(wfErr.sensorId, 0)
+
+            zk = wfErr.annularZernikePoly
+            self.assertEqual(len(zk), 19)
+            self.assertNotEqual(np.sum(np.abs(zk)), 0)
+
+        numOfWfErrRej = len(csc.getModel().getListOfWavefrontErrorRej())
+        for counter in range(numOfWfErrRej):
+            wfErr = await remote.evt_rejectedWavefrontError.next(
+                flush=False, timeout=STD_TIMEOUT)
+            self.assertNotEqual(wfErr.sensorId, 0)
+
+            zk = wfErr.annularZernikePoly
+            self.assertEqual(len(zk), 19)
+            self.assertNotEqual(np.sum(np.abs(zk)), 0)
+
+        durationWep = await remote.tel_wepDuration.next(
+            flush=False, timeout=STD_TIMEOUT)
+        self.assertGreater(durationWep.calcTime, 14)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ ConfigDefault <|-- ConfigByObj
 Model <|-- ModelSim
 Model *-- ConfigDefault
 Model "1" *-- "2" CalcTime
+Model "1" *-- "2" CollOfListOfWfErr
 MtaosCsc *-- Model
 MtaosCsc ..> ConfigByObj
 @enduml

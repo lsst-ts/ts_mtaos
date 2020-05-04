@@ -63,6 +63,8 @@ class TestModel(unittest.TestCase):
 
         self.model.resetFWHMSensorData()
         self.model.resetWavefrontCorrection()
+        self.model.calcTimeWep.resetRecord()
+        self.model.calcTimeOfc.resetRecord()
 
         shutil.rmtree(self.dataDir)
         try:
@@ -88,18 +90,15 @@ class TestModel(unittest.TestCase):
 
     def testGetListOfWavefrontError(self):
 
-        listOfWfErr = self.model.getListOfWavefrontError()
-        self.assertEqual(listOfWfErr, [])
+        self.assertEqual(self.model.getListOfWavefrontError(), [])
 
     def testGetListOfWavefrontErrorRej(self):
 
-        listOfWfErrRej = self.model.getListOfWavefrontErrorRej()
-        self.assertEqual(listOfWfErrRej, [])
+        self.assertEqual(self.model.getListOfWavefrontErrorRej(), [])
 
     def testGetListOfFWHMSensorData(self):
 
-        listOfFWHMSensorData = self.model.getListOfFWHMSensorData()
-        self.assertEqual(listOfFWHMSensorData, [])
+        self.assertEqual(self.model.getListOfFWHMSensorData(), [])
 
     def testSetFWHMSensorData(self):
 
@@ -180,7 +179,7 @@ class TestModel(unittest.TestCase):
         actCorr = self.model.getM2ActCorr()
         self.assertEqual(len(actCorr), M2Correction.NUM_OF_ACT)
 
-    def testProcIntraExtraWavefrontError(self):
+    def testProcIntraExtraWavefrontErrorAndCalcCorrectionFromAvgWfErr(self):
 
         self._ingestCalibs()
 
@@ -203,6 +202,10 @@ class TestModel(unittest.TestCase):
 
         self.assertEqual(len(self.model.getListOfWavefrontError()), 9)
 
+        # Mimic the publish of event of MtaosCsc
+        self.model.getListOfWavefrontError()
+
+        self.model.calcCorrectionFromAvgWfErr()
         dofAggr = self._getDofAggr()
         self.assertNotEqual(np.sum(np.abs(dofAggr)), 0)
 
@@ -245,6 +248,9 @@ class TestModel(unittest.TestCase):
         dofVisit = self._getDofVisit()
         self.assertEqual(np.sum(np.abs(dofVisit)), 0)
 
+        # Check the data in collections are cleared
+        self._checkWfsErrAndWfsErrRejClear()
+
     def _ingestCalibs(self):
 
         # Make fake gain images
@@ -285,6 +291,25 @@ class TestModel(unittest.TestCase):
         command = "makeGainImages.py"
         argstring = "--detector_list %s" % detector
         runProgram(command, argstring=argstring)
+
+    def _checkWfsErrAndWfsErrRejClear(self):
+
+        self.assertEqual(self.model.getListOfWavefrontError(), [])
+        self.assertEqual(self.model.getListOfWavefrontErrorRej(), [])
+
+    def testResetWavefrontCorrection(self):
+
+        data = [1, 2, 3]
+        self.model.collectionOfListOfWfErr.append(data)
+        self.model.collectionOfListOfWfErrRej.append(data)
+
+        self.model.resetWavefrontCorrection()
+
+        self._checkWfsErrAndWfsErrRejClear()
+
+    def testRejWavefrontErrorUnreasonable(self):
+
+        self.assertEqual(self.model.rejWavefrontErrorUnreasonable([]), [])
 
 
 if __name__ == "__main__":

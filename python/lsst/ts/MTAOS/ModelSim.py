@@ -78,10 +78,13 @@ class ModelSim(Model):
         # Simulate WEP and record time
         self.calcTimeWep.evalCalcTimeAndPutRecord(self._fakeWavefrontError)
 
-        # Do OFC and record time
+        # Record the data in WEP
         filterType = FilterType(aFilter)
-        self.calcTimeOfc.evalCalcTimeAndPutRecord(
-            self._calcCorrection, filterType, rotAngInDeg, userGain)
+        self.wep.setFilter(filterType)
+        self.wep.setRotAng(rotAngInDeg)
+
+        # Record the user gain value for OFC to use
+        self.userGain = userGain
 
     def _fakeWavefrontError(self):
         """Fake the wavefront error.
@@ -113,7 +116,11 @@ class ModelSim(Model):
             listOfWfErr.append(sensorWavefrontData)
 
         # Keep this function here for the future's test of rejection of WEP
-        self._rejWavefrontErrorUnreasonable(listOfWfErr)
+        listOfWfErrRej = self.rejWavefrontErrorUnreasonable(listOfWfErr)
+
+        # Collect the data
+        self.collectionOfListOfWfErr.append(listOfWfErr)
+        self.collectionOfListOfWfErrRej.append(listOfWfErrRej)
 
 
 if __name__ == "__main__":

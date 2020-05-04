@@ -27,7 +27,7 @@ MTAOS is a component of LSST Telescope and Site software. It is responsible for 
 Pull the built develop docker image by:
 
 ```bash
-docker pull lsstts/aos_aoclc:w_2020_14_sal
+docker pull lsstts/aos_aoclc:w_2020_15_sal
 ```
 
 The scientific pipeline and lsst packages are installed already (except `ts_MTAOS`). For the details of docker image, please follow the [docker aos_aoclc image](https://hub.docker.com/r/lsstts/aos_aoclc).
