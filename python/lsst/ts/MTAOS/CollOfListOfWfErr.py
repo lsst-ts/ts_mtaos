@@ -169,7 +169,7 @@ class CollOfListOfWfErr(object):
         """
 
         for wfErr in listOfWfErr:
-            if (wfErr.getSensorId() == sensorId):
+            if wfErr.getSensorId() == sensorId:
                 return wfErr
             else:
                 continue
