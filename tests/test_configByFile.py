@@ -29,14 +29,14 @@ from lsst.ts import MTAOS
 
 
 class TestConfigByFile(unittest.TestCase):
-    """Test the ConfigByFile class."""
+    """Test the Config class with a file."""
 
     def setUp(self):
 
         os.environ["ISRDIRPATH"] = os.path.join(os.sep, "isrDir")
 
-        config = MTAOS.getModulePath().joinpath("tests", "testData", "default.yaml")
-        self.configByFile = MTAOS.ConfigByFile(config)
+        configFile = MTAOS.getModulePath().joinpath("tests", "testData", "default.yaml")
+        self.config = MTAOS.Config(str(configFile))
 
     def tearDown(self):
 
@@ -45,19 +45,19 @@ class TestConfigByFile(unittest.TestCase):
         except KeyError:
             pass
 
-    def testGetCamTypeInConfig(self):
+    def testGetCamType(self):
 
-        camType = self.configByFile.getCamTypeInConfig()
+        camType = self.config.getCamType()
         self.assertEqual(camType, CamType.ComCam)
 
-    def testGetInstNameInConfig(self):
+    def testGetInstName(self):
 
-        instName = self.configByFile.getInstNameInConfig()
+        instName = self.config.getInstName()
         self.assertEqual(instName, InstName.COMCAM)
 
     def testGetIsrDirWithEnvPath(self):
 
-        isrDir = self.configByFile.getIsrDir()
+        isrDir = self.config.getIsrDir()
         self.assertEqual(isrDir, os.environ["ISRDIRPATH"])
 
     def testGetIsrDirWithoutEnvPath(self):
@@ -65,14 +65,19 @@ class TestConfigByFile(unittest.TestCase):
         os.environ.pop("ISRDIRPATH")
 
         with self.assertWarns(UserWarning):
-            isrDir = self.configByFile.getIsrDir()
+            isrDir = self.config.getIsrDir()
 
         self.assertEqual(isrDir, "/home/lsst/input")
 
-    def testGetDefaultSkyFileInConfig(self):
+    def testGetDefaultSkyFile(self):
 
-        skyFilePath = self.configByFile.getDefaultSkyFileInConfig()
+        skyFilePath = self.config.getDefaultSkyFile()
         self.assertTrue(skyFilePath.exists())
+
+    def testGetState0DofFile(self):
+
+        dofFileName = self.config.getState0DofFile()
+        self.assertTrue(dofFileName.exists())
 
 
 if __name__ == "__main__":

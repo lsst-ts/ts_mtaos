@@ -1,0 +1,64 @@
+---
+
+# This file is for the initial state of telescope in the basis of DOF
+# d[XYZ] are in um
+# r[XY] are in arcsec
+# mode[1-20] are in um
+
+M2Hexapod:
+  dZ: 0
+  dX: 0
+  dY: 0
+  rX: 0
+  rY: 0
+
+cameraHexapod:
+  dZ: 0
+  dX: 0
+  dY: 0
+  rX: 0
+  rY: 0
+
+M1M3Bending:
+  mode1: 0
+  mode2: 0
+  mode3: 0
+  mode4: 0
+  mode5: 0
+  mode6: 0
+  mode7: 0
+  mode8: 0
+  mode9: 0
+  mode10: 0
+  mode11: 0
+  mode12: 0
+  mode13: 0
+  mode14: 0
+  mode15: 0
+  mode16: 0
+  mode17: 0
+  mode18: 0
+  mode19: 0
+  mode20: 0
+
+M2Bending:
+  mode1: 0
+  mode2: 0
+  mode3: 0
+  mode4: 0
+  mode5: 0
+  mode6: 0
+  mode7: 0
+  mode8: 0
+  mode9: 0
+  mode10: 0
+  mode11: 0
+  mode12: 0
+  mode13: 0
+  mode14: 0
+  mode15: 0
+  mode16: 0
+  mode17: 0
+  mode18: 0
+  mode19: 0
+  mode20: 0

@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+# This file is part of ts_MTAOS.
+#
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+import asyncio
+import dataclasses
+import functools
+
+from lsst.ts import salobj
+
+STD_TIMEOUT = 2
+TRACK_INTERVAL = 0.1
+
+
+@dataclasses.dataclass
+class RampArgs:
+    el_pos0: float
+    az_pos0: float
+    el_vel: float
+    az_vel: float
+    duration: float
+
+
+class MTAOSCommander(salobj.CscCommander):
+    def __init__(self):
+        super().__init__(name="MTAOS")
+        # Remote for telemetry
+        self.mtaos_remote = salobj.Remote(
+            domain=self.remote.salinfo.domain, name="MTAOS"
+        )
+        self.mtaos_remote.evt_settingsApplied = functools.partial(self.settings_callback)
+
+        self.mtaos_remote.tel_wepDuration.callback = functools.partial(
+            self.duration_callback, name="wepDuration"
+        )
+        self.mtaos_remote.tel_ofcDuration.callback = functools.partial(
+            self.duration_callback, name="ofcDuration"
+        )
+
+    def settings_callback(self, data):
+        print(f"Settings {str(data)}")
+
+    def duration_callback(self, data, name):
+        print(f"{name}:{data.calcTime:.2f}s")
+
+asyncio.run(MTAOSCommander.amain(index=0))

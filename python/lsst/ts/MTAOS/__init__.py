@@ -21,9 +21,7 @@
 
 from .Utility import *
 from .CalcTime import *
-from .ConfigDefault import *
-from .ConfigByObj import *
-from .ConfigByFile import *
+from .Config import *
 from .CollOfListOfWfErr import *
 from .Model import *
 from .ModelSim import *

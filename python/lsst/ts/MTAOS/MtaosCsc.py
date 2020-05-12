@@ -25,10 +25,12 @@ import inspect
 import asyncio
 import concurrent
 import logging
+import sys
+import yaml
 
 from lsst.ts import salobj
 
-from .ConfigByObj import ConfigByObj
+from .Config import Config
 from .Model import Model
 from .ModelSim import ModelSim
 from . import Utility
@@ -76,7 +78,13 @@ class MtaosCsc(salobj.ConfigurableCsc):
             debug_level = logging.DEBUG
         self.log = self._addLogWithFileHandlerIfDebug(debug_level,
                                                       outputLogFile=log_to_file)
+        if log_to_file is False:
+            logging.basicConfig(stream=sys.stdout, level=debug_level)
+
         self.log.info("Prepare MTAOS CSC.")
+
+        schema = yaml.safe_load(Utility.getSchemaDir().joinpath("telescopedof.yaml").open().read())
+        self.state0DofValidator = salobj.DefaultingValidator(schema=schema)
 
         # CSC of M2 hexapod
         self._cscM2Hex = salobj.Remote(self.domain, "Hexapod", index=2)
@@ -123,15 +131,21 @@ class MtaosCsc(salobj.ConfigurableCsc):
     async def configure(self, config):
 
         self._logExecFunc()
-        self.log.info("Begin to configurate MTAOS CSC.")
+        self.log.info("Begin to configure MTAOS CSC.")
 
-        configByObj = ConfigByObj(config)
+        configObj = Config(config)
+        state0DofFile = configObj.getState0DofFile()
+        if state0DofFile is None:
+            state0Dof = None
+        else:
+            state0Dof = self.state0DofValidator.validate(yaml.safe_load(open(state0DofFile).read()))
+
         if self._isNormalMode():
-            self.model = Model(configByObj)
+            self.model = Model(configObj, state0Dof)
             self.log.info("Configure MTAOS CSC in the normal operation mode.")
         else:
-            self.model = ModelSim(configByObj)
-            self.log.info("Configure MTAOS CSC in the simuation mode.")
+            self.model = ModelSim(configObj, state0Dof)
+            self.log.info("Configure MTAOS CSC in the simulation mode.")
 
     def _logExecFunc(self):
         """Log the executed function."""

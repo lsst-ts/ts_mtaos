@@ -23,6 +23,7 @@ import os
 import time
 import numpy as np
 import unittest
+import yaml
 
 from lsst.ts.wep.ctrlIntf.SensorWavefrontData import SensorWavefrontData
 
@@ -51,8 +52,14 @@ class TestModelSim(unittest.TestCase):
     def setUpClass(cls):
 
         config = Config()
-        configByObj = MTAOS.ConfigByObj(config)
-        cls.modelSim = MTAOS.ModelSim(configByObj)
+        configObj = MTAOS.Config(config)
+        state0Dof = yaml.safe_load(
+            MTAOS.getModulePath()
+            .joinpath("tests", "testData", "state0inDof.yaml")
+            .open()
+            .read()
+        )
+        cls.modelSim = MTAOS.ModelSim(configObj, state0Dof)
 
     def tearDown(self):
 

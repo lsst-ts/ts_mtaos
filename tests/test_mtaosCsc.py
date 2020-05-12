@@ -72,7 +72,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
     async def testBinScript(self):
         cmdline_args = ["--simulate", "--logToFile"]
         await self.check_bin_script("MTAOS", 0, "run_mtaos.py",
-                                    cmdline_args=cmdline_args)
+                                    cmdline_args)
 
     async def testInitWithoutConfigDir(self):
         async with self.make_csc(

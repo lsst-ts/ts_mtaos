@@ -31,25 +31,27 @@ from lsst.ts import MTAOS
 class Config(object):
     """Config Class for the test."""
 
-    def __init__(self, hasSkyFile=True):
+    def __init__(self, hasSkyFile=True, hasState0Dof=True):
 
         self.camera = "comcam"
         self.instrument = "comcam"
         self.defaultIsrDir = "/home/lsst/input"
 
-        if (hasSkyFile):
+        if hasSkyFile:
             self.defaultSkyFilePath = "tests/testData/phosimOutput/realComCam/skyComCamInfo.txt"
+
+        if hasState0Dof:
+            self.state0DofFilePath = "tests/testData/state0inDof.yaml"
 
 
 class TestConfigByObj(unittest.TestCase):
-    """Test the ConfigByObj class."""
+    """Test the Config class with an object."""
 
     def setUp(self):
 
         os.environ["ISRDIRPATH"] = os.path.join(os.sep, "isrDir")
 
-        config = Config()
-        self.configByObj = MTAOS.ConfigByObj(config)
+        self.configObj = MTAOS.Config(Config())
 
     def tearDown(self):
 
@@ -58,19 +60,19 @@ class TestConfigByObj(unittest.TestCase):
         except KeyError:
             pass
 
-    def testGetCamTypeInConfig(self):
+    def testGetCamType(self):
 
-        camType = self.configByObj.getCamTypeInConfig()
+        camType = self.configObj.getCamType()
         self.assertEqual(camType, CamType.ComCam)
 
-    def testGetInstNameInConfig(self):
+    def testGetInstName(self):
 
-        instName = self.configByObj.getInstNameInConfig()
+        instName = self.configObj.getInstName()
         self.assertEqual(instName, InstName.COMCAM)
 
     def testGetIsrDirWithEnvPath(self):
 
-        isrDir = self.configByObj.getIsrDir()
+        isrDir = self.configObj.getIsrDir()
         self.assertEqual(isrDir, os.environ["ISRDIRPATH"])
 
     def testGetIsrDirWithoutEnvPath(self):
@@ -78,22 +80,35 @@ class TestConfigByObj(unittest.TestCase):
         os.environ.pop("ISRDIRPATH")
 
         with self.assertWarns(UserWarning):
-            isrDir = self.configByObj.getIsrDir()
+            isrDir = self.configObj.getIsrDir()
 
-        self.assertEqual(isrDir, self.configByObj.configObj.defaultIsrDir)
+        self.assertEqual(isrDir, self.configObj.configObj.defaultIsrDir)
 
-    def testGetDefaultSkyFileInConfig(self):
+    def testGetDefaultSkyFile(self):
 
-        skyFilePath = self.configByObj.getDefaultSkyFileInConfig()
+        skyFilePath = self.configObj.getDefaultSkyFile()
         self.assertTrue(skyFilePath.exists())
 
-    def testGetDefaultSkyFileNotInConfig(self):
+    def testGetDefaultSkyFileNot(self):
 
         config = Config(hasSkyFile=False)
-        configByObj = MTAOS.ConfigByObj(config)
+        configObj = MTAOS.Config(config)
 
-        skyFilePath = configByObj.getDefaultSkyFileInConfig()
+        skyFilePath = configObj.getDefaultSkyFile()
         self.assertTrue(skyFilePath is None)
+
+    def testGetState0DofFile(self):
+
+        state0DofFilePath = self.configObj.getState0DofFile()
+        self.assertTrue(state0DofFilePath.exists())
+
+    def testGetState0DofFileNot(self):
+
+        config = Config(hasState0Dof=False)
+        configObj = MTAOS.Config(config)
+
+        state0DofFile = configObj.getState0DofFile()
+        self.assertTrue(state0DofFile is None)
 
 
 if __name__ == "__main__":

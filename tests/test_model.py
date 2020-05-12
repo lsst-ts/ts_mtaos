@@ -24,6 +24,7 @@ from pathlib import Path
 import shutil
 import unittest
 import numpy as np
+import yaml
 
 from lsst.ts.wep.ctrlIntf.WEPCalculationOfComCam import WEPCalculationOfComCam
 from lsst.ts.wep.Utility import runProgram
@@ -46,10 +47,17 @@ class TestModel(unittest.TestCase):
         # Let the MTAOS to set WEP based on this path variable
         os.environ["ISRDIRPATH"] = cls.isrDir.as_posix()
 
-        settingFilePath = MTAOS.getModulePath().joinpath("tests", "testData",
-                                                         "default.yaml")
-        config = MTAOS.ConfigByFile(settingFilePath)
-        cls.model = MTAOS.Model(config)
+        settingFilePath = MTAOS.getModulePath().joinpath(
+            "tests", "testData", "default.yaml"
+        )
+        config = MTAOS.Config(str(settingFilePath))
+        state0Dof = yaml.safe_load(
+            MTAOS.getModulePath()
+            .joinpath("tests", "testData", "state0inDof.yaml")
+            .open()
+            .read()
+        )
+        cls.model = MTAOS.Model(config, state0Dof)
 
     def setUp(self):
         os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
@@ -86,7 +94,7 @@ class TestModel(unittest.TestCase):
     def testGetConfig(self):
 
         config = self.model.getConfig()
-        self.assertTrue(isinstance(config, MTAOS.ConfigByFile))
+        self.assertTrue(isinstance(config, MTAOS.Config))
 
     def testGetListOfWavefrontError(self):
 
@@ -192,13 +200,22 @@ class TestModel(unittest.TestCase):
         userGain = 1
 
         rawImgDir = MTAOS.getModulePath().joinpath(
-            "tests", "testData", "phosimOutput", "realComCam")
+            "tests", "testData", "phosimOutput", "realComCam"
+        )
         priDir = rawImgDir.joinpath("intra").as_posix()
         secDir = rawImgDir.joinpath("extra").as_posix()
 
         self.model.procIntraExtraWavefrontError(
-            raInDeg, decInDeg, aFilter, rotAngInDeg, priVisit, priDir,
-            secVisit, secDir, userGain)
+            raInDeg,
+            decInDeg,
+            aFilter,
+            rotAngInDeg,
+            priVisit,
+            priDir,
+            secVisit,
+            secDir,
+            userGain,
+        )
 
         self.assertEqual(len(self.model.getListOfWavefrontError()), 9)
 
@@ -266,8 +283,17 @@ class TestModel(unittest.TestCase):
 
     def _getComCamSensorNameList(self):
 
-        sensorNameList = ["R22_S00", "R22_S01", "R22_S02", "R22_S10", "R22_S11",
-                          "R22_S12", "R22_S20", "R22_S21", "R22_S22"]
+        sensorNameList = [
+            "R22_S00",
+            "R22_S01",
+            "R22_S02",
+            "R22_S10",
+            "R22_S11",
+            "R22_S12",
+            "R22_S20",
+            "R22_S21",
+            "R22_S22",
+        ]
         return sensorNameList
 
     def _genFakeFlat(self, fakeFlatDir, detector):

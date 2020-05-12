@@ -16,5 +16,8 @@ defaultIsrDir: /home/lsst/input
 
 # Default sky file path relative to the root of ts_MTAOS module
 # This is for the test only
-# Comment this if use the bright star catalog instead
+# Comment this if the bright star catalog is used instead
 defaultSkyFilePath: tests/testData/phosimOutput/realComCam/skyComCamInfo.txt
+
+# State 0 Dof file path
+state0DofFilePath: tests/testData/state0inDof.yaml
