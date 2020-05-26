@@ -36,7 +36,7 @@ class Config(object):
         ----------
         config : str or object
             Source of the configuration. Either object received in configure
-            CsC call, or string for a filename.
+            CSC call, or string for a filename.
         """
         if type(config) == str:
             data = yaml.safe_load(open(config).read())

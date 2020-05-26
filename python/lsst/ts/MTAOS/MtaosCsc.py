@@ -78,9 +78,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
             debug_level = logging.DEBUG
         self.log = self._addLogWithFileHandlerIfDebug(debug_level,
                                                       outputLogFile=log_to_file)
-        if log_to_file is False:
-            logging.basicConfig(stream=sys.stdout, level=debug_level)
-
         self.log.info("Prepare MTAOS CSC.")
 
         schema = yaml.safe_load(Utility.getSchemaDir().joinpath("telescopedof.yaml").open().read())
@@ -125,6 +122,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
             fileDir = Utility.getLogDir()
             filePath = fileDir.joinpath(self.LOG_FILE_NAME)
             Utility.addRotFileHandler(self.log, filePath, debugLevel)
+        else:
+            logging.basicConfig(stream=sys.stdout, level=debugLevel)
 
         return self.log
 

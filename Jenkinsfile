@@ -7,7 +7,7 @@ pipeline {
         // Use the label to assign the node to run the test.
         // It is recommended by SQUARE team do not add the label.
         docker {
-            image 'lsstts/aos_sal'
+            image 'lsstts/aos_sal:latest'
             args "-u root --entrypoint=''"
         }
     }
@@ -48,30 +48,20 @@ pipeline {
             }
         }
 
-        stage('Setup container') {
+        stage('Building ts_wep C++ interface') {
             steps {
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
                         cd ${env.SAL_REPOS}
-    
+
                         cd phosim_utils
-                        setup -k -r . -t ${env.SIMS_VERSION}
+                        setup -r . -t ${env.SIMS_VERSION}
                         scons
                         cd ..
-    
+
                         cd ts_wep
-                        setup -k -r . -t ${env.SIMS_VERSION}
-                        scons
-                        cd ..
-    
-                        cd ts_ofc
-                        setup -k -r . -t ${env.SIMS_VERSION}
-                        scons
-                        cd ..
-    
-                        cd ts_phosim
-                        setup -k -r . -t ${env.SIMS_VERSION}
+                        setup -k -r .
                         scons
                         cd ..
                     """
@@ -93,19 +83,19 @@ pipeline {
                         cd ${env.SAL_REPOS}
     
                         cd phosim_utils
-                        setup -k -r . -t ${env.SIMS_VERSION}
+                        setup -r . -t ${env.SIMS_VERSION}
                         cd ..
     
                         cd ts_wep
-                        setup -k -r . -t ${env.SIMS_VERSION}
+                        setup -k -r .
                         cd ..
     
                         cd ts_ofc
-                        setup -k -r . -t ${env.SIMS_VERSION}
+                        setup -k -r .
                         cd ..
     
                         cd ts_phosim
-                        setup -k -r . -t ${env.SIMS_VERSION}
+                        setup -k -r .
                         cd ..
 
                         cd ${env.SAL_REPOS}/ts_config_mttcs

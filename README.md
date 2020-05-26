@@ -1,6 +1,6 @@
 # Main Telescope Active Optical System (MTAOS)
 
-MTAOS is a component of LSST Telescope and Site software. It process images taken by camera corner raft (wavefront sensors), computes corrections and sends them to M2 and camera hexapods and M1M3 support system.
+MTAOS is a component of LSST Telescope and Site software. It processes images taken by camera corner raft (wavefront sensors), computes corrections and sends them to M2 and camera hexapods and M1M3 support system.
 
 ## Supported OS + packages
 
