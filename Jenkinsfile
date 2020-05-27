@@ -7,7 +7,7 @@ pipeline {
         // Use the label to assign the node to run the test.
         // It is recommended by SQUARE team do not add the label.
         docker {
-            image 'lsstts/aos_aoclc:w_2020_15_sal'
+            image 'lsstts/aos_sal:latest'
             args "-u root --entrypoint=''"
         }
     }
@@ -27,9 +27,47 @@ pipeline {
         XML_REPORT="jenkinsReport/report.xml"
         // Module name used in the pytest coverage analysis
         MODULE_NAME="lsst.ts.MTAOS"
+        // SIMulated version
+        SIMS_VERSION="current"
     }
 
     stages {
+
+        stage('Cloning repos') {
+            steps {
+                withEnv(["HOME=${env.WORKSPACE}"]) {
+                    sh """
+                        cd ${env.SAL_REPOS}
+    
+                        git clone -b master https://github.com/lsst-dm/phosim_utils.git
+                        git clone -b ${env.CHANGE_TARGET} https://github.com/lsst-ts/ts_wep.git
+                        git clone -b ${env.CHANGE_TARGET} https://github.com/lsst-ts/ts_ofc.git
+                        git clone -b ${env.CHANGE_TARGET} https://github.com/lsst-ts/ts_phosim.git
+                    """
+                }
+            }
+        }
+
+        stage('Building ts_wep C++ interface') {
+            steps {
+                withEnv(["HOME=${env.WORKSPACE}"]) {
+                    sh """
+                        source ${env.SAL_SETUP_FILE}
+                        cd ${env.SAL_REPOS}
+
+                        cd phosim_utils
+                        setup -r . -t ${env.SIMS_VERSION}
+                        scons
+                        cd ..
+
+                        cd ts_wep
+                        setup -k -r .
+                        scons
+                        cd ..
+                    """
+                }
+            }
+        }
 
         stage('Unit Tests and Coverage Analysis') { 
             steps {
@@ -42,8 +80,27 @@ pipeline {
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
+                        cd ${env.SAL_REPOS}
+    
+                        cd phosim_utils
+                        setup -r . -t ${env.SIMS_VERSION}
+                        cd ..
+    
+                        cd ts_wep
+                        setup -k -r .
+                        cd ..
+    
+                        cd ts_ofc
+                        setup -k -r .
+                        cd ..
+    
+                        cd ts_phosim
+                        setup -k -r .
+                        cd ..
+
                         cd ${env.SAL_REPOS}/ts_config_mttcs
                         setup -k -r .
+
                         cd ${env.WORKSPACE}
                         setup -k -r .
                         pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT} tests/
@@ -60,6 +117,7 @@ pipeline {
             withEnv(["HOME=${env.WORKSPACE}"]) {
                 sh 'chown -R 1003:1003 ${HOME}/'
             }
+
             // The path of xml needed by JUnit is relative to
             // the workspace.
             junit "${env.XML_REPORT}"

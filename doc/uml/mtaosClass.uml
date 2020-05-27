@@ -1,10 +1,9 @@
 @startuml
-ConfigDefault <|-- ConfigByFile
-ConfigDefault <|-- ConfigByObj
+Config
 Model <|-- ModelSim
-Model *-- ConfigDefault
+Model *-- Config
 Model "1" *-- "2" CalcTime
 Model "1" *-- "2" CollOfListOfWfErr
 MtaosCsc *-- Model
-MtaosCsc ..> ConfigByObj
+MtaosCsc ..> Config
 @enduml

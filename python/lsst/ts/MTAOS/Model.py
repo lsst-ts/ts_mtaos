@@ -42,13 +42,15 @@ class Model(object):
     # Maximum length of queue for wavefront error
     MAX_LEN_QUEUE = 10
 
-    def __init__(self, config):
+    def __init__(self, config, state0Dof):
         """Initialize the model class.
 
         Parameters
         ----------
-        config : ConfigByFile or ConfigByObj
+        config : Config
             Configuration.
+        state0Dof : dict
+            Dictionary with state0 DoF data. None for default DoF.
         """
 
         # Configuration
@@ -74,13 +76,13 @@ class Model(object):
         self.calcTimeOfc = CalcTime()
 
         # Wavefront estimation pipeline
-        camType = self._config.getCamTypeInConfig()
+        camType = self._config.getCamType()
         isrDir = self._config.getIsrDir()
         self.wep = WEPCalculationFactory.getCalculator(camType, isrDir)
 
         # Optical feedback control
-        instName = self._config.getInstNameInConfig()
-        self.ofc = OFCCalculationFactory.getCalculator(instName)
+        instName = self._config.getInstName()
+        self.ofc = OFCCalculationFactory.getCalculator(instName, state0Dof)
 
         # M2 hexapod correction
         self.m2HexapodCorrection = M2HexapodCorrection(
@@ -103,7 +105,7 @@ class Model(object):
 
         Returns
         -------
-        ConfigByFile or ConfigByObj
+        Config
             Configuration.
         """
 
@@ -240,7 +242,7 @@ class Model(object):
 
         ztaac.aggState(-dofVisit[dofIdx])
 
-        self.ofc._initDofFromLastVisit()
+        self.ofc.initDofFromLastVisit()
 
     def resetWavefrontCorrection(self):
         """Reset the current calculation contains the wavefront error and
@@ -447,7 +449,7 @@ class Model(object):
         This function will be removed in the final.
         """
 
-        skyFile = self._config.getDefaultSkyFileInConfig()
+        skyFile = self._config.getDefaultSkyFile()
         if (skyFile is not None):
             self.wep.setSkyFile(skyFile.as_posix())
 
@@ -550,7 +552,3 @@ class Model(object):
         """
 
         return self.calcTimeOfc.getAvgTime()
-
-
-if __name__ == "__main__":
-    pass
