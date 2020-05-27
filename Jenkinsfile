@@ -17,18 +17,21 @@ pipeline {
     }
 
     environment {
-        //SAL user home
-        SAL_USERS_HOME="/home/saluser"
+        // SAL user home
+        SAL_USERS_HOME = "/home/saluser"
         // SAL setup file
-        SAL_SETUP_FILE="/home/saluser/.setup.sh"
+        SAL_SETUP_FILE = "/home/saluser/.setup.sh"
         // SAL-related repositories directory
-        SAL_REPOS="/home/saluser/repos"
+        SAL_REPOS = "/home/saluser/repos"
         // XML report path
-        XML_REPORT="jenkinsReport/report.xml"
+        XML_REPORT = "jenkinsReport/report.xml"
         // Module name used in the pytest coverage analysis
-        MODULE_NAME="lsst.ts.MTAOS"
+        MODULE_NAME = "lsst.ts.MTAOS"
         // SIMulated version
-        SIMS_VERSION="current"
+        SIMS_VERSION = "current"
+        // Target branch - either develop or master, depending on where we are merging or what
+        // branch is run
+        BRANCH = getBranchName(env.CHANGE_TARGET, env.BRANCH_NAME)
     }
 
     stages {
@@ -40,9 +43,9 @@ pipeline {
                         cd ${env.SAL_REPOS}
     
                         git clone -b master https://github.com/lsst-dm/phosim_utils.git
-                        git clone -b ${env.CHANGE_TARGET} https://github.com/lsst-ts/ts_wep.git
-                        git clone -b ${env.CHANGE_TARGET} https://github.com/lsst-ts/ts_ofc.git
-                        git clone -b ${env.CHANGE_TARGET} https://github.com/lsst-ts/ts_phosim.git
+                        git clone -b ${BRANCH} https://github.com/lsst-ts/ts_wep.git
+                        git clone -b ${BRANCH} https://github.com/lsst-ts/ts_ofc.git
+                        git clone -b ${BRANCH} https://github.com/lsst-ts/ts_phosim.git
                     """
                 }
             }
@@ -138,4 +141,20 @@ pipeline {
             deleteDir()
         }
     }
+}
+
+// Return branch name. If changeTarget isn't defined, use branchName. Returns 
+// either develop or master
+def getBranchName(changeTarget, branchName) {
+    def branch = (changeTarget != null) ? changeTarget : branchName
+    // if not master or develop, it's ticket branch and so the main branch is
+    // develop. Can be adjusted with hotfix branches merging into master
+    // if (branch.startsWith("hotfix")) { return "master" }
+    switch (branch) {
+        case "master":
+        case "develop":
+            return branch
+    }
+    print("!!! Returning default for branch " + branch + " !!!\n")
+    return "develop"
 }
