@@ -39,7 +39,8 @@ class TestUtility(unittest.TestCase):
     def setUp(self):
 
         self.dataDir = tempfile.TemporaryDirectory(
-            dir=MTAOS.getModulePath().joinpath("tests").as_posix())
+            dir=MTAOS.getModulePath().joinpath("tests").as_posix()
+        )
 
     def tearDown(self):
 
@@ -110,8 +111,9 @@ class TestUtility(unittest.TestCase):
         log = logging.Logger("test")
         dataDirPath = self.dataDir.name
         filePath = Path(dataDirPath).joinpath("test.log")
-        MTAOS.addRotFileHandler(log, filePath, logging.DEBUG, maxBytes=1e3,
-                                backupCount=5)
+        MTAOS.addRotFileHandler(
+            log, filePath, logging.DEBUG, maxBytes=1e3, backupCount=5
+        )
 
         handlers = log.handlers
         self.assertEqual(len(handlers), 1)

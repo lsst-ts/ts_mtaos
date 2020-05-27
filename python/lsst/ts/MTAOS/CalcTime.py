@@ -26,7 +26,6 @@ import numpy as np
 
 
 class CalcTime(object):
-
     def __init__(self):
         """Initialize the calculation time class."""
 
@@ -53,7 +52,7 @@ class CalcTime(object):
             Latest record in second. Return None if there is no record.
         """
 
-        if (self._recordExists()):
+        if self._recordExists():
             return self._calcTimes[-1]
         else:
             return None
@@ -67,7 +66,7 @@ class CalcTime(object):
             Return True if there is the record. False if no record.
         """
 
-        if (len(self._calcTimes) == 0):
+        if len(self._calcTimes) == 0:
             return False
         else:
             return True
@@ -87,7 +86,7 @@ class CalcTime(object):
             record.
         """
 
-        if (self._recordExists()):
+        if self._recordExists():
             return np.average(self._calcTimes)
         else:
             return 0.0

@@ -46,9 +46,18 @@ class ModelSim(Model):
         # Fake the ingestion time
         time.sleep(3)
 
-    def procIntraExtraWavefrontError(self, raInDeg, decInDeg, aFilter,
-                                     rotAngInDeg, priVisit, priDir, secVisit,
-                                     secDir, userGain):
+    def procIntraExtraWavefrontError(
+        self,
+        raInDeg,
+        decInDeg,
+        aFilter,
+        rotAngInDeg,
+        priVisit,
+        priDir,
+        secVisit,
+        secDir,
+        userGain,
+    ):
         """Process the intra- and extra-focal wavefront error.
 
         Parameters

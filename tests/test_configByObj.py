@@ -38,7 +38,9 @@ class Config(object):
         self.defaultIsrDir = "/home/lsst/input"
 
         if hasSkyFile:
-            self.defaultSkyFilePath = "tests/testData/phosimOutput/realComCam/skyComCamInfo.txt"
+            self.defaultSkyFilePath = (
+                "tests/testData/phosimOutput/realComCam/skyComCamInfo.txt"
+            )
 
         if hasState0Dof:
             self.state0DofFilePath = "tests/testData/state0inDof.yaml"

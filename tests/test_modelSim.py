@@ -39,7 +39,8 @@ class Config(object):
         self.instrument = "comcam"
         self.defaultIsrDir = os.path.join(os.sep, "home", "lsst", "input")
         self.defaultSkyFilePath = os.path.join(
-            "tests", "testData", "phosimOutput", "realComCam", "skyComCamInfo.txt")
+            "tests", "testData", "phosimOutput", "realComCam", "skyComCamInfo.txt"
+        )
 
 
 class TestModelSim(unittest.TestCase):
@@ -109,8 +110,16 @@ class TestModelSim(unittest.TestCase):
         secVisit = 9006001
         secDir = "secDir"
         self.modelSim.procIntraExtraWavefrontError(
-            raInDeg, decInDeg, aFilter, rotAngInDeg, priVisit, priDir,
-            secVisit, secDir, userGain)
+            raInDeg,
+            decInDeg,
+            aFilter,
+            rotAngInDeg,
+            priVisit,
+            priDir,
+            secVisit,
+            secDir,
+            userGain,
+        )
 
     def _getAvgCalcTimeWep(self):
 
@@ -141,9 +150,11 @@ class TestModelSim(unittest.TestCase):
 
     def testCalcCorrectionFromAvgWfErrException(self):
 
-        self.assertRaisesRegex(RuntimeError,
-                               "No data in the collection of taken data.",
-                               self.modelSim.calcCorrectionFromAvgWfErr)
+        self.assertRaisesRegex(
+            RuntimeError,
+            "No data in the collection of taken data.",
+            self.modelSim.calcCorrectionFromAvgWfErr,
+        )
 
         sensorWavefrontData = SensorWavefrontData()
         sensorWavefrontData.setSensorId(96)
@@ -153,9 +164,11 @@ class TestModelSim(unittest.TestCase):
         # Mimic the publish of event of MtaosCsc
         self.modelSim.getListOfWavefrontError()
 
-        self.assertRaisesRegex(RuntimeError,
-                               "Equation number < variable number.",
-                               self.modelSim.calcCorrectionFromAvgWfErr)
+        self.assertRaisesRegex(
+            RuntimeError,
+            "Equation number < variable number.",
+            self.modelSim.calcCorrectionFromAvgWfErr,
+        )
 
     def testCalcCorrectionFromAvgWfErrMultiExp(self):
 

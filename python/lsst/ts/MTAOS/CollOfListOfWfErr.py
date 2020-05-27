@@ -26,7 +26,6 @@ from collections import deque
 
 
 class CollOfListOfWfErr(object):
-
     def __init__(self, maxLeng):
         """Collection of list of wavefront sensor data.
 
@@ -116,7 +115,7 @@ class CollOfListOfWfErr(object):
 
         # Check there is the wavefront error data in collection or not
         numOfElements = len(self._collectionDataTaken)
-        if (numOfElements == 0):
+        if numOfElements == 0:
             raise RuntimeError("No data in the collection of taken data.")
 
         # Do the average of wavefont error
@@ -124,7 +123,7 @@ class CollOfListOfWfErr(object):
 
         for wfErr in listOfWfErrAvg:
             zk = wfErr.getAnnularZernikePoly()
-            wfErr.setAnnularZernikePoly(zk/numOfElements)
+            wfErr.setAnnularZernikePoly(zk / numOfElements)
 
         idxWfErrMiss = []
         while self._collectionDataTaken:
@@ -132,13 +131,14 @@ class CollOfListOfWfErr(object):
             listOfWfErrNext = self._collectionDataTaken.pop()
             for idx, wfErr in enumerate(listOfWfErrAvg):
                 sensorId = wfErr.getSensorId()
-                wfErrNext = self._getSensorWavefrontDataInList(listOfWfErrNext,
-                                                               sensorId)
+                wfErrNext = self._getSensorWavefrontDataInList(
+                    listOfWfErrNext, sensorId
+                )
 
-                if (wfErrNext is not None):
+                if wfErrNext is not None:
                     zk = wfErr.getAnnularZernikePoly()
                     zkNext = wfErrNext.getAnnularZernikePoly()
-                    wfErr.setAnnularZernikePoly(zk + zkNext/numOfElements)
+                    wfErr.setAnnularZernikePoly(zk + zkNext / numOfElements)
                 else:
                     # Collect the index of wavefront error data if there is the
                     # data missing
@@ -149,8 +149,11 @@ class CollOfListOfWfErr(object):
         idxWfErrMissUnique = np.unique(np.array(idxWfErrMiss)).tolist()
 
         # Only return the value that is not in the above list
-        return [listOfWfErrAvg[idx] for idx in range(len(listOfWfErrAvg))
-                if idx not in idxWfErrMissUnique]
+        return [
+            listOfWfErrAvg[idx]
+            for idx in range(len(listOfWfErrAvg))
+            if idx not in idxWfErrMissUnique
+        ]
 
     def _getSensorWavefrontDataInList(self, listOfWfErr, sensorId):
         """Get the sensor wavefront data in the list.

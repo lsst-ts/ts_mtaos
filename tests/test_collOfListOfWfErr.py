@@ -102,8 +102,9 @@ class TestCollOfListOfWfErr(unittest.TestCase):
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithoutData(self):
 
-        self.assertRaises(RuntimeError,
-                          self.collOfListOfWfErr.getListOfWavefrontErrorAvgInTakenData)
+        self.assertRaises(
+            RuntimeError, self.collOfListOfWfErr.getListOfWavefrontErrorAvgInTakenData
+        )
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithSglData(self):
 
