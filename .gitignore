@@ -16,5 +16,8 @@ pytest_session.txt
 .cache/
 .pytest_cache
 
+# Vscode setting
+.vscode/
+
 # Mac related files
 .DS_Store
