@@ -2,28 +2,32 @@
 
 MTAOS is a component of LSST Telescope and Site software. It processes images taken by camera corner raft (wavefront sensors), computes corrections and sends them to M2 and camera hexapods and M1M3 support system.
 
-## Supported OS + packages
+## Supported OS + Packages
 
 - CentOS 7
 - python: 3.7.6
-- scientific pipeline (`newinstall.sh` from master branch)
 
-## Required LSST packages
+## Required LSST Packages
 
 - [ts_wep](https://github.com/lsst-ts/ts_wep)
 - [ts_ofc](https://github.com/lsst-ts/ts_ofc)
-- [ts_sal](https://github.com/lsst-ts/ts_sal)
-- [ts_xml](https://github.com/lsst-ts/ts_xml)
-- [ts_opensplice](https://github.com/lsst-ts/ts_opensplice)
 - [ts_config_mttcs](https://github.com/lsst-ts/ts_config_mttcs)
 - [ts_salobj](https://github.com/lsst-ts/ts_salobj)
-- [ts_phosim](https://github.com/lsst-ts/ts_phosim) (optional)
+- [black](https://github.com/psf/black) (optional)
 
-## Docker images
+## Docker Images
 
 All required packages are available in [lsst/aos_aoclc](https://hub.docker.com/r/lsstts/aos_aoclc) container. [lsstts/mtaos_sim](https://hub.docker.com/r/lsstts/mtaos_sim) runs MTAOS CsC as simulator.
 
-## Client IDL files
+## Code Format
+
+This code is automatically formatted by `black` using a git pre-commit hook.
+To enable this:
+
+1. Install the `black` Python package.
+2. Run `git config core.hooksPath .githooks` once in this repository.
+
+## Client IDL Files
 
 To generate IDL files for clients, run:
 
@@ -65,9 +69,9 @@ See `run_mtaos.py -h` for details.
 
 Python logging packages is used, with default log level set to DEBUG. You can change the level with `--debugLevel` argument. Add the `--logToFile` argument to log messages to a log file.
 
-## Building documentation
+## Building Documentation
 
-### Additional requirements
+### Additional Requirements
 
 _Provided in `lsstts/mtaos_sim` container._
 
@@ -75,9 +79,9 @@ _Provided in `lsstts/mtaos_sim` container._
 - [plantuml](https://newcontinuum.dl.sourceforge.net/project/plantuml/plantuml.jar)
 - [sphinxcontrib-plantuml](https://pypi.org/project/sphinxcontrib-plantuml/)
 
-You can update plantuml.jar path in [doc/conf.py](doc/conf.py).
+You can update `plantuml.jar` path in [doc/conf.py](doc/conf.py).
 
-To build the documentation, run 
+To build the documentation, run:
 
 ```bash
 package-docs build

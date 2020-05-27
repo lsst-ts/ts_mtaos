@@ -6,6 +6,22 @@
 Version History
 ##################
 
+.. _lsst.ts.MTAOS-0.4.1:
+
+-------------
+0.4.1
+-------------
+
+Reformat the code by black. Add the black check to .githooks. Ignore flake8 check of E203 ans W503 for the black.
+
+.. _lsst.ts.MTAOS-0.4.0:
+
+-------------
+0.4.0
+-------------
+
+Configure the state0 in degree of freedom (DOF) from MTAOS files. Use the scientific pipeline w_2020_20.
+
 .. _lsst.ts.MTAOS-0.3.9:
 
 -------------
