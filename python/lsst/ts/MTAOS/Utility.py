@@ -19,9 +19,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["WEPWarning", "OFCWarning", "getModulePath", "getConfigDir",
-           "getSchemaDir", "getLogDir", "getIsrDirPath", "getCamType",
-           "getInstName", "getCscName", "addRotFileHandler"]
+__all__ = [
+    "WEPWarning",
+    "OFCWarning",
+    "getModulePath",
+    "getConfigDir",
+    "getSchemaDir",
+    "getLogDir",
+    "getIsrDirPath",
+    "getCamType",
+    "getInstName",
+    "getCscName",
+    "addRotFileHandler",
+]
 
 import os
 import logging
@@ -132,11 +142,11 @@ def getCamType(camera):
         The camera is not supported.
     """
 
-    if (camera == "lsstCam"):
+    if camera == "lsstCam":
         return CamType.LsstCam
-    elif (camera == "lsstFamCam"):
+    elif camera == "lsstFamCam":
         return CamType.LsstFamCam
-    elif (camera == "comcam"):
+    elif camera == "comcam":
         return CamType.ComCam
     else:
         raise ValueError("The camera (%s) is not supported." % camera)
@@ -161,13 +171,13 @@ def getInstName(instName):
         This instrument is not supported.
     """
 
-    if (instName == "lsst"):
+    if instName == "lsst":
         return InstName.LSST
-    elif (instName == "comcam"):
+    elif instName == "comcam":
         return InstName.COMCAM
-    elif (instName == "sh"):
+    elif instName == "sh":
         return InstName.SH
-    elif (instName == "cmos"):
+    elif instName == "cmos":
         return InstName.CMOS
     else:
         raise ValueError("This instrument (%s) is not supported." % instName)
@@ -208,8 +218,11 @@ def addRotFileHandler(log, filePath, debugLevel, maxBytes=1e6, backupCount=5):
     """
 
     fileHandler = RotatingFileHandler(
-        filename=filePath, mode="a", maxBytes=int(maxBytes),
-        backupCount=int(backupCount))
+        filename=filePath,
+        mode="a",
+        maxBytes=int(maxBytes),
+        backupCount=int(backupCount),
+    )
 
     logFormat = logging.Formatter(fmt="%(asctime)s - %(levelname)s - %(message)s")
     fileHandler.setFormatter(logFormat)

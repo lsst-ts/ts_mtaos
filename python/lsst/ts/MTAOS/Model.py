@@ -85,20 +85,18 @@ class Model(object):
         self.ofc = OFCCalculationFactory.getCalculator(instName, state0Dof)
 
         # M2 hexapod correction
-        self.m2HexapodCorrection = M2HexapodCorrection(
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        self.m2HexapodCorrection = M2HexapodCorrection(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
         # Camera hexapod correction
         self.cameraHexapodCorrection = CameraHexapodCorrection(
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        )
 
         # M1M3 actuator correction
-        self.m1m3Correction = M1M3Correction(np.zeros(
-            M1M3Correction.NUM_OF_ACT))
+        self.m1m3Correction = M1M3Correction(np.zeros(M1M3Correction.NUM_OF_ACT))
 
         # M2 actuator correction
-        self.m2Correction = M2Correction(np.zeros(
-            M2Correction.NUM_OF_ACT))
+        self.m2Correction = M2Correction(np.zeros(M2Correction.NUM_OF_ACT))
 
     def getConfig(self):
         """Get the configuration.
@@ -167,7 +165,7 @@ class Model(object):
 
         sensorData = self._getFWHMSensorDataInList(sensorId)
 
-        if (sensorData is None):
+        if sensorData is None:
             sensorDataNew = FWHMSensorData(sensorId, fwhmValues)
             self.listOfFWHMSensorData.append(sensorDataNew)
         else:
@@ -191,7 +189,7 @@ class Model(object):
         """
 
         for fwhmSensorData in self.listOfFWHMSensorData:
-            if (fwhmSensorData.getSensorId() == sensorId):
+            if fwhmSensorData.getSensorId() == sensorId:
                 return fwhmSensorData
 
         return None
@@ -252,8 +250,12 @@ class Model(object):
         """
 
         self._clearCollectionsOfWfErr()
-        self.m2HexapodCorrection, self.cameraHexapodCorrection, self.m1m3Correction, self.m2Correction = \
-            self.ofc.resetOfcState()
+        (
+            self.m2HexapodCorrection,
+            self.cameraHexapodCorrection,
+            self.m1m3Correction,
+            self.m2Correction,
+        ) = self.ofc.resetOfcState()
 
     def _clearCollectionsOfWfErr(self):
         """Clear the collections of wavefront error contain the rejected one.
@@ -337,9 +339,18 @@ class Model(object):
 
         self.wep.ingestCalibs(calibsDir)
 
-    def procIntraExtraWavefrontError(self, raInDeg, decInDeg, aFilter,
-                                     rotAngInDeg, priVisit, priDir, secVisit,
-                                     secDir, userGain):
+    def procIntraExtraWavefrontError(
+        self,
+        raInDeg,
+        decInDeg,
+        aFilter,
+        rotAngInDeg,
+        priVisit,
+        priDir,
+        secVisit,
+        secDir,
+        userGain,
+    ):
         """Process the intra- and extra-focal wavefront error.
 
         Parameters
@@ -374,8 +385,14 @@ class Model(object):
 
         # Do WEP and record time
         self.calcTimeWep.evalCalcTimeAndPutRecord(
-            self._calcWavefrontError, raInDeg, decInDeg, filterType, rotAngInDeg,
-            intraRawExpData, extraRawExpData)
+            self._calcWavefrontError,
+            raInDeg,
+            decInDeg,
+            filterType,
+            rotAngInDeg,
+            intraRawExpData,
+            extraRawExpData,
+        )
 
         # Record the user gain value for OFC to use
         self.userGain = userGain
@@ -404,8 +421,15 @@ class Model(object):
 
         return expData
 
-    def _calcWavefrontError(self, raInDeg, decInDeg, filterType, rotAngInDeg,
-                            rawExpData, extraRawExpData=None):
+    def _calcWavefrontError(
+        self,
+        raInDeg,
+        decInDeg,
+        filterType,
+        rotAngInDeg,
+        rawExpData,
+        extraRawExpData=None,
+    ):
         """Calculate the wavefront error.
 
         Parameters
@@ -436,7 +460,8 @@ class Model(object):
         self.wep.setRotAng(rotAngInDeg)
 
         listOfWfErr = self.wep.calculateWavefrontErrors(
-            rawExpData, extraRawExpData=extraRawExpData)
+            rawExpData, extraRawExpData=extraRawExpData
+        )
         listOfWfErrRej = self.rejWavefrontErrorUnreasonable(listOfWfErr)
 
         # Collect the data
@@ -450,7 +475,7 @@ class Model(object):
         """
 
         skyFile = self._config.getDefaultSkyFile()
-        if (skyFile is not None):
+        if skyFile is not None:
             self.wep.setSkyFile(skyFile.as_posix())
 
     def rejWavefrontErrorUnreasonable(self, listOfWfErr):
@@ -482,7 +507,8 @@ class Model(object):
         try:
             # Do OFC and record time
             self.calcTimeOfc.evalCalcTimeAndPutRecord(
-                self._calcCorrection, filterType, rotAngInDeg)
+                self._calcCorrection, filterType, rotAngInDeg
+            )
         except Exception:
             raise
         finally:
@@ -507,8 +533,8 @@ class Model(object):
 
         self.ofc.setFilter(filterType)
         self.ofc.setRotAng(rotAngInDeg)
-        if (self.userGain == -1):
-            if (len(self.listOfFWHMSensorData) == 0):
+        if self.userGain == -1:
+            if len(self.listOfFWHMSensorData) == 0:
                 raise RuntimeError("No FWHM sensor data to use.")
             else:
                 self.ofc.setGainByPSSN()
@@ -516,9 +542,15 @@ class Model(object):
         else:
             self.ofc.setGainByUser(self.userGain)
 
-        listOfWfErrAvg = self.collectionOfListOfWfErr.getListOfWavefrontErrorAvgInTakenData()
-        m2HexapodCorrection, cameraHexapodCorrection, m1m3Correction, m2Correction = \
-            self.ofc.calculateCorrections(listOfWfErrAvg)
+        listOfWfErrAvg = (
+            self.collectionOfListOfWfErr.getListOfWavefrontErrorAvgInTakenData()
+        )
+        (
+            m2HexapodCorrection,
+            cameraHexapodCorrection,
+            m1m3Correction,
+            m2Correction,
+        ) = self.ofc.calculateCorrections(listOfWfErrAvg)
 
         # Need to add a step of checking the calculated correction
         # in the future

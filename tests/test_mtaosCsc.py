@@ -34,12 +34,9 @@ STD_TIMEOUT = 60
 
 
 class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
-
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
         return MTAOS.MtaosCsc(
-            config_dir=config_dir,
-            simulation_mode=simulation_mode,
-            log_to_file=True
+            config_dir=config_dir, simulation_mode=simulation_mode, log_to_file=True
         )
 
     def setUp(self):
@@ -71,13 +68,13 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     async def testBinScript(self):
         cmdline_args = ["--simulate", "--logToFile"]
-        await self.check_bin_script("MTAOS", 0, "run_mtaos.py",
-                                    cmdline_args=cmdline_args)
+        await self.check_bin_script(
+            "MTAOS", 0, "run_mtaos.py", cmdline_args=cmdline_args
+        )
 
     async def testInitWithoutConfigDir(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None,
-            simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
 
             configDir = Path(getPackageDir("ts_config_mttcs"))
@@ -89,8 +86,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
     async def testInitWithConfigDir(self):
         configDir = MTAOS.getModulePath().joinpath("tests", "testData")
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=configDir,
-            simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=configDir, simulation_mode=1
         ):
 
             csc = self._getCsc()
@@ -98,8 +94,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     async def testConfiguration(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None,
-            simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
             await self._startCsc()
 
@@ -113,15 +108,17 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     async def testCommandsWrongState(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None,
-            simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
 
             remote = self._getRemote()
 
-            funcNames = ["resetWavefrontCorrection", "issueWavefrontCorrection",
-                         "processCalibrationProducts",
-                         "processIntraExtraWavefrontError"]
+            funcNames = [
+                "resetWavefrontCorrection",
+                "issueWavefrontCorrection",
+                "processCalibrationProducts",
+                "processIntraExtraWavefrontError",
+            ]
             for funcName in funcNames:
                 cmdObj = getattr(remote, f"cmd_{funcName}")
                 with self.assertRaises(salobj.AckError):
@@ -130,33 +127,37 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
     @asynctest.skip("Need timeout support of check_standard_state_transitions()")
     async def testStandardStateTransitions(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None,
-            simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
-            enabled_commands = ("resetWavefrontCorrection",
-                                "issueWavefrontCorrection",
-                                "processCalibrationProducts",
-                                "processIntraExtraWavefrontError")
-            skip_commands = ("processWavefrontError",
-                             "processShWavefrontError",
-                             "processCmosWavefrontError")
+            enabled_commands = (
+                "resetWavefrontCorrection",
+                "issueWavefrontCorrection",
+                "processCalibrationProducts",
+                "processIntraExtraWavefrontError",
+            )
+            skip_commands = (
+                "processWavefrontError",
+                "processShWavefrontError",
+                "processCmosWavefrontError",
+            )
             await self.check_standard_state_transitions(
-                enabled_commands=enabled_commands,
-                skip_commands=skip_commands)
+                enabled_commands=enabled_commands, skip_commands=skip_commands
+            )
 
     async def testResetWavefrontCorrection(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None,
-            simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
             await self._startCsc()
 
             remote = self._getRemote()
             await remote.cmd_resetWavefrontCorrection.set_start(
-                timeout=STD_TIMEOUT, value=True)
+                timeout=STD_TIMEOUT, value=True
+            )
 
             dof = await remote.evt_degreeOfFreedom.next(
-                flush=False, timeout=STD_TIMEOUT)
+                flush=False, timeout=STD_TIMEOUT
+            )
             dofAggr = dof.aggregatedDoF
             dofVisit = dof.visitDoF
             self.assertEqual(len(dofAggr), 50)
@@ -169,7 +170,8 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
     async def _checkCorrIsZero(self, remote):
 
         corrM2Hex = await remote.evt_m2HexapodCorrection.next(
-            flush=False, timeout=STD_TIMEOUT)
+            flush=False, timeout=STD_TIMEOUT
+        )
         self.assertEqual(corrM2Hex.x, 0)
         self.assertEqual(corrM2Hex.y, 0)
         self.assertEqual(corrM2Hex.z, 0)
@@ -178,7 +180,8 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         self.assertEqual(corrM2Hex.w, 0)
 
         corrCamHex = await remote.evt_cameraHexapodCorrection.next(
-            flush=False, timeout=STD_TIMEOUT)
+            flush=False, timeout=STD_TIMEOUT
+        )
         self.assertEqual(corrCamHex.x, 0)
         self.assertEqual(corrCamHex.y, 0)
         self.assertEqual(corrCamHex.z, 0)
@@ -187,21 +190,20 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         self.assertEqual(corrCamHex.w, 0)
 
         corrM1M3 = await remote.evt_m1m3Correction.next(
-            flush=False, timeout=STD_TIMEOUT)
+            flush=False, timeout=STD_TIMEOUT
+        )
         actForcesM1M3 = corrM1M3.zForces
         self.assertEqual(len(actForcesM1M3), 156)
         self.assertEqual(np.sum(np.abs(actForcesM1M3)), 0)
 
-        corrM2 = await remote.evt_m2Correction.next(
-            flush=False, timeout=STD_TIMEOUT)
+        corrM2 = await remote.evt_m2Correction.next(flush=False, timeout=STD_TIMEOUT)
         actForcesM2 = corrM2.zForces
         self.assertEqual(len(actForcesM2), 72)
         self.assertEqual(np.sum(np.abs(actForcesM2)), 0)
 
     async def testIssueWavefrontCorrection(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None,
-            simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
             await self._startCsc()
 
@@ -212,10 +214,12 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                     # value in the Model. Otherwise, the salobj.AckTimeoutError
                     # will not be raised.
                     await remote.cmd_issueWavefrontCorrection.set_start(
-                        timeout=10.0, value=True)
+                        timeout=10.0, value=True
+                    )
 
             dof = await remote.evt_rejectedDegreeOfFreedom.next(
-                flush=False, timeout=STD_TIMEOUT)
+                flush=False, timeout=STD_TIMEOUT
+            )
             dofAggr = dof.aggregatedDoF
             dofVisit = dof.visitDoF
             self.assertEqual(len(dofAggr), 50)
@@ -224,7 +228,8 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             self.assertEqual(np.sum(np.abs(dofVisit)), 0)
 
             corrM2Hex = await remote.evt_rejectedM2HexapodCorrection.next(
-                flush=False, timeout=STD_TIMEOUT)
+                flush=False, timeout=STD_TIMEOUT
+            )
             self.assertEqual(corrM2Hex.x, 0)
             self.assertEqual(corrM2Hex.y, 0)
             self.assertEqual(corrM2Hex.z, 0)
@@ -234,18 +239,24 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     async def testIssueWavefrontCorrectionWithWfErr(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None,
-            simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
             await self._startCsc()
 
             # Set the timeout > 20 seconds for the long calculation time
             remote = self._getRemote()
             await remote.cmd_processIntraExtraWavefrontError.set_start(
-                timeout=2*STD_TIMEOUT, intraVisit=0, extraVisit=1,
-                intraDirectoryPath="intraDir", extraDirectoryPath="extraDir",
-                fieldRA=0.0, fieldDEC=0.0, filter=7, cameraRotation=0.0,
-                userGain=1)
+                timeout=2 * STD_TIMEOUT,
+                intraVisit=0,
+                extraVisit=1,
+                intraDirectoryPath="intraDir",
+                extraDirectoryPath="extraDir",
+                fieldRA=0.0,
+                fieldDEC=0.0,
+                filter=7,
+                cameraRotation=0.0,
+                userGain=1,
+            )
 
             with self.assertRaises(salobj.AckTimeoutError):
                 with self.assertWarns(UserWarning):
@@ -253,18 +264,17 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                     # value in the Model. Otherwise, the salobj.AckTimeoutError
                     # will not be raised.
                     await remote.cmd_issueWavefrontCorrection.set_start(
-                        timeout=10.0, value=True)
+                        timeout=10.0, value=True
+                    )
 
             await self._checkOfcTopicsFromProcImg(remote)
 
     async def _checkOfcTopicsFromProcImg(self, remote):
 
-        warningOfc = await remote.evt_ofcWarning.next(
-            flush=False, timeout=STD_TIMEOUT)
+        warningOfc = await remote.evt_ofcWarning.next(flush=False, timeout=STD_TIMEOUT)
         self.assertEqual(warningOfc.warning, 0)
 
-        dof = await remote.evt_degreeOfFreedom.next(
-            flush=False, timeout=STD_TIMEOUT)
+        dof = await remote.evt_degreeOfFreedom.next(flush=False, timeout=STD_TIMEOUT)
         dofAggr = dof.aggregatedDoF
         dofVisit = dof.visitDoF
         self.assertEqual(len(dofAggr), 50)
@@ -275,13 +285,15 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         await self._checkCorrNotZero(remote)
 
         durationOfc = await remote.tel_ofcDuration.next(
-            flush=False, timeout=STD_TIMEOUT)
+            flush=False, timeout=STD_TIMEOUT
+        )
         self.assertGreater(durationOfc.calcTime, 0)
 
     async def _checkCorrNotZero(self, remote):
 
         corrM2Hex = await remote.evt_m2HexapodCorrection.next(
-            flush=False, timeout=STD_TIMEOUT)
+            flush=False, timeout=STD_TIMEOUT
+        )
         self.assertNotEqual(corrM2Hex.x, 0)
         self.assertNotEqual(corrM2Hex.y, 0)
         self.assertNotEqual(corrM2Hex.z, 0)
@@ -290,7 +302,8 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         self.assertEqual(corrM2Hex.w, 0)
 
         corrCamHex = await remote.evt_cameraHexapodCorrection.next(
-            flush=False, timeout=STD_TIMEOUT)
+            flush=False, timeout=STD_TIMEOUT
+        )
         self.assertNotEqual(corrCamHex.x, 0)
         self.assertNotEqual(corrCamHex.y, 0)
         self.assertNotEqual(corrCamHex.z, 0)
@@ -299,50 +312,55 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         self.assertEqual(corrCamHex.w, 0)
 
         corrM1M3 = await remote.evt_m1m3Correction.next(
-            flush=False, timeout=STD_TIMEOUT)
+            flush=False, timeout=STD_TIMEOUT
+        )
         actForcesM1M3 = corrM1M3.zForces
         self.assertEqual(len(actForcesM1M3), 156)
         self.assertNotEqual(np.sum(np.abs(actForcesM1M3)), 0)
 
-        corrM2 = await remote.evt_m2Correction.next(
-            flush=False, timeout=STD_TIMEOUT)
+        corrM2 = await remote.evt_m2Correction.next(flush=False, timeout=STD_TIMEOUT)
         actForcesM2 = corrM2.zForces
         self.assertEqual(len(actForcesM2), 72)
         self.assertNotEqual(np.sum(np.abs(actForcesM2)), 0)
 
     async def testProcessCalibrationProducts(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None,
-            simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
             await self._startCsc()
 
             remote = self._getRemote()
             await remote.cmd_processCalibrationProducts.set_start(
-                timeout=STD_TIMEOUT, directoryPath="calibsDir")
+                timeout=STD_TIMEOUT, directoryPath="calibsDir"
+            )
 
     async def testProcessIntraExtraWavefrontError(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None,
-            simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
             await self._startCsc()
 
             # Set the timeout > 20 seconds for the long calculation time
             remote = self._getRemote()
             await remote.cmd_processIntraExtraWavefrontError.set_start(
-                timeout=2*STD_TIMEOUT, intraVisit=0, extraVisit=1,
-                intraDirectoryPath="intraDir", extraDirectoryPath="extraDir",
-                fieldRA=0.0, fieldDEC=0.0, filter=7, cameraRotation=0.0,
-                userGain=1)
+                timeout=2 * STD_TIMEOUT,
+                intraVisit=0,
+                extraVisit=1,
+                intraDirectoryPath="intraDir",
+                extraDirectoryPath="extraDir",
+                fieldRA=0.0,
+                fieldDEC=0.0,
+                filter=7,
+                cameraRotation=0.0,
+                userGain=1,
+            )
 
             csc = self._getCsc()
             await self._checkWepTopicsFromProcImg(remote, csc)
 
     async def _checkWepTopicsFromProcImg(self, remote, csc):
 
-        warningWep = await remote.evt_wepWarning.next(
-            flush=False, timeout=STD_TIMEOUT)
+        warningWep = await remote.evt_wepWarning.next(flush=False, timeout=STD_TIMEOUT)
         self.assertEqual(warningWep.warning, 0)
 
         # The value here should be 0 because the wavefront error is published
@@ -353,7 +371,8 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         # Check the published wavefront error
         for counter in range(9):
             wfErr = await remote.evt_wavefrontError.next(
-                flush=False, timeout=STD_TIMEOUT)
+                flush=False, timeout=STD_TIMEOUT
+            )
             self.assertNotEqual(wfErr.sensorId, 0)
 
             zk = wfErr.annularZernikePoly
@@ -363,7 +382,8 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         numOfWfErrRej = len(csc.getModel().getListOfWavefrontErrorRej())
         for counter in range(numOfWfErrRej):
             wfErr = await remote.evt_rejectedWavefrontError.next(
-                flush=False, timeout=STD_TIMEOUT)
+                flush=False, timeout=STD_TIMEOUT
+            )
             self.assertNotEqual(wfErr.sensorId, 0)
 
             zk = wfErr.annularZernikePoly
@@ -371,7 +391,8 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             self.assertNotEqual(np.sum(np.abs(zk)), 0)
 
         durationWep = await remote.tel_wepDuration.next(
-            flush=False, timeout=STD_TIMEOUT)
+            flush=False, timeout=STD_TIMEOUT
+        )
         self.assertGreater(durationWep.calcTime, 14)
 
 

@@ -89,7 +89,7 @@ class TestCalcTime(unittest.TestCase):
         self.assertGreater(timeLatest, 3.0)
 
     def _testFunc(self, a, defaultTime=1.0):
-        sleepTime = a*defaultTime
+        sleepTime = a * defaultTime
         time.sleep(sleepTime)
 
 
