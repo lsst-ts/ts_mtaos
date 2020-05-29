@@ -53,9 +53,11 @@ pipeline {
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
+
                         cd phosim_utils
                         setup -k -r . -t ${env.SIMS_VERSION}
                         scons
+
                         cd ../ts_wep
                         setup -k -r .
                         scons
@@ -70,14 +72,19 @@ pipeline {
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
+
                         cd phosim_utils
                         setup -k -r . -t ${env.SIMS_VERSION}
+
                         cd ../ts_wep
                         setup -k -r .
+
                         cd ../ts_ofc
                         setup -k -r .
+
                         cd ${env.SAL_REPOS}/ts_config_mttcs
                         setup -k -r .
+
                         cd ${HOME}
                         setup -k -r .
                         pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT} tests/
