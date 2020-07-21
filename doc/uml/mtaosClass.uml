@@ -1,5 +1,4 @@
 @startuml
-Config
 Model <|-- ModelSim
 Model *-- Config
 Model "1" *-- "2" CalcTime
