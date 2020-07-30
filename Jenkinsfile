@@ -7,7 +7,7 @@ pipeline {
         // Use the label to assign the node to run the test.
         // It is recommended by SQUARE team do not add the label.
         docker {
-            image 'lsstts/aos_sal:latest'
+            image 'lsstts/aos_sal:w_2020_22_sal'
             args "-u root --entrypoint=''"
         }
     }
@@ -20,7 +20,7 @@ pipeline {
         // SAL user home
         SAL_USERS_HOME = "/home/saluser"
         // SAL setup file
-        SAL_SETUP_FILE = "/home/saluser/.setup.sh"
+        SAL_SETUP_FILE = "/home/saluser/.setup_dev.sh"
         // SAL-related repositories directory
         SAL_REPOS = "/home/saluser/repos"
         // XML report path
@@ -32,6 +32,11 @@ pipeline {
         // Target branch - either develop or master, depending on where we are
         // merging or what branch is run
         BRANCH = getBranchName(env.CHANGE_TARGET, env.BRANCH_NAME)
+        // Authority to publish the document online
+        user_ci = credentials('lsst-io')
+        LTD_USERNAME = "${user_ci_USR}"
+        LTD_PASSWORD = "${user_ci_PSW}"
+        DOCUMENT_NAME = "ts-mtaos"
     }
 
     stages {
@@ -54,11 +59,11 @@ pipeline {
                     sh """
                         source ${env.SAL_SETUP_FILE}
 
-                        cd phosim_utils
+                        cd phosim_utils/
                         setup -k -r . -t ${env.SIMS_VERSION}
                         scons
 
-                        cd ../ts_wep
+                        cd ../ts_wep/
                         setup -k -r .
                         scons
                     """
@@ -73,25 +78,48 @@ pipeline {
                     sh """
                         source ${env.SAL_SETUP_FILE}
 
-                        cd phosim_utils
+                        cd phosim_utils/
                         setup -k -r . -t ${env.SIMS_VERSION}
 
-                        cd ../ts_wep
+                        cd ../ts_wep/
                         setup -k -r .
 
-                        cd ../ts_ofc
+                        cd ../ts_ofc/
                         setup -k -r .
 
-                        cd ${env.SAL_REPOS}/ts_config_mttcs
-                        setup -k -r .
-
-                        cd ${HOME}
+                        cd ../
                         setup -k -r .
                         pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT} tests/
                     """
                 }
             }
         }
+
+        stage('Build and Upload Documentation') {
+            steps {
+                withEnv(["HOME=${env.WORKSPACE}"]) {
+                    sh """
+                        source ${env.SAL_SETUP_FILE}
+
+                        cd phosim_utils/
+                        setup -k -r . -t ${env.SIMS_VERSION}
+
+                        cd ../ts_wep/
+                        setup -k -r .
+
+                        cd ../ts_ofc/
+                        setup -k -r .
+
+                        cd ../
+                        setup -k -r .
+
+                        package-docs build
+                        ltd upload --product ${env.DOCUMENT_NAME} --git-ref ${GIT_BRANCH} --dir doc/_build/html
+                    """
+                }
+            }
+        }
+
     }
 
     post {
