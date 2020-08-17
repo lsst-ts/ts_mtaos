@@ -7,7 +7,7 @@ pipeline {
         // Use the label to assign the node to run the test.
         // It is recommended by SQUARE team do not add the label.
         docker {
-            image 'lsstts/aos_sal:w_2020_22_sal'
+            image 'lsstts/aos_sal:w_2020_29_sal'
             args "-u root --entrypoint=''"
         }
     }
@@ -27,7 +27,7 @@ pipeline {
         XML_REPORT = "jenkinsReport/report.xml"
         // Module name used in the pytest coverage analysis
         MODULE_NAME = "lsst.ts.MTAOS"
-        // SIMulated version
+        // Simulated version
         SIMS_VERSION = "current"
         // Target branch - either develop or master, depending on where we are
         // merging or what branch is run
