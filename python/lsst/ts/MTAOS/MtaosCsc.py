@@ -93,16 +93,18 @@ class MtaosCsc(salobj.ConfigurableCsc):
         self.state0DofValidator = salobj.DefaultingValidator(schema=schema)
 
         # CSC of M2 hexapod
-        self._cscM2Hex = salobj.Remote(self.domain, "Hexapod", index=2)
+        # Use the "include = []" to get rid of all event and telemetry topics
+        # to save the resourse
+        self._cscM2Hex = salobj.Remote(self.domain, "Hexapod", index=2, include=[])
 
         # CSC of camera hexapod
-        self._cscCamHex = salobj.Remote(self.domain, "Hexapod", index=1)
+        self._cscCamHex = salobj.Remote(self.domain, "Hexapod", index=1, include=[])
 
         # CSC of M1M3
-        self._cscM1M3 = salobj.Remote(self.domain, "MTM1M3")
+        self._cscM1M3 = salobj.Remote(self.domain, "MTM1M3", include=[])
 
         # CSC of M2
-        self._cscM2 = salobj.Remote(self.domain, "MTM2")
+        self._cscM2 = salobj.Remote(self.domain, "MTM2", include=[])
 
         # Model class to do the real data processing
         self.model = None
@@ -392,7 +394,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         try:
             await self._cscM2.cmd_applyForces.set_start(
-                timeout=self.DEFAULT_TIMEOUT, axialForceSetPoints=zForces
+                timeout=self.DEFAULT_TIMEOUT, axial=zForces
             )
 
             self.log.info("Issue the M2 correction successfully.")

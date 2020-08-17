@@ -233,8 +233,8 @@ class Model(object):
 
         ztaac = self.ofc.getZtaac()
 
-        dataShare = ztaac.dataShare
-        dofIdx = dataShare.getDofIdx()
+        paramData = ztaac.getParamData()
+        dofIdx = paramData.getDofIdx()
 
         dofVisit = self.getDofVisit()
 
