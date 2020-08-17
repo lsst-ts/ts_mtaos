@@ -60,9 +60,16 @@ MTAOS
 Overview
 ========
 
-The main telescope active optics system (MTAOS) commandable SAL component (CSC) is responsible for operating the closed-loop optical system. It calculates the wavefront error based on defocal images, estimates the optical state, and sends the correction in the forms of bending modes and rigid body positions to the mirrors and hexapods. This control system is with the data distribution service (DDS) as a CSC. The service abstraction layer (SAL) provides the access from services of the control, management and application plane to services and applications of the application plane.
+The main telescope active optics system (MTAOS) commandable SAL component (CSC) is responsible for operating the closed-loop optical system.
+It calculates the wavefront error based on defocal images, estimates the optical state, and sends the correction in the forms of bending modes and rigid body positions to the mirrors and hexapods.
+This control system is with the data distribution service (DDS) as a CSC.
+The service abstraction layer (SAL) provides the access from services of the control, management and application plane to services and applications of the application plane.
 
-Under normal operations, MTAOS will be controlled by the telescope control system (TCS) to do the closed-loop correction. The MTAOS is part of the `Main Telescope Control Packages <https://obs-controls.lsst.io/System-Architecture/Control-Packages/index.html>`_. The backbone of CSC is using the `ts_salobj <https://ts-salobj.lsst.io>`_ library, which defines the state transitions. The summary state machine is defined in `TCS Software Component Interface <https://docushare.lsst.org/docushare/dsweb/Get/LTS-307>`_ and there is no detailed state defined in MTAOS. The `eups <https://github.com/RobertLuptonTheGood/eups>`_ is used as the package manager.
+Under normal operations, MTAOS will be controlled by the telescope control system (TCS) to do the closed-loop correction.
+The MTAOS is part of the `Main Telescope Control Packages <https://obs-controls.lsst.io/System-Architecture/Control-Packages/index.html>`_.
+The backbone of CSC is using the `ts_salobj <https://ts-salobj.lsst.io>`_ library, which defines the state transitions.
+The summary state machine is defined in `TCS Software Component Interface <https://docushare.lsst.org/docushare/dsweb/Get/LTS-307>`_ and there is no detailed state defined in MTAOS.
+The `eups <https://github.com/RobertLuptonTheGood/eups>`_ is used as the package manager.
 
 The badges above navigate to the GitHub repository for the CSC code, Jenkins CI jobs, Jira issues, and communication interface for the software.
 
@@ -117,6 +124,7 @@ The released version is `here <https://github.com/lsst-ts/ts_MTAOS/releases>`_.
 Contact Personnel
 =================
 
-For questions not covered in the documentation, emails should be addressed to the developers: |CSC_developer|. The product owner is |CSC_product_owner|.
+For questions not covered in the documentation, emails should be addressed to the developers: |CSC_developer|.
+The product owner is |CSC_product_owner|.
 
 This page was last modified |today|.

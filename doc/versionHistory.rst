@@ -2,6 +2,14 @@
 Version History
 ===============
 
+v0.4.3
+-------------
+* Update the M2 interface based on the ts_xml v6.1.0.
+* Do some minor fixes.
+* Update the test cases of CSC.
+* Reformat the documents to improve the readibility.
+* Use the sims_w_2020_29.
+
 v0.4.2
 -------------
 * Reformat the rst documents to follow the standard.
