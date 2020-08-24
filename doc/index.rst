@@ -1,43 +1,4 @@
-..
-  This is a template for documentation that will accompany each CSC.
-  It consists of a user guide and development guide, however, cross linking between the guides is expected.
-  This template is provided to ensure that the documentation remains similar in look, feel, and contents to users.
-  The headings below are expected to be present for all CSCs, but for many CSCs, additional fields will be required.
-
-  ** All text in square brackets [] must be re-populated accordingly **
-
-  See https://developer.lsst.io/restructuredtext/style.html
-  for a guide to reStructuredText writing.
-
-  Use the following syntax for sections:
-
-  Sections
-  ========
-
-  and
-
-  Subsections
-  -----------
-
-  and
-
-  Subsubsections
-  ^^^^^^^^^^^^^^
-
-  To add images, add the image file (png, svg or jpeg preferred) to the
-  images/ directory. The reST syntax for adding the image is
-
-  .. figure:: /images/filename.ext
-  :name: fig-label
-
-  Caption text.
-
-  Feel free to delete this instructional comment.
-
-.. Fill out data so contacts section below is auto-populated
-.. add name and email between the *'s below e.g. *Marie Smith <msmith@lsst.org>*
-
-.. |CSC_developer| replace:: *Te-Wei Tsai <ttsai@lsst.org>* and *Petr Kubanek <pkubanek@lsst.org>*
+.. |CSC_developer| replace:: *Te-Wei Tsai <ttsai@lsst.org>* and *Petr Kubánek <pkubanek@lsst.org>*
 .. |CSC_product_owner| replace:: *Bo Xin <bxin@lsst.org>*
 
 .. Note that the ts_ prefix is omitted from the title
@@ -60,13 +21,12 @@ MTAOS
 Overview
 ========
 
-The main telescope active optics system (MTAOS) commandable SAL component (CSC) is responsible for operating the closed-loop optical system.
-It calculates the wavefront error based on defocal images, estimates the optical state, and sends the correction in the forms of bending modes and rigid body positions to the mirrors and hexapods.
-This control system is with the data distribution service (DDS) as a CSC.
-The service abstraction layer (SAL) provides the access from services of the control, management and application plane to services and applications of the application plane.
+The Main Telescope Active Optics System (MTAOS) Commandable SAL Component (CSC) is operating the closed-loop optical system.
+MTAOS calculates the wavefront error based on defocal images obtained with corner raft wavefront sensor, estimates the optical state, and sends the correction in the forms of bending modes and rigid body positions to the mirrors and hexapods.
+DDS/SAL (Service Abstraction Layer) is used to send commands from MTAOS to M1M3 static support and M2 hexapod.
 
-Under normal operations, MTAOS will be controlled by the telescope control system (TCS) to do the closed-loop correction.
-The MTAOS is part of the `Main Telescope Control Packages <https://obs-controls.lsst.io/System-Architecture/Control-Packages/index.html>`_.
+In automatic operations, MTAOS will be controlled by the Telescope Control System (TCS) to do the closed-loop correction.
+MTAOS is part of the `Main Telescope Control Packages <https://obs-controls.lsst.io/System-Architecture/Control-Packages/index.html>`_.
 The backbone of CSC is using the `ts_salobj <https://ts-salobj.lsst.io>`_ library, which defines the state transitions.
 The summary state machine is defined in `TCS Software Component Interface <https://docushare.lsst.org/docushare/dsweb/Get/LTS-307>`_ and there is no detailed state defined in MTAOS.
 The `eups <https://github.com/RobertLuptonTheGood/eups>`_ is used as the package manager.
@@ -78,7 +38,7 @@ The badges above navigate to the GitHub repository for the CSC code, Jenkins CI 
 User Documentation
 ==================
 
-User-level documentation, found at the link below, is aimed at personnel looking to perform the standard use-cases/operations with MTAOS.
+Observatory operators and other interested parties should consult the user guide for insights into MTAOS operations.
 
 .. toctree::
     user-guide/user-guide
@@ -87,9 +47,9 @@ User-level documentation, found at the link below, is aimed at personnel looking
 .. _Configuration:
 
 Configuring the MTAOS
-=========================
+=====================
 
-The configuration is described at the following link.
+MTAOSs configuration is described at the following link.
 
 .. toctree::
     configuration/configuration
@@ -97,10 +57,10 @@ The configuration is described at the following link.
 
 .. _Development_Documentation:
 
-Development Documentation
-=========================
+Developer Documentation
+=======================
 
-This area of documentation focuses on the class and function, and how to participate to the development of MTAOS software package.
+Classes and their methods, and how to get involved in the MTAOS development is described in this section.
 
 .. toctree::
     developer-guide/developer-guide
@@ -121,8 +81,8 @@ The released version is `here <https://github.com/lsst-ts/ts_MTAOS/releases>`_.
 
 .. _Contact_Personnel:
 
-Contact Personnel
-=================
+Contacts
+========
 
 For questions not covered in the documentation, emails should be addressed to the developers: |CSC_developer|.
 The product owner is |CSC_product_owner|.
