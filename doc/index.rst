@@ -23,9 +23,9 @@ Overview
 
 The Main Telescope Active Optics System (MTAOS) Commandable SAL Component (CSC) is operating the closed-loop optical system.
 MTAOS calculates the wavefront error based on defocal images obtained with corner raft wavefront sensor, estimates the optical state, and sends the correction in the forms of bending modes and rigid body positions to the mirrors and hexapods.
-DDS/SAL (Service Abstraction Layer) is used to send commands from MTAOS to M1M3 static support and M2 hexapod.
+DDS/SAL (Service Abstraction Layer) is used to send or receive commands/events/telemetry among telescope's subsystems such as M1M3/M2 static support, M2/camera hexapod, etc.
 
-In automatic operations, MTAOS will be controlled by the Telescope Control System (TCS) to do the closed-loop correction.
+In automatic operation, MTAOS will be controlled by the Telescope Control System (TCS) to do the closed-loop correction.
 MTAOS is part of the `Main Telescope Control Packages <https://obs-controls.lsst.io/System-Architecture/Control-Packages/index.html>`_.
 The backbone of CSC is using the `ts_salobj <https://ts-salobj.lsst.io>`_ library, which defines the state transitions.
 The summary state machine is defined in `TCS Software Component Interface <https://docushare.lsst.org/docushare/dsweb/Get/LTS-307>`_ and there is no detailed state defined in MTAOS.
@@ -49,7 +49,7 @@ Observatory operators and other interested parties should consult the user guide
 Configuring the MTAOS
 =====================
 
-MTAOSs configuration is described at the following link.
+MTAOS's configuration is described at the following link.
 
 .. toctree::
     configuration/configuration
@@ -57,8 +57,8 @@ MTAOSs configuration is described at the following link.
 
 .. _Development_Documentation:
 
-Developer Documentation
-=======================
+Development Documentation
+=========================
 
 Classes and their methods, and how to get involved in the MTAOS development is described in this section.
 
@@ -81,8 +81,8 @@ The released version is `here <https://github.com/lsst-ts/ts_MTAOS/releases>`_.
 
 .. _Contact_Personnel:
 
-Contacts
-========
+Contact Personnel
+=================
 
 For questions not covered in the documentation, emails should be addressed to the developers: |CSC_developer|.
 The product owner is |CSC_product_owner|.

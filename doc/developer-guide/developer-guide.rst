@@ -103,6 +103,6 @@ Stopping the CSC is done by SIG-INTing the process, usually by :kbd:`ctrl` + :kb
 Contributing
 ============
 
-To contribute, please start a new pull request on `GitHub <https://github.com/lsst-ts/ts_MTAOS`_.
-Feautre requests shall be filled in JIRA with the *ts_MTAOS* or *MTAOS* label.
-In all cases, reaching out to the :ref:`contacts for this CSC <Contacts>` is recommended.
+To contribute, please start a new pull request on `GitHub <https://github.com/lsst-ts/ts_MTAOS>`_.
+Feature requests shall be filled in JIRA with the *ts_MTAOS* or *MTAOS* label.
+In all cases, reaching out to the :ref:`contacts for this CSC <Contact_Personnel>` is recommended.
