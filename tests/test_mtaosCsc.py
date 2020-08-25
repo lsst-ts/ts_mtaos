@@ -67,7 +67,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         return self.remote
 
     async def testBinScript(self):
-        cmdline_args = ["--simulate", "--logToFile"]
+        cmdline_args = ["--simulate", "--logToFile", "--debugLevel", "20"]
         await self.check_bin_script(
             "MTAOS", 0, "run_mtaos.py", cmdline_args=cmdline_args
         )
@@ -124,7 +124,6 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                 with self.assertRaises(salobj.AckError):
                     await cmdObj.set_start(timeout=5)
 
-    @asynctest.skip("Need timeout support of check_standard_state_transitions()")
     async def testStandardStateTransitions(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
@@ -141,7 +140,9 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                 "processCmosWavefrontError",
             )
             await self.check_standard_state_transitions(
-                enabled_commands=enabled_commands, skip_commands=skip_commands
+                enabled_commands=enabled_commands,
+                skip_commands=skip_commands,
+                timeout=STD_TIMEOUT,
             )
 
     async def testResetWavefrontCorrection(self):
@@ -169,25 +170,29 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     async def _checkCorrIsZero(self, remote):
 
-        corrM2Hex = await remote.evt_m2HexapodCorrection.next(
-            flush=False, timeout=STD_TIMEOUT
+        await self.assert_next_sample(
+            remote.evt_m2HexapodCorrection,
+            flush=False,
+            timeout=STD_TIMEOUT,
+            x=0,
+            y=0,
+            z=0,
+            u=0,
+            v=0,
+            w=0,
         )
-        self.assertEqual(corrM2Hex.x, 0)
-        self.assertEqual(corrM2Hex.y, 0)
-        self.assertEqual(corrM2Hex.z, 0)
-        self.assertEqual(corrM2Hex.u, 0)
-        self.assertEqual(corrM2Hex.v, 0)
-        self.assertEqual(corrM2Hex.w, 0)
 
-        corrCamHex = await remote.evt_cameraHexapodCorrection.next(
-            flush=False, timeout=STD_TIMEOUT
+        await self.assert_next_sample(
+            remote.evt_cameraHexapodCorrection,
+            flush=False,
+            timeout=STD_TIMEOUT,
+            x=0,
+            y=0,
+            z=0,
+            u=0,
+            v=0,
+            w=0,
         )
-        self.assertEqual(corrCamHex.x, 0)
-        self.assertEqual(corrCamHex.y, 0)
-        self.assertEqual(corrCamHex.z, 0)
-        self.assertEqual(corrCamHex.u, 0)
-        self.assertEqual(corrCamHex.v, 0)
-        self.assertEqual(corrCamHex.w, 0)
 
         corrM1M3 = await remote.evt_m1m3Correction.next(
             flush=False, timeout=STD_TIMEOUT
@@ -201,7 +206,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         self.assertEqual(len(actForcesM2), 72)
         self.assertEqual(np.sum(np.abs(actForcesM2)), 0)
 
-    async def testIssueWavefrontCorrection(self):
+    async def testIssueWavefrontCorrectionTimeout(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
@@ -227,17 +232,19 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
             self.assertEqual(np.sum(np.abs(dofAggr)), 0)
             self.assertEqual(np.sum(np.abs(dofVisit)), 0)
 
-            corrM2Hex = await remote.evt_rejectedM2HexapodCorrection.next(
-                flush=False, timeout=STD_TIMEOUT
+            await self.assert_next_sample(
+                remote.evt_rejectedM2HexapodCorrection,
+                flush=False,
+                timeout=STD_TIMEOUT,
+                x=0,
+                y=0,
+                z=0,
+                u=0,
+                v=0,
+                w=0,
             )
-            self.assertEqual(corrM2Hex.x, 0)
-            self.assertEqual(corrM2Hex.y, 0)
-            self.assertEqual(corrM2Hex.z, 0)
-            self.assertEqual(corrM2Hex.u, 0)
-            self.assertEqual(corrM2Hex.v, 0)
-            self.assertEqual(corrM2Hex.w, 0)
 
-    async def testIssueWavefrontCorrectionWithWfErr(self):
+    async def testIssueWavefrontCorrectionWithWfErrAndRej(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
@@ -271,8 +278,9 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     async def _checkOfcTopicsFromProcImg(self, remote):
 
-        warningOfc = await remote.evt_ofcWarning.next(flush=False, timeout=STD_TIMEOUT)
-        self.assertEqual(warningOfc.warning, 0)
+        await self.assert_next_sample(
+            remote.evt_ofcWarning, flush=False, timeout=STD_TIMEOUT, warning=0
+        )
 
         dof = await remote.evt_degreeOfFreedom.next(flush=False, timeout=STD_TIMEOUT)
         dofAggr = dof.aggregatedDoF
@@ -291,24 +299,28 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     async def _checkCorrNotZero(self, remote):
 
-        corrM2Hex = await remote.evt_m2HexapodCorrection.next(
-            flush=False, timeout=STD_TIMEOUT
+        corrM2Hex = await self.assert_next_sample_not_equal(
+            remote.evt_m2HexapodCorrection,
+            flush=False,
+            timeout=STD_TIMEOUT,
+            x=0,
+            y=0,
+            z=0,
+            u=0,
+            v=0,
         )
-        self.assertNotEqual(corrM2Hex.x, 0)
-        self.assertNotEqual(corrM2Hex.y, 0)
-        self.assertNotEqual(corrM2Hex.z, 0)
-        self.assertNotEqual(corrM2Hex.u, 0)
-        self.assertNotEqual(corrM2Hex.v, 0)
         self.assertEqual(corrM2Hex.w, 0)
 
-        corrCamHex = await remote.evt_cameraHexapodCorrection.next(
-            flush=False, timeout=STD_TIMEOUT
+        corrCamHex = await self.assert_next_sample_not_equal(
+            remote.evt_cameraHexapodCorrection,
+            flush=False,
+            timeout=STD_TIMEOUT,
+            x=0,
+            y=0,
+            z=0,
+            u=0,
+            v=0,
         )
-        self.assertNotEqual(corrCamHex.x, 0)
-        self.assertNotEqual(corrCamHex.y, 0)
-        self.assertNotEqual(corrCamHex.z, 0)
-        self.assertNotEqual(corrCamHex.u, 0)
-        self.assertNotEqual(corrCamHex.v, 0)
         self.assertEqual(corrCamHex.w, 0)
 
         corrM1M3 = await remote.evt_m1m3Correction.next(
@@ -322,6 +334,42 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         actForcesM2 = corrM2.zForces
         self.assertEqual(len(actForcesM2), 72)
         self.assertNotEqual(np.sum(np.abs(actForcesM2)), 0)
+
+    async def assert_next_sample_not_equal(
+        self, topic, flush=False, timeout=STD_TIMEOUT, **kwargs
+    ):
+        """Wait for the next data sample for the specified topic,
+        check specified fields for inequality, and return the data.
+
+        Parameters
+        ----------
+        topic : lsst.ts.salobj.topics.ReadTopic
+            Topic to read, e.g. remote.evt_logMessage.
+        flush : bool, optional
+            Flush the read queue before waiting?
+        timeout : double, optional
+            Time limit for getting the data sample (sec).
+        kwargs : dict
+            Dict of field_name: unexpected_value
+            The specified fields will be checked for inequality.
+
+        Returns
+        -------
+        data : topic data type
+            The data read.
+        """
+
+        data = await topic.next(flush=flush, timeout=timeout)
+        for field_name, unexpected_value in kwargs.items():
+            read_value = getattr(data, field_name, None)
+            if read_value is None:
+                self.fail(f"No such field {field_name} in topic {topic}")
+            self.assertNotEqual(
+                read_value,
+                unexpected_value,
+                msg=f"Failed on field {field_name}: read {read_value!r} = unexpected {unexpected_value!r}",
+            )
+        return data
 
     async def testProcessCalibrationProducts(self):
         async with self.make_csc(
@@ -360,8 +408,9 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     async def _checkWepTopicsFromProcImg(self, remote, csc):
 
-        warningWep = await remote.evt_wepWarning.next(flush=False, timeout=STD_TIMEOUT)
-        self.assertEqual(warningWep.warning, 0)
+        await self.assert_next_sample(
+            remote.evt_wepWarning, flush=False, timeout=STD_TIMEOUT, warning=0
+        )
 
         # The value here should be 0 because the wavefront error is published
         # already
