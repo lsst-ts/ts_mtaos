@@ -61,6 +61,15 @@ The ``salobj.set_summary_state()`` call is used to switch to *ENABLED* state.
     await salobj.set_summary_state(mtaosCsc, salobj.State.ENABLED, timeout=30)
 
 The optional *settingsToApply* argument of the ``salobj.set_summary_state()`` call can be provided to assign the configuration profile (file), such as "default.yaml".
+When you want to make sure the profile will be applied, it is better to switch to *STANDBY* state first [#]_.
+
+.. [#] If the system is already in *ENABLED* state, state switch (and hence application of the profile) will not happen.
+
+.. code:: python
+
+    await salobj.set_summary_state(mtaosCsc, salobj.State.STANDBY)
+    await salobj.set_summary_state(mtaosCsc, salobj.State.ENABLED, settingsToApply="default.yaml", timeout=30)
+
 Configuration files (profiles) are stored in `MTAOS configuration <https://github.com/lsst-ts/ts_config_mttcs/tree/develop/MTAOS/v1>`_.
 Notice that the version number (e.g. v1) is assigned in `ts_MTAOS schema <https://github.com/lsst-ts/ts_MTAOS/tree/master/schema>`_.
 
@@ -68,51 +77,54 @@ As CSC starts, ``Model`` or ``ModelSim`` object is created.
 This requires reading a lot of data from the database in the butler, so MTAOS needs some time to finish the configuration.
 It is better to provide a long (~30 seconds) timeout for the transition.
 
-In addition, you need to make sure the system is either *OFFLINE* or *STANDBY* before entering the *ENABLED* state to be sure the settings are applied.
-It is recommended that you do the following:
+To issue a correction to the subsystems, do [#]_
 
-.. code:: python
-
-    await salobj.set_summary_state(mtaosCsc, salobj.State.STANDBY)
-    await salobj.set_summary_state(mtaosCsc, salobj.State.ENABLED, settingsToApply="default.yaml", timeout=30)
-
-To issue the correction to subsystems, you can do (note that the *value* parameter below is being removed in future versions of SAL):
+.. [#] The *value* parameter will be removed in future versions of SAL
 
 .. code:: python
 
     await mtaosCsc.cmd_issueWavefrontCorrection.set_start(timeout=10, value=True)
 
-If you ignore the input parameters, the default values will be applied.
-However, it is recommended to add the *timeout* in seconds.
+*Timeout* is specified in seconds.
+Default values are provided for all parameters.
+
 For example:
 
 .. code:: python
 
     await mtaosCsc.cmd_issueWavefrontCorrection.set_start(timeout=10)
 
-The ``processIntraExtraWavefrontError`` command (and all others) follows the same format as shown above:
+To call an another MTOAS command, use a cmd_*{nameOfCommand}* property. Such as:
 
 .. code:: python
 
-    await mtaosCsc.cmd_{nameOfCommand}.set_start(timeout=10, parameters)
+    await mtaosCsc.cmd_processIntraExtraWavefrontError.set_start(timeout=10, parameters)
 
-It is noted that the ``processIntraExtraWavefrontError`` command will take some time.
-If the *timeout* is less than the calculation time, you will get the *salobj.AckTimeoutError*.
-In the simulation mode, it is safe to put the *timeout* to be 15 to 30 seconds.
+The *salobj.AckTimeoutError* exception will be thrown if *timeout* seconds passed and the command is not finished.
+In the simulation mode It is safe to set the *timeout* parameter between 15 to 30 seconds.
 
-To receive the events, you follow the format below, where the ``degreeOfFreedom`` event gives the most recent DOF.
-This syntax is generic and can be replaced with any other event.
+MTAOS (SalObj) provides methods to wait for reception of the event.
+Similarly to cmd handling, use a evt_*{nameOfEvent}* property.
+For example, to wait for next DOF, call:
 
 .. code:: python
 
     dof = await mtaosCsc.evt_degreeOfFreedom.next(flush=False, timeout=30)
 
-The *next* command will pop out the value in the queue.
-If you just want to know the current value, you can do:
+The *next* method waits for a value, returning the oldest next value (if multiple events are received).
+Use *aget* to retrieve the current value (or wait for any, if the event wasn't yet received):
 
 .. code:: python
 
     dof = await mtaosCsc.evt_degreeOfFreedom.aget(timeout=30)
 
-Receiving telemetry, you follow a similar format as event except using the prefix of *tel_* instead of *evt_* now.
-You can follow `RemoteCommand <https://ts-salobj.lsst.io/py-api/lsst.ts.salobj.topics.RemoteCommand.html>`_, `RemoteEvent <https://ts-salobj.lsst.io/py-api/lsst.ts.salobj.topics.RemoteEvent.html>`_, and `RemoteTelemetry <https://ts-salobj.lsst.io/py-api/lsst.ts.salobj.topics.RemoteTelemetry.html>`_ for further details.
+Telemetry is received using *tel_* prefix instead of *evt_*.
+
+Further reading
+===============
+
+For further details, please see:
+
+- `RemoteCommand <https://ts-salobj.lsst.io/py-api/lsst.ts.salobj.topics.RemoteCommand.html>`_
+- `RemoteEvent <https://ts-salobj.lsst.io/py-api/lsst.ts.salobj.topics.RemoteEvent.html>`_
+- `RemoteTelemetry <https://ts-salobj.lsst.io/py-api/lsst.ts.salobj.topics.RemoteTelemetry.html>`_
