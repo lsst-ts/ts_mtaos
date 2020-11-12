@@ -7,7 +7,7 @@ pipeline {
         // Use the label to assign the node to run the test.
         // It is recommended by SQUARE team do not add the label.
         docker {
-            image 'lsstts/aos_sal:w_2020_29_sal'
+            image 'lsstts/aos_sal:w_2020_42_sal'
             args "-u root --entrypoint=''"
         }
     }
@@ -20,7 +20,7 @@ pipeline {
         // SAL user home
         SAL_USERS_HOME = "/home/saluser"
         // SAL setup file
-        SAL_SETUP_FILE = "/home/saluser/.setup_dev.sh"
+        SAL_SETUP_FILE = "/home/saluser/.setup.sh"
         // SAL-related repositories directory
         SAL_REPOS = "/home/saluser/repos"
         // XML report path
@@ -65,7 +65,7 @@ pipeline {
 
                         cd ../ts_wep/
                         setup -k -r .
-                        scons
+                        scons python
                     """
                 }
             }
