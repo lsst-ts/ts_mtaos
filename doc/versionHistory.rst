@@ -2,6 +2,13 @@
 Version History
 ===============
 
+v0.4.4
+-------------
+* Use the sims_w_2020_42.
+* Use the ts_salobj v6.0.3.
+* Remove the deprecated functions for the new version of ts_salobj.
+* Update the user-guide.rst for the use of CSC.
+
 v0.4.3
 -------------
 * Update the M2 interface based on the ts_xml v6.1.0.
