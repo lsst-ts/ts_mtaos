@@ -57,7 +57,8 @@ The ``salobj.set_summary_state()`` call is used to switch to *ENABLED* state.
 .. code:: python
 
     from lsst.ts import salobj
-    mtaosCsc = salobj.Remote("MTAOS", salobj.Domain())
+    mtaosCsc = salobj.Remote(salobj.Domain(), "MTAOS")
+    await mtaosCsc.start_task
     await salobj.set_summary_state(mtaosCsc, salobj.State.ENABLED, timeout=30)
 
 The optional *settingsToApply* argument of the ``salobj.set_summary_state()`` call can be provided to assign the configuration profile (file), such as "default.yaml".
@@ -72,6 +73,21 @@ When you want to make sure the profile will be applied, it is better to switch t
 
 Configuration files (profiles) are stored in `MTAOS configuration <https://github.com/lsst-ts/ts_config_mttcs/tree/develop/MTAOS/v1>`_.
 Notice that the version number (e.g. v1) is assigned in `ts_MTAOS schema <https://github.com/lsst-ts/ts_MTAOS/tree/master/schema>`_.
+
+In the *ts_salobj* v6.0.3, the user can not create the **Remote** object in ipython directly.
+Instead, you need to create an event loop by yourself and do the related instantiation.
+For example,
+
+.. code:: python
+
+    import asyncio
+    from lsst.ts import salobj
+
+    async def createCsc():
+        return salobj.Remote(salobj.Domain(), "MTAOS")
+
+    loop = asyncio.get_event_loop()
+    mtaosCsc = loop.run_until_complete(createCsc())
 
 As CSC starts, ``Model`` or ``ModelSim`` object is created.
 This requires reading a lot of data from the database in the butler, so MTAOS needs some time to finish the configuration.

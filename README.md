@@ -5,7 +5,7 @@ MTAOS is a component of LSST Telescope and Site software. It processes images ta
 ## Supported OS + Packages
 
 - CentOS 7
-- python: 3.7.6
+- python: 3.7.8
 - [black](https://github.com/psf/black) (optional)
 
 ## Required LSST Packages

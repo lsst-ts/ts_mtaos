@@ -38,6 +38,9 @@ from . import Utility
 
 class MtaosCsc(salobj.ConfigurableCsc):
 
+    # Class attribute comes from the upstream BaseCsc class
+    valid_simulation_modes = [0, 1]
+
     DEFAULT_TIMEOUT = 10.0
     LOG_FILE_NAME = "MTAOS.log"
 
@@ -194,15 +197,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
             self._cscM2.start_task,
         )
         await super().start()
-
-    async def implement_simulation_mode(self, simulation_mode):
-
-        self._logExecFunc()
-
-        if simulation_mode not in (0, 1):
-            raise salobj.ExpectedError(
-                f"Simulation_mode={simulation_mode} must be 0 or 1"
-            )
 
     def getModel(self):
         """Get the model.
@@ -861,9 +855,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
     def add_arguments(cls, parser):
         super(MtaosCsc, cls).add_arguments(parser)
         parser.add_argument(
-            "-s", "--simulate", action="store_true", help="Run in simuation mode?"
-        )
-        parser.add_argument(
             "--logToFile",
             action="store_true",
             help="""
@@ -884,10 +875,5 @@ class MtaosCsc(salobj.ConfigurableCsc):
     @classmethod
     def add_kwargs_from_args(cls, args, kwargs):
         super(MtaosCsc, cls).add_kwargs_from_args(args, kwargs)
-        kwargs["simulation_mode"] = 1 if args.simulate else 0
         kwargs["log_to_file"] = args.logToFile
         kwargs["debug_level"] = args.debugLevel
-
-
-if __name__ == "__main__":
-    pass
