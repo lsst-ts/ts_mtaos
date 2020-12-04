@@ -41,6 +41,38 @@ pipeline {
 
     stages {
 
+        stage('Updating xml, sal and salobj') {
+          steps{
+          withEnv(["HOME=${env.WORKSPACE}"]) {
+                sh """
+                    cd /home/saluser/repos/ts_xml
+                    git fetch --all
+                    /home/saluser/.checkout_repo.sh ${BRANCH} develop
+                    git pull
+                    cd /home/saluser/repos/ts_sal
+                    git fetch --all
+                    /home/saluser/.checkout_repo.sh ${BRANCH} develop
+                    git pull
+                    cd /home/saluser/repos/ts_salobj
+                    git fetch --all
+                    /home/saluser/.checkout_repo.sh ${BRANCH} develop
+                    git pull
+                """
+              }
+          }
+        }
+
+        stage('Rebuilding idl files'){
+          steps{
+            withEnv(["HOME=${env.WORKSPACE}"]) {
+                  sh """
+                      source ${env.SAL_SETUP_FILE}
+
+                      make_idl_files.py MTAOS MTHexapod MTM1M3 MTM2
+                  """
+              }
+          }
+        }
         stage('Cloning Repos') {
             steps {
                 withEnv(["HOME=${env.WORKSPACE}"]) {
@@ -71,9 +103,9 @@ pipeline {
             }
         }
 
-        stage('Unit Tests and Coverage Analysis') { 
+        stage('Unit Tests and Coverage Analysis') {
             steps {
-                // Pytest needs to export the junit report. 
+                // Pytest needs to export the junit report.
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
@@ -155,7 +187,7 @@ pipeline {
     }
 }
 
-// Return branch name. If changeTarget isn't defined, use branchName. Returns 
+// Return branch name. If changeTarget isn't defined, use branchName. Returns
 // either develop or master
 def getBranchName(changeTarget, branchName) {
     def branch = (changeTarget != null) ? changeTarget : branchName

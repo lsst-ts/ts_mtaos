@@ -22,6 +22,7 @@
 __all__ = [
     "WEPWarning",
     "OFCWarning",
+    "MTHexapodIndex",
     "getModulePath",
     "getConfigDir",
     "getSchemaDir",
@@ -53,6 +54,11 @@ class WEPWarning(Enum):
 class OFCWarning(Enum):
     NoWarning = 0
     NoEnoughAnnularZernikePoly = auto()
+
+
+class MTHexapodIndex(Enum):
+    Camera = 1
+    M2 = 2
 
 
 def getModulePath():

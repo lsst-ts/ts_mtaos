@@ -187,6 +187,7 @@ class TestModel(unittest.TestCase):
         actCorr = self.model.getM2ActCorr()
         self.assertEqual(len(actCorr), M2Correction.NUM_OF_ACT)
 
+    @unittest.skip("Need new test images to be able to run.")
     def testProcIntraExtraWavefrontErrorAndCalcCorrectionFromAvgWfErr(self):
 
         self._ingestCalibs()

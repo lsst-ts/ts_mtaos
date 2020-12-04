@@ -98,10 +98,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # CSC of M2 hexapod
         # Use the "include = []" to get rid of all event and telemetry topics
         # to save the resourse
-        self._cscM2Hex = salobj.Remote(self.domain, "Hexapod", index=2, include=[])
-
-        # CSC of camera hexapod
-        self._cscCamHex = salobj.Remote(self.domain, "Hexapod", index=1, include=[])
+        # Use index=0 and then select index at command time.
+        self._cscMTHex = salobj.Remote(self.domain, "MTHexapod", index=0, include=[])
 
         # CSC of M1M3
         self._cscM1M3 = salobj.Remote(self.domain, "MTM1M3", include=[])
@@ -191,10 +189,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         await asyncio.gather(
-            self._cscM2Hex.start_task,
-            self._cscCamHex.start_task,
-            self._cscM1M3.start_task,
-            self._cscM2.start_task,
+            self._cscMTHex.start_task, self._cscM1M3.start_task, self._cscM2.start_task,
         )
         await super().start()
 
@@ -316,8 +311,16 @@ class MtaosCsc(salobj.ConfigurableCsc):
         x, y, z, u, v, w = self.model.getM2HexCorr()
 
         try:
-            await self._cscM2Hex.cmd_move.set_start(
-                timeout=self.DEFAULT_TIMEOUT, x=x, y=y, z=z, u=u, v=v, w=w, sync=sync
+            await self._cscMTHex.cmd_moveWithCompensation.set_start(
+                x=x,
+                y=y,
+                z=z,
+                u=u,
+                v=v,
+                w=w,
+                sync=sync,
+                MTHexapodID=Utility.MTHexapodIndex.M2.value,
+                timeout=self.DEFAULT_TIMEOUT,
             )
 
             self.log.info("Issue the M2 hexapod correction successfully.")
@@ -341,8 +344,16 @@ class MtaosCsc(salobj.ConfigurableCsc):
         x, y, z, u, v, w = self.model.getCamHexCorr()
 
         try:
-            await self._cscCamHex.cmd_move.set_start(
-                timeout=self.DEFAULT_TIMEOUT, x=x, y=y, z=z, u=u, v=v, w=w, sync=sync
+            await self._cscMTHex.cmd_moveWithCompensation.set_start(
+                x=x,
+                y=y,
+                z=z,
+                u=u,
+                v=v,
+                w=w,
+                sync=sync,
+                MTHexapodID=Utility.MTHexapodIndex.Camera.value,
+                timeout=self.DEFAULT_TIMEOUT,
             )
 
             self.log.info("Issue the camera hexapod correction successfully.")
