@@ -109,7 +109,9 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     async def _simulateM2Hex(self):
 
-        self.cscM2Hex = salobj.Controller("Hexapod", index=2)
+        self.cscM2Hex = salobj.Controller(
+            "MTHexapod", index=MTAOS.Utility.MTHexapodIndex.M2.value
+        )
         self.cscM2Hex.cmd_move.callback = self._checkDataHex
 
     def _checkDataHex(self, data):
@@ -125,7 +127,9 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     async def _simulateCamHex(self):
 
-        self.cscCamHex = salobj.Controller("Hexapod", index=1)
+        self.cscCamHex = salobj.Controller(
+            "MTHexapod", index=MTAOS.Utility.MTHexapodIndex.Camera.value
+        )
         self.cscCamHex.cmd_move.callback = self._checkDataHex
 
     async def _simulateM1M3(self):
