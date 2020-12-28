@@ -7,7 +7,7 @@ pipeline {
         // Use the label to assign the node to run the test.
         // It is recommended by SQUARE team do not add the label.
         docker {
-            image 'lsstts/aos_sal:w_2020_42_sal'
+            image 'lsstts/develop-env:c0016.001'
             args "-u root --entrypoint=''"
         }
     }
@@ -21,14 +21,14 @@ pipeline {
         SAL_USERS_HOME = "/home/saluser"
         // SAL setup file
         SAL_SETUP_FILE = "/home/saluser/.setup.sh"
-        // SAL-related repositories directory
-        SAL_REPOS = "/home/saluser/repos"
+        // PlantUML url
+        PLANTUML_URL = "https://managedway.dl.sourceforge.net/project/plantuml/plantuml.jar"
         // XML report path
         XML_REPORT = "jenkinsReport/report.xml"
         // Module name used in the pytest coverage analysis
         MODULE_NAME = "lsst.ts.MTAOS"
-        // Simulated version
-        SIMS_VERSION = "current"
+        // Stack version
+        STACK_VERSION = "current"
         // Target branch - either develop or master, depending on where we are
         // merging or what branch is run
         BRANCH = getBranchName(env.CHANGE_TARGET, env.BRANCH_NAME)
@@ -41,12 +41,25 @@ pipeline {
 
     stages {
 
+        stage('Install the Libraries') {
+            steps {
+                withEnv(["HOME=${env.WORKSPACE}"]) {
+                    sh """
+                        source ${env.SAL_SETUP_FILE}
+
+                        cd ${env.SAL_USERS_HOME} && { curl -O ${env.PLANTUML_URL} ; cd -; }
+                        pip install sphinxcontrib-plantuml
+                    """
+                }
+            }
+        }
+
         stage('Cloning Repos') {
             steps {
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
                         git clone -b master https://github.com/lsst-dm/phosim_utils.git
-                        git clone -b ${BRANCH} https://github.com/lsst-ts/ts_wep.git
+                        git clone -b tickets/DM-27899 https://github.com/lsst-ts/ts_wep.git
                         git clone -b ${BRANCH} https://github.com/lsst-ts/ts_ofc.git
                     """
                 }
@@ -60,7 +73,7 @@ pipeline {
                         source ${env.SAL_SETUP_FILE}
 
                         cd phosim_utils/
-                        setup -k -r . -t ${env.SIMS_VERSION}
+                        setup -k -r . -t ${env.STACK_VERSION}
                         scons
 
                         cd ../ts_wep/
@@ -71,15 +84,15 @@ pipeline {
             }
         }
 
-        stage('Unit Tests and Coverage Analysis') { 
+        stage('Unit Tests and Coverage Analysis') {
             steps {
-                // Pytest needs to export the junit report. 
+                // Pytest needs to export the junit report.
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
 
                         cd phosim_utils/
-                        setup -k -r . -t ${env.SIMS_VERSION}
+                        setup -k -r . -t ${env.STACK_VERSION}
 
                         cd ../ts_wep/
                         setup -k -r .
@@ -102,7 +115,7 @@ pipeline {
                         source ${env.SAL_SETUP_FILE}
 
                         cd phosim_utils/
-                        setup -k -r . -t ${env.SIMS_VERSION}
+                        setup -k -r . -t ${env.STACK_VERSION}
 
                         cd ../ts_wep/
                         setup -k -r .
@@ -155,7 +168,7 @@ pipeline {
     }
 }
 
-// Return branch name. If changeTarget isn't defined, use branchName. Returns 
+// Return branch name. If changeTarget isn't defined, use branchName. Returns
 // either develop or master
 def getBranchName(changeTarget, branchName) {
     def branch = (changeTarget != null) ? changeTarget : branchName
