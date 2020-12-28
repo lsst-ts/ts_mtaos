@@ -98,10 +98,29 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # CSC of M2 hexapod
         # Use the "include = []" to get rid of all event and telemetry topics
         # to save the resourse
-        self._cscM2Hex = salobj.Remote(self.domain, "Hexapod", index=2, include=[])
+        self._cscM2Hex = salobj.Remote(
+            self.domain, "MTHexapod", index=Utility.MTHexapodIndex.M2.value, include=[]
+        )
 
         # CSC of camera hexapod
-        self._cscCamHex = salobj.Remote(self.domain, "Hexapod", index=1, include=[])
+        self._cscCamHex = salobj.Remote(
+            self.domain,
+            "MTHexapod",
+            index=Utility.MTHexapodIndex.Camera.value,
+            include=[],
+        )
+
+        # Note: Use two hexapod instances here because the MTAOS CSC may want
+        # to subscribe their events/telemetry in a latter time to check
+        # their positions. The detail is under the discussion now. This will
+        # affect the use of move() or moveWithCompensation() in hexapod CSC.
+        # If it is decided that we do not use the events/telemetry in the
+        # fianl, we could use index=0 and then select index at command time.
+        # For example,
+        # self._cscMTHex = salobj.Remote(self.domain, "MTHexapod", index=0,
+        #                                include=[])
+        # self._cscMTHex.cmd_start.set_start(
+        #     MTHexapodID=Utility.MTHexapodIndex.M2.value)
 
         # CSC of M1M3
         self._cscM1M3 = salobj.Remote(self.domain, "MTM1M3", include=[])
