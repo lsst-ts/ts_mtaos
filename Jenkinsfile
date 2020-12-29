@@ -41,7 +41,7 @@ pipeline {
 
     stages {
 
-        stage('Install the Libraries') {
+        stage ('Install the Libraries') {
             steps {
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
@@ -54,19 +54,21 @@ pipeline {
             }
         }
 
-        stage('Cloning Repos') {
+        stage ('Cloning Repos') {
             steps {
-                withEnv(["HOME=${env.WORKSPACE}"]) {
-                    sh """
-                        git clone -b master https://github.com/lsst-dm/phosim_utils.git
-                        git clone -b tickets/DM-27899 https://github.com/lsst-ts/ts_wep.git
-                        git clone -b ${BRANCH} https://github.com/lsst-ts/ts_ofc.git
-                    """
+                dir(env.WORKSPACE + '/phosim_utils') {
+                    git branch: 'master', url: 'https://github.com/lsst-dm/phosim_utils.git'
+                }
+                dir(env.WORKSPACE + '/ts_wep') {
+                    git branch: "${BRANCH}", url: 'https://github.com/lsst-ts/ts_wep.git'
+                }
+                dir(env.WORKSPACE + '/ts_ofc') {
+                    git branch: "${BRANCH}", url: 'https://github.com/lsst-ts/ts_ofc.git'
                 }
             }
         }
 
-        stage('Building the Dependencies') {
+        stage ('Building the Dependencies') {
             steps {
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
@@ -84,7 +86,7 @@ pipeline {
             }
         }
 
-        stage('Unit Tests and Coverage Analysis') {
+        stage ('Unit Tests and Coverage Analysis') {
             steps {
                 // Pytest needs to export the junit report.
                 withEnv(["HOME=${env.WORKSPACE}"]) {
@@ -108,7 +110,7 @@ pipeline {
             }
         }
 
-        stage('Build and Upload Documentation') {
+        stage ('Build and Upload Documentation') {
             steps {
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
