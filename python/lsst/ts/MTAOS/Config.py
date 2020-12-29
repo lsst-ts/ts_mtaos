@@ -114,7 +114,8 @@ class Config(object):
         Returns
         -------
         pathlib.PosixPath or None
-            Default state 0 DoF file path. Return None if value isn't specified.
+            Default state 0 DoF file path. Return None if value isn't
+            specified.
         """
 
         try:
