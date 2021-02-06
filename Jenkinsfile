@@ -7,9 +7,13 @@ pipeline {
         // Use the label to assign the node to run the test.
         // It is recommended by SQUARE team do not add the label.
         docker {
-            image 'lsstts/develop-env:c0016.001'
+            image 'lsstts/develop-env:develop'
             args "-u root --entrypoint=''"
         }
+    }
+
+    options {
+      disableConcurrentBuilds()
     }
 
     triggers {
@@ -37,6 +41,7 @@ pipeline {
         LTD_USERNAME = "${user_ci_USR}"
         LTD_PASSWORD = "${user_ci_PSW}"
         DOCUMENT_NAME = "ts-mtaos"
+        work_branches = "${GIT_BRANCH} ${CHANGE_BRANCH} develop"
     }
 
     stages {
@@ -85,7 +90,42 @@ pipeline {
                 }
             }
         }
-
+        stage("Checkout xml") {
+            steps {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
+                    sh """
+                        source ~/.setup.sh
+                        cd /home/saluser/repos/ts_xml
+                        /home/saluser/.checkout_repo.sh \${work_branches}
+                        git pull
+                    """
+                }
+            }
+        }
+        stage("Checkout IDL") {
+            steps {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
+                    sh """
+                        source ~/.setup.sh
+                        source /home/saluser/.bashrc
+                        cd /home/saluser/repos/ts_idl
+                        /home/saluser/.checkout_repo.sh \${work_branches}
+                        git pull
+                    """
+                }
+            }
+        }
+        stage("Build IDL files") {
+            steps {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
+                    sh """
+                        source ~/.setup.sh
+                        source /home/saluser/.bashrc
+                        make_idl_files.py MTAOS
+                    """
+                }
+            }
+        }
         stage ('Unit Tests and Coverage Analysis') {
             steps {
                 // Pytest needs to export the junit report.

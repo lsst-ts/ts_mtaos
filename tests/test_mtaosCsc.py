@@ -106,55 +106,32 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         remote = self._getRemote()
         await salobj.set_summary_state(remote, salobj.State.ENABLED)
 
-    async def testCommandsWrongState(self):
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
-        ):
-
-            remote = self._getRemote()
-
-            funcNames = [
-                "resetWavefrontCorrection",
-                "issueWavefrontCorrection",
-                "processCalibrationProducts",
-                "processIntraExtraWavefrontError",
-            ]
-            for funcName in funcNames:
-                cmdObj = getattr(remote, f"cmd_{funcName}")
-                with self.assertRaises(salobj.AckError):
-                    await cmdObj.set_start(timeout=5)
-
     async def testStandardStateTransitions(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
             enabled_commands = (
-                "resetWavefrontCorrection",
-                "issueWavefrontCorrection",
-                "processCalibrationProducts",
-                "processIntraExtraWavefrontError",
-            )
-            skip_commands = (
-                "processWavefrontError",
-                "processShWavefrontError",
-                "processCmosWavefrontError",
+                "resetCorrection",
+                "issueCorrection",
+                "rejectCorrection",
+                "selectSources",
+                "preProcess",
+                "runWEP",
+                "runOFC",
+                "addAberration",
             )
             await self.check_standard_state_transitions(
-                enabled_commands=enabled_commands,
-                skip_commands=skip_commands,
-                timeout=STD_TIMEOUT,
+                enabled_commands=enabled_commands, timeout=STD_TIMEOUT,
             )
 
-    async def testResetWavefrontCorrection(self):
+    async def testResetCorrection(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
             await self._startCsc()
 
             remote = self._getRemote()
-            await remote.cmd_resetWavefrontCorrection.set_start(
-                timeout=STD_TIMEOUT, value=True
-            )
+            await remote.cmd_resetCorrection.set_start(timeout=STD_TIMEOUT)
 
             dof = await remote.evt_degreeOfFreedom.next(
                 flush=False, timeout=STD_TIMEOUT
@@ -206,21 +183,15 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         self.assertEqual(len(actForcesM2), 72)
         self.assertEqual(np.sum(np.abs(actForcesM2)), 0)
 
-    async def testIssueWavefrontCorrectionTimeout(self):
+    async def testIssueCorrectionError(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
             await self._startCsc()
 
             remote = self._getRemote()
-            with self.assertRaises(salobj.AckTimeoutError):
-                with self.assertWarns(UserWarning):
-                    # timeout value here can not be longer than the default
-                    # value in the Model. Otherwise, the salobj.AckTimeoutError
-                    # will not be raised.
-                    await remote.cmd_issueWavefrontCorrection.set_start(
-                        timeout=10.0, value=True
-                    )
+            with self.assertRaises(salobj.AckError):
+                await remote.cmd_issueCorrection.set_start(timeout=10.0)
 
             dof = await remote.evt_rejectedDegreeOfFreedom.next(
                 flush=False, timeout=STD_TIMEOUT
@@ -243,206 +214,6 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
                 v=0,
                 w=0,
             )
-
-    async def testIssueWavefrontCorrectionWithWfErrAndRej(self):
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
-        ):
-            await self._startCsc()
-
-            # Set the timeout > 20 seconds for the long calculation time
-            remote = self._getRemote()
-            await remote.cmd_processIntraExtraWavefrontError.set_start(
-                timeout=2 * STD_TIMEOUT,
-                intraVisit=0,
-                extraVisit=1,
-                intraDirectoryPath="intraDir",
-                extraDirectoryPath="extraDir",
-                fieldRA=0.0,
-                fieldDEC=0.0,
-                filter=7,
-                cameraRotation=0.0,
-                userGain=1,
-            )
-
-            with self.assertRaises(salobj.AckTimeoutError):
-                with self.assertWarns(UserWarning):
-                    # timeout value here can not be longer than the default
-                    # value in the Model. Otherwise, the salobj.AckTimeoutError
-                    # will not be raised.
-                    await remote.cmd_issueWavefrontCorrection.set_start(
-                        timeout=10.0, value=True
-                    )
-
-            await self._checkOfcTopicsFromProcImg(remote)
-
-    async def _checkOfcTopicsFromProcImg(self, remote):
-
-        await self.assert_next_sample(
-            remote.evt_ofcWarning, flush=False, timeout=STD_TIMEOUT, warning=0
-        )
-
-        dof = await remote.evt_degreeOfFreedom.next(flush=False, timeout=STD_TIMEOUT)
-        dofAggr = dof.aggregatedDoF
-        dofVisit = dof.visitDoF
-        self.assertEqual(len(dofAggr), 50)
-        self.assertEqual(len(dofVisit), 50)
-        self.assertNotEqual(np.sum(np.abs(dofAggr)), 0)
-        self.assertNotEqual(np.sum(np.abs(dofVisit)), 0)
-
-        await self._checkCorrNotZero(remote)
-
-        durationOfc = await remote.tel_ofcDuration.next(
-            flush=False, timeout=STD_TIMEOUT
-        )
-        self.assertGreater(durationOfc.calcTime, 0)
-
-    async def _checkCorrNotZero(self, remote):
-
-        corrM2Hex = await self.assert_next_sample_not_equal(
-            remote.evt_m2HexapodCorrection,
-            flush=False,
-            timeout=STD_TIMEOUT,
-            x=0,
-            y=0,
-            z=0,
-            u=0,
-            v=0,
-        )
-        self.assertEqual(corrM2Hex.w, 0)
-
-        corrCamHex = await self.assert_next_sample_not_equal(
-            remote.evt_cameraHexapodCorrection,
-            flush=False,
-            timeout=STD_TIMEOUT,
-            x=0,
-            y=0,
-            z=0,
-            u=0,
-            v=0,
-        )
-        self.assertEqual(corrCamHex.w, 0)
-
-        corrM1M3 = await remote.evt_m1m3Correction.next(
-            flush=False, timeout=STD_TIMEOUT
-        )
-        actForcesM1M3 = corrM1M3.zForces
-        self.assertEqual(len(actForcesM1M3), 156)
-        self.assertNotEqual(np.sum(np.abs(actForcesM1M3)), 0)
-
-        corrM2 = await remote.evt_m2Correction.next(flush=False, timeout=STD_TIMEOUT)
-        actForcesM2 = corrM2.zForces
-        self.assertEqual(len(actForcesM2), 72)
-        self.assertNotEqual(np.sum(np.abs(actForcesM2)), 0)
-
-    async def assert_next_sample_not_equal(
-        self, topic, flush=False, timeout=STD_TIMEOUT, **kwargs
-    ):
-        """Wait for the next data sample for the specified topic,
-        check specified fields for inequality, and return the data.
-
-        Parameters
-        ----------
-        topic : lsst.ts.salobj.topics.ReadTopic
-            Topic to read, e.g. remote.evt_logMessage.
-        flush : bool, optional
-            Flush the read queue before waiting?
-        timeout : double, optional
-            Time limit for getting the data sample (sec).
-        kwargs : dict
-            Dict of field_name: unexpected_value
-            The specified fields will be checked for inequality.
-
-        Returns
-        -------
-        data : topic data type
-            The data read.
-        """
-
-        data = await topic.next(flush=flush, timeout=timeout)
-        for field_name, unexpected_value in kwargs.items():
-            read_value = getattr(data, field_name, None)
-            if read_value is None:
-                self.fail(f"No such field {field_name} in topic {topic}")
-            self.assertNotEqual(
-                read_value,
-                unexpected_value,
-                msg=f"Failed on field {field_name}: read {read_value!r} = unexpected {unexpected_value!r}",
-            )
-        return data
-
-    async def testProcessCalibrationProducts(self):
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
-        ):
-            await self._startCsc()
-
-            remote = self._getRemote()
-            await remote.cmd_processCalibrationProducts.set_start(
-                timeout=STD_TIMEOUT, directoryPath="calibsDir"
-            )
-
-    async def testProcessIntraExtraWavefrontError(self):
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
-        ):
-            await self._startCsc()
-
-            # Set the timeout > 20 seconds for the long calculation time
-            remote = self._getRemote()
-            await remote.cmd_processIntraExtraWavefrontError.set_start(
-                timeout=2 * STD_TIMEOUT,
-                intraVisit=0,
-                extraVisit=1,
-                intraDirectoryPath="intraDir",
-                extraDirectoryPath="extraDir",
-                fieldRA=0.0,
-                fieldDEC=0.0,
-                filter=7,
-                cameraRotation=0.0,
-                userGain=1,
-            )
-
-            csc = self._getCsc()
-            await self._checkWepTopicsFromProcImg(remote, csc)
-
-    async def _checkWepTopicsFromProcImg(self, remote, csc):
-
-        await self.assert_next_sample(
-            remote.evt_wepWarning, flush=False, timeout=STD_TIMEOUT, warning=0
-        )
-
-        # The value here should be 0 because the wavefront error is published
-        # already
-        numOfWfErr = len(csc.getModel().getListOfWavefrontError())
-        self.assertEqual(numOfWfErr, 0)
-
-        # Check the published wavefront error
-        for counter in range(9):
-            wfErr = await remote.evt_wavefrontError.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
-            self.assertNotEqual(wfErr.sensorId, 0)
-
-            zk = wfErr.annularZernikePoly
-            self.assertEqual(len(zk), 19)
-            self.assertNotEqual(np.sum(np.abs(zk)), 0)
-
-        numOfWfErrRej = len(csc.getModel().getListOfWavefrontErrorRej())
-        for counter in range(numOfWfErrRej):
-            wfErr = await remote.evt_rejectedWavefrontError.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
-            self.assertNotEqual(wfErr.sensorId, 0)
-
-            zk = wfErr.annularZernikePoly
-            self.assertEqual(len(zk), 19)
-            self.assertNotEqual(np.sum(np.abs(zk)), 0)
-
-        durationWep = await remote.tel_wepDuration.next(
-            flush=False, timeout=STD_TIMEOUT
-        )
-        self.assertGreater(durationWep.calcTime, 14)
 
 
 if __name__ == "__main__":
