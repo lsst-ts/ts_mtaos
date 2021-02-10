@@ -43,6 +43,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
     valid_simulation_modes = [0, 1]
 
     DEFAULT_TIMEOUT = 10.0
+    LONG_TIMEOUT = 60.0
     LOG_FILE_NAME = "MTAOS.log"
 
     def __init__(
@@ -69,6 +70,33 @@ class MtaosCsc(salobj.ConfigurableCsc):
             None.)
         simulation_mode : int, optional
             Simulation mode. (the default is 0: do not simulate.)
+
+        Attributes
+        ----------
+        log : `logging.Logger`
+            A logger.
+        state0DofValidator : `salobj.DefaultingValidator`
+            Validator for the telescopedof configuration file.
+        remotes : `dict`
+            A dictionary with `salobj.Remote` for each component the MTAOS
+            communicates with.
+        issue_correction_to : `set`
+            Set with the name of the component in self.remote that also makes
+            the name of the method to issue the correction, e.g.,
+            `m2hex` -> `issue_m2hex_correction`.
+        model : `None` or `lsst.ts.MTAOS.Model`
+            MTAOS Model class. This attribute is initialized during
+            configuration.
+        issue_correction_lock : `asyncio.Lock`
+            A lock used to synchronize sending corrections to the components.
+        DEFAULT_TIMEOUT : `float`
+            Default timeout (in seconds). Used on normal operations, e.g.
+            issuing corrections to the CSCs.
+        LONG_TIMEOUT : `float`
+            Long timeout (in seconds). Used in operations that will take longer
+            than normal operations, e.g. running OFC.
+        LOG_FILE_NAME : `str`
+            Name of the log file.
         """
 
         cscName = Utility.getCscName()
@@ -96,9 +124,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
         )
         self.state0DofValidator = salobj.DefaultingValidator(schema=schema)
 
-        # CSC of M2 hexapod
-        # Use the "include = []" to get rid of all event and telemetry topics
-        # to save the resourse
+        # Dictionary with remotes for M2 Hexapod, Camera Hexapod, M1M3 and M2
+        # components. Note the use of include=[] in all remotes. This prevents
+        # the remote from subscribing to events and telemetry from those
+        # systems that we do not need, helping to solve resources.
         self.remotes = {
             "m2hex": salobj.Remote(
                 self.domain,
@@ -116,20 +145,20 @@ class MtaosCsc(salobj.ConfigurableCsc):
             "m2": salobj.Remote(self.domain, "MTM2", include=[]),
         }
 
-        self.issue_corrections_func = {
-            "m2hex": self.issue_m2hex_correction,
-            "camhex": self.issue_camhex_correction,
-            "m1m3": self.issue_m1m3_correction,
-            "m2": self.issue_m2_correction,
+        # Set with the name of the component in self.remote that also makes the
+        # name of the method to issue the correction, e.g.
+        # m2hex -> issue_m2hex_correction
+        self.issue_correction_to = {
+            "m2hex",
+            "camhex",
+            "m1m3",
+            "m2",
         }
 
         # Model class to do the real data processing
         self.model = None
 
-        # estimated timeout for issueCorrection command in seconds.
-        self.issue_correction_timeout = 60
-
-        # lock to prevent multiple issueCorrection commands to execute at the
+        # Lock to prevent multiple issueCorrection commands to execute at the
         # same time.
         self.issue_correction_lock = asyncio.Lock()
 
@@ -268,12 +297,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
         self.cmd_issueCorrection.ack_in_progress(
-            data,
-            timeout=self.issue_correction_timeout,
-            result="issueCorrection started.",
+            data, timeout=self.DEFAULT_TIMEOUT, result="issueCorrection started.",
         )
 
-        # We dont want multiple commands to be executed at the same time.
+        # We don't want multiple commands to be executed at the same time.
         # This lock will block any subsequent command from being executed until
         # this one is done.
         async with self.issue_correction_lock:
@@ -286,6 +313,11 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
     async def do_rejectCorrection(self, data):
         """Reject the most recent wavefront correction.
+
+        Parameters
+        ----------
+        data : object
+            Data for the command being executed.
         """
 
         self._logExecFunc()
@@ -306,7 +338,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         Raises
         ------
         NotImplementedError
-            This function is not supported yet.
+            This function is not supported yet (DM-28708).
         """
         self.assert_enabled()
 
@@ -324,7 +356,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         Raises
         ------
         NotImplementedError
-            This function is not supported yet.
+            This function is not supported yet (DM-28708).
         """
         self.assert_enabled()
 
@@ -342,7 +374,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         Raises
         ------
         NotImplementedError
-            This function is not supported yet.
+            This function is not supported yet (DM-28710).
         """
         self.assert_enabled()
 
@@ -353,7 +385,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         """Run OFC on the latest wavefront errors data. Before running this
         command, you must have ran runWEP at least once.
 
-        This command will run ofc to compute corrections but won't apply them.
+        This command will run OFC to compute corrections but won't apply them.
         Use `issueCorrection` to apply the corrections. This allow users to
         evaluate whether the corrections are sensible before applying them.
 
@@ -361,7 +393,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
         ----------
         data : object
             Data for the command being executed.
-
         """
 
         self.assert_enabled()
@@ -369,7 +400,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
         self.cmd_issueCorrection.ack_in_progress(
-            data, timeout=self.issue_correction_timeout, result="runOFC started.",
+            data, timeout=self.LONG_TIMEOUT, result="runOFC started.",
         )
 
         if len(data.config) > 0:
@@ -395,6 +426,16 @@ class MtaosCsc(salobj.ConfigurableCsc):
         """Utility command to add aberration to the system based on user
         provided wavefront errors. The command assume uniform aberration on all
         sensors.
+
+        Parameters
+        ----------
+        data : object
+            Data for the command being executed.
+
+        Raises
+        -------
+        NotImplementedError
+            This command is not implemented yet (DM-28711).
         """
         self.assert_enabled()
 
@@ -420,8 +461,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # corrections and reject command.
         issue_corrections_tasks = dict(
             [
-                (comp, asyncio.create_task(self.issue_corrections_func[comp]()))
-                for comp in self.issue_corrections_func
+                (comp, asyncio.create_task(getattr(self, f"issue_{comp}_correction")()))
+                for comp in self.issue_correction_to
             ]
         )
 
@@ -438,26 +479,59 @@ class MtaosCsc(salobj.ConfigurableCsc):
         ):
             self.pubEvent_rejectedDegreeOfFreedom()
             self.model.rejCorrection()
+
             # Undo corrections that completed.
-            failed_to_do = []
-            failed_to_undo = []
-            for comp in self.issue_corrections_func:
-                if issue_corrections_tasks[comp].exception() is None:
-                    self.log.warning(f"Undoing {comp} correction.")
-                    try:
-                        await self.issue_corrections_func[comp](undo=True)
-                    except Exception:
-                        self.log.exception(
-                            f"Failed to undo successfull correction in {comp}."
-                        )
-                        failed_to_undo.append(comp)
-                else:
-                    failed_to_do.append(comp)
-            # Need to generate a report about the issue.
-            error_report = f"Failed to apply correction to: {failed_to_do}. "
-            if len(failed_to_undo) > 0:
-                error_report += f"Failed to undo correction to: {failed_to_undo}"
-            raise RuntimeError(error_report)
+            error_repor = await self.handle_undo_corrections(issue_corrections_tasks)
+
+            raise RuntimeError(error_repor)
+
+    async def handle_undo_corrections(self, issued_corrections):
+        """Handle undoing corrections.
+
+        The method will inspect the `issued_corrections` list of tasks, will
+        undo all the successful corrections and log the unsuccesful. If any
+        successful correction fail to be undone, it will log the issue and skip
+        the error.
+
+        At the end return a report with the activities performed.
+
+        Parameters
+        ----------
+        issued_corrections : `list` of `asyncio.Task`
+            List with all the tasks that executed corrections.
+
+        Returns
+        -------
+        error_report : `str`
+            String with error report.
+        """
+
+        failed_to_do = []
+        failed_to_undo = []
+
+        # Loop through all the components
+        for comp in self.issue_correction_to:
+            if issue_corrections_tasks[comp].exception() is None:
+                # If the task exception is None it means the task completed
+                # successfully and the correction needs to be undone. If it
+                # fails to undo the exception log the error and continue.
+                self.log.warning(f"Undoing {comp} correction.")
+                try:
+                    await getattr(self, f"issue_{comp}_correction")(undo=True)
+                except Exception:
+                    self.log.exception(
+                        f"Failed to undo successful correction in {comp}."
+                    )
+                    failed_to_undo.append(comp)
+            else:
+                # Correction failed, store it as failed and continue.
+                failed_to_do.append(comp)
+        # Generate a report about the issue.
+        error_report = f"Failed to apply correction to: {failed_to_do}. "
+        if len(failed_to_undo) > 0:
+            error_report += f"Failed to undo correction to: {failed_to_undo}"
+
+        return error_report
 
     async def issue_m2hex_correction(self, undo=False):
         """Issue the correction of M2 hexapod.
@@ -466,7 +540,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
         ----------
         undo : bool
             If `True` apply the negative value of each correction.
-
         """
 
         x, y, z, u, v, w = self.model.getM2HexCorr()
@@ -481,10 +554,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
             self.log.debug("Issue the M2 hexapod correction successfully.")
 
-        except Exception as e:
+        except Exception:
             self.log.exception("M2 hexapod correction command failed.")
             self.pubEvent_rejectedM2HexapodCorrection()
-            raise e
+            raise
 
     async def issue_camhex_correction(self, undo=False):
         """Issue the correction of camera hexapod.
@@ -493,7 +566,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
         ----------
         undo : bool
             If `True` apply the negative value of each correction.
-
         """
 
         x, y, z, u, v, w = self.model.getCamHexCorr()
@@ -508,10 +580,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
             self.log.debug("Issue the camera hexapod correction successfully.")
 
-        except Exception as e:
+        except Exception:
             self.log.exception("Camera hexapod correction command failed.")
             self.pubEvent_rejectedCameraHexapodCorrection()
-            raise e
+            raise
 
     async def issue_m1m3_correction(self, undo=False):
         """Issue the correction of M1M3.
@@ -535,10 +607,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
             self.log.debug("Issue the M1M3 correction successfully.")
 
-        except Exception as e:
+        except Exception:
             self.log.exception("M1M3 correction command failed.")
             self.pubEvent_rejectedM1M3Correction()
-            raise e
+            raise
 
     async def issue_m2_correction(self, undo=False):
         """Issue the correction of M2.
@@ -562,10 +634,10 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
             self.log.info("Issue the M2 correction successfully.")
 
-        except Exception as e:
+        except Exception:
             self.log.exception("M2 correction command failed.")
             self.pubEvent_rejectedM2Correction()
-            raise e
+            raise
 
     def pubEvent_wavefrontError(self):
         """Publish the calculated wavefront error calculated by WEP.

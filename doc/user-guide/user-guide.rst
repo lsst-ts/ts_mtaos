@@ -99,7 +99,7 @@ To issue a correction to the subsystems, do [#]_
 
 .. code:: python
 
-    await mtaosCsc.cmd_issueWavefrontCorrection.set_start(timeout=10, value=True)
+    await mtaosCsc.cmd_issueCorrection.set_start(timeout=10, value=True)
 
 *Timeout* is specified in seconds.
 Default values are provided for all parameters.
@@ -108,13 +108,13 @@ For example:
 
 .. code:: python
 
-    await mtaosCsc.cmd_issueWavefrontCorrection.set_start(timeout=10)
+    await mtaosCsc.cmd_issueCorrection.set_start(timeout=10)
 
 To call an another MTOAS command, use a cmd_*{nameOfCommand}* property. Such as:
 
 .. code:: python
 
-    await mtaosCsc.cmd_processIntraExtraWavefrontError.set_start(timeout=10, parameters)
+    await mtaosCsc.cmd_runWEP.set_start(timeout=10, parameters)
 
 The *salobj.AckTimeoutError* exception will be thrown if *timeout* seconds passed and the command is not finished.
 In the simulation mode It is safe to set the *timeout* parameter between 15 to 30 seconds.

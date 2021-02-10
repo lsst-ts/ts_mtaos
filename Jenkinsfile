@@ -41,7 +41,7 @@ pipeline {
         LTD_USERNAME = "${user_ci_USR}"
         LTD_PASSWORD = "${user_ci_PSW}"
         DOCUMENT_NAME = "ts-mtaos"
-        work_branches = "${GIT_BRANCH} ${CHANGE_BRANCH} develop"
+        WORK_BRANCHES = "${GIT_BRANCH} ${CHANGE_BRANCH} develop"
     }
 
     stages {
@@ -92,11 +92,11 @@ pipeline {
         }
         stage("Checkout xml") {
             steps {
-                withEnv(["WHOME=${env.WORKSPACE}"]) {
+                withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
-                        source ~/.setup.sh
-                        cd /home/saluser/repos/ts_xml
-                        /home/saluser/.checkout_repo.sh \${work_branches}
+                        source ${env.SAL_SETUP_FILE}
+                        cd ${env.SAL_USERS_HOME}/repos/ts_xml
+                        ${env.SAL_USERS_HOME}/.checkout_repo.sh \${WORK_BRANCHES}
                         git pull
                     """
                 }
@@ -104,12 +104,11 @@ pipeline {
         }
         stage("Checkout IDL") {
             steps {
-                withEnv(["WHOME=${env.WORKSPACE}"]) {
+                withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
-                        source ~/.setup.sh
-                        source /home/saluser/.bashrc
-                        cd /home/saluser/repos/ts_idl
-                        /home/saluser/.checkout_repo.sh \${work_branches}
+                        source ${env.SAL_SETUP_FILE}
+                        cd ${env.SAL_USERS_HOME}/repos/ts_idl
+                        ${env.SAL_USERS_HOME}/.checkout_repo.sh \${WORK_BRANCHES}
                         git pull
                     """
                 }
@@ -117,10 +116,10 @@ pipeline {
         }
         stage("Build IDL files") {
             steps {
-                withEnv(["WHOME=${env.WORKSPACE}"]) {
+                withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
-                        source ~/.setup.sh
-                        source /home/saluser/.bashrc
+                        source ${env.SAL_SETUP_FILE}
+                        source ${env.SAL_USERS_HOME}/.bashrc
                         make_idl_files.py MTAOS
                     """
                 }

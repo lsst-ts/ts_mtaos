@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.5.0
+------
+
+* Update MTAOS CSC to reflect new xml interface discussed in tstn-026.
+
 v0.4.5
 -------------
 * Use the latest **ts_wep** that removes the dependency of ``sims`` package.
