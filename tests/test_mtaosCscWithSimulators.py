@@ -22,6 +22,7 @@
 import os
 import asyncio
 import asynctest
+import unittest
 import numpy as np
 from pathlib import Path
 from lsst.ts import salobj
@@ -31,6 +32,7 @@ from lsst.ts import MTAOS
 STD_TIMEOUT = 60
 
 
+@unittest.skip("Skip until commands implementation.")
 class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
         return MTAOS.MtaosCsc(
@@ -68,7 +70,7 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         if logFile.exists():
             logFile.unlink()
 
-    async def testIssueWavefrontCorrection(self):
+    async def testIssueCorrection(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
@@ -79,22 +81,11 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
             # Set the timeout > 20 seconds for the long calculation time
             remote = self._getRemote()
-            await remote.cmd_processIntraExtraWavefrontError.set_start(
-                timeout=2 * STD_TIMEOUT,
-                intraVisit=0,
-                extraVisit=1,
-                intraDirectoryPath="intraDir",
-                extraDirectoryPath="extraDir",
-                fieldRA=0.0,
-                fieldDEC=0.0,
-                filter=7,
-                cameraRotation=0.0,
-                userGain=1,
-            )
+            await remote.cmd_runWEP.set_start()
 
-            await remote.cmd_issueWavefrontCorrection.set_start(
-                timeout=10.0, value=True
-            )
+            await remote.cmd_runOFC.set_start()
+
+            await remote.cmd_issueCorrection.set_start(timeout=10.0, value=True)
 
             await self._cancelCSCs()
 

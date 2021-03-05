@@ -7,9 +7,13 @@ pipeline {
         // Use the label to assign the node to run the test.
         // It is recommended by SQUARE team do not add the label.
         docker {
-            image 'lsstts/develop-env:c0016.001'
+            image 'lsstts/develop-env:develop'
             args "-u root --entrypoint=''"
         }
+    }
+
+    options {
+      disableConcurrentBuilds()
     }
 
     triggers {
@@ -37,6 +41,7 @@ pipeline {
         LTD_USERNAME = "${user_ci_USR}"
         LTD_PASSWORD = "${user_ci_PSW}"
         DOCUMENT_NAME = "ts-mtaos"
+        WORK_BRANCHES = "${GIT_BRANCH} ${CHANGE_BRANCH} develop"
     }
 
     stages {
@@ -85,7 +90,41 @@ pipeline {
                 }
             }
         }
-
+        stage("Checkout xml") {
+            steps {
+                withEnv(["HOME=${env.WORKSPACE}"]) {
+                    sh """
+                        source ${env.SAL_SETUP_FILE}
+                        cd ${env.SAL_USERS_HOME}/repos/ts_xml
+                        ${env.SAL_USERS_HOME}/.checkout_repo.sh \${WORK_BRANCHES}
+                        git pull
+                    """
+                }
+            }
+        }
+        stage("Checkout IDL") {
+            steps {
+                withEnv(["HOME=${env.WORKSPACE}"]) {
+                    sh """
+                        source ${env.SAL_SETUP_FILE}
+                        cd ${env.SAL_USERS_HOME}/repos/ts_idl
+                        ${env.SAL_USERS_HOME}/.checkout_repo.sh \${WORK_BRANCHES}
+                        git pull
+                    """
+                }
+            }
+        }
+        stage("Build IDL files") {
+            steps {
+                withEnv(["HOME=${env.WORKSPACE}"]) {
+                    sh """
+                        source ${env.SAL_SETUP_FILE}
+                        source ${env.SAL_USERS_HOME}/.bashrc
+                        make_idl_files.py MTAOS
+                    """
+                }
+            }
+        }
         stage ('Unit Tests and Coverage Analysis') {
             steps {
                 // Pytest needs to export the junit report.
