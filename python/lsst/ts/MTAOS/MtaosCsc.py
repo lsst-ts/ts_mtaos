@@ -511,7 +511,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         # Loop through all the components
         for comp in self.issue_correction_to:
-            if issue_corrections_tasks[comp].exception() is None:
+            if issued_corrections[comp].exception() is None:
                 # If the task exception is None it means the task completed
                 # successfully and the correction needs to be undone. If it
                 # fails to undo the exception log the error and continue.
