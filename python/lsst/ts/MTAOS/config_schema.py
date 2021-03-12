@@ -1,6 +1,77 @@
----
+# This file is part of ts_MTAOS.
+#
+# Developed for Vera C. Rubin Observatory Telescope and Site Systems.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+
+__all__ = ["CONFIG_SCHEMA", "TELESCOPE_DOF_SCHEMA"]
+
+import yaml
+
+CONFIG_SCHEMA = yaml.safe_load(
+    """
 $schema: http://json-schema.org/draft-07/schema#
-$id: https://github.com/lsst-ts/ts_MTAOS/blob/master/schema/telescopeDoF.yaml
+$id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
+# title must end with one or more spaces followed by the schema version, which
+# must begin with "v"
+title: MTAOS v1
+description: Schema for MTAOS configuration files
+type: object
+
+properties:
+
+  camera:
+    description: Type of camera for wavefront estimation pipeline (WEP) to use
+    type: string
+    enum: [lsstCam, lsstFamCam, comcam]
+    default: comcam
+
+  instrument:
+    description: Type of instrument for optical feedback control (OFC) to use
+    type: string
+    enum: [lsst, comcam, sh, cmos]
+    default: comcam
+
+  defaultIsrDir:
+    description: >
+      Default instrument signature removal (ISR) directory.
+      This setting will be override by the 'ISRDIRPATH' path variable.
+    type: string
+    default: /home/lsst/input
+
+  defaultSkyFilePath:
+    description: >
+      Default sky file path relative to the root of module.
+      This is for the test only.
+    type: string
+    default: tests/testData/phosimOutput/realComCam/skyComCamInfo.txt
+
+required:
+  - camera
+  - instrument
+
+additionalProperties: false
+"""
+)
+
+TELESCOPE_DOF_SCHEMA = yaml.safe_load(
+    """
+$schema: http://json-schema.org/draft-07/schema#
+$id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
 title: TelescopeDoF v1
@@ -141,3 +212,5 @@ required:
   - M2Bending
 
 additionalProperties: false
+"""
+)

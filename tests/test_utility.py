@@ -57,12 +57,6 @@ class TestUtility(unittest.TestCase):
         ansConfigDir = MTAOS.getModulePath().joinpath("policy")
         self.assertEqual(MTAOS.getConfigDir(), ansConfigDir)
 
-    def testGetSchemaDir(self):
-
-        ansSchemaDir = MTAOS.getModulePath().joinpath("schema")
-        self.assertEqual(MTAOS.getSchemaDir(), ansSchemaDir)
-        self.assertTrue(ansSchemaDir.exists())
-
     def testGetLogDir(self):
 
         ansLogDir = MTAOS.getModulePath().joinpath("logs")

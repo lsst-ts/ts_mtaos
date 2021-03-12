@@ -32,10 +32,14 @@ __all__ = [
     "getInstName",
     "getCscName",
     "addRotFileHandler",
+    "timeit",
 ]
 
-import os
+import asyncio
 import logging
+import os
+import time
+
 from logging.handlers import RotatingFileHandler
 from enum import Enum, auto
 from pathlib import Path
@@ -238,6 +242,28 @@ def addRotFileHandler(log, filePath, debugLevel, maxBytes=1e6, backupCount=5):
     log.addHandler(fileHandler)
 
     return fileHandler
+
+
+def timeit(func):
+    """Decorator to compute execution time.
+    """
+
+    async def timed(*args, **kwargs):
+        if asyncio.iscoroutinefunction(func):
+            start_time = time.perf_counter()
+            result = await func(*args, **kwargs)
+            calc_time = time.perf_counter() - start_time
+        else:
+            # not a coroutine
+            result = func(*args, **kwargs)
+        if "log_time" in kwargs:
+            name = kwargs.get("log_name", func.__name__.upper())
+            if name not in kwargs["log_time"]:
+                kwargs["log_time"][name] = []
+            kwargs["log_time"][name].append(calc_time)
+        return result
+
+    return timed
 
 
 if __name__ == "__main__":
