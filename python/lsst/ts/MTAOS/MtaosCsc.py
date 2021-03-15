@@ -27,24 +27,30 @@ import logging
 import sys
 import yaml
 
+from astropy import units as u
+
 import numpy as np
 
 from lsst.ts import salobj
+from lsst.ts.idl.enums.MTAOS import FilterType
 
+from .config_schema import CONFIG_SCHEMA, TELESCOPE_DOF_SCHEMA
 from .Config import Config
 from .Model import Model
-from .ModelSim import ModelSim
 from . import Utility
+from . import __version__
 
 
 class MtaosCsc(salobj.ConfigurableCsc):
 
     # Class attribute comes from the upstream BaseCsc class
-    valid_simulation_modes = [0, 1]
+    valid_simulation_modes = (0,)
+    version = __version__
 
     DEFAULT_TIMEOUT = 10.0
     LONG_TIMEOUT = 60.0
     LOG_FILE_NAME = "MTAOS.log"
+    MAX_TIME_SAMPLE = 100
 
     def __init__(
         self, config_dir=None, log_to_file=False, debug_level=None, simulation_mode=0
@@ -89,6 +95,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
             configuration.
         issue_correction_lock : `asyncio.Lock`
             A lock used to synchronize sending corrections to the components.
+        execution_times : `dict`
+            Dictionary to store cricital execution times.
         DEFAULT_TIMEOUT : `float`
             Default timeout (in seconds). Used on normal operations, e.g.
             issuing corrections to the CSCs.
@@ -97,32 +105,31 @@ class MtaosCsc(salobj.ConfigurableCsc):
             than normal operations, e.g. running OFC.
         LOG_FILE_NAME : `str`
             Name of the log file.
+        MAX_TIME_SAMPLE : `int`
+            Maximum samples of execution times to store.
         """
 
         cscName = Utility.getCscName()
-        index = 0
-        schemaPath = Utility.getSchemaDir().joinpath("MTAOS.yaml")
+
         super().__init__(
             cscName,
-            index,
-            schemaPath,
+            index=0,
+            config_schema=CONFIG_SCHEMA,
             config_dir=config_dir,
             initial_state=salobj.State.STANDBY,
             simulation_mode=int(simulation_mode),
         )
 
         # Logger attribute comes from the upstream Controller class
-        if debug_level is None:
-            debug_level = logging.DEBUG
         self.log = self._addLogWithFileHandlerIfDebug(
-            debug_level, outputLogFile=log_to_file
+            logging.DEBUG if debug_level is None else debug_level,
+            outputLogFile=log_to_file,
         )
         self.log.info("Prepare MTAOS CSC.")
 
-        schema = yaml.safe_load(
-            Utility.getSchemaDir().joinpath("telescopedof.yaml").open().read()
+        self.state0DofValidator = salobj.DefaultingValidator(
+            schema=TELESCOPE_DOF_SCHEMA
         )
-        self.state0DofValidator = salobj.DefaultingValidator(schema=schema)
 
         # Dictionary with remotes for M2 Hexapod, Camera Hexapod, M1M3 and M2
         # components. Note the use of include=[] in all remotes. This prevents
@@ -144,6 +151,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
             "m1m3": salobj.Remote(self.domain, "MTM1M3", include=[]),
             "m2": salobj.Remote(self.domain, "MTM2", include=[]),
         }
+
+        self.execution_times = {}
 
         # Set with the name of the component in self.remote that also makes the
         # name of the method to issue the correction, e.g.
@@ -205,31 +214,13 @@ class MtaosCsc(salobj.ConfigurableCsc):
                 yaml.safe_load(open(state0DofFile).read())
             )
 
-        if self._isNormalMode():
-            self.model = Model(configObj, state0Dof)
-            self.log.info("Configure MTAOS CSC in the normal operation mode.")
-        else:
-            self.model = ModelSim(configObj, state0Dof)
-            self.log.info("Configure MTAOS CSC in the simulation mode.")
+        self.model = Model(configObj, state0Dof, log=self.log)
 
     def _logExecFunc(self):
         """Log the executed function."""
 
         funcName = inspect.stack()[1].function
         self.log.info(f"Execute {funcName}().")
-
-    def _isNormalMode(self):
-        """Is the normal operation mode or not.
-
-        Returns
-        -------
-        bool
-            True if normal operation. False if simulation.
-        """
-
-        # Simulation_mode comes from the upstream property function of BaseCsc
-        # class.
-        return self.simulation_mode == 0
 
     @staticmethod
     def get_config_pkg():
@@ -239,8 +230,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
     async def start(self):
 
         self._logExecFunc()
-
-        await asyncio.gather(*[self.remotes[rem].start_task for rem in self.remotes])
 
         await super().start()
 
@@ -335,15 +324,22 @@ class MtaosCsc(salobj.ConfigurableCsc):
         data : object
             Data for the command being executed.
 
-        Raises
-        ------
-        NotImplementedError
-            This function is not supported yet (DM-28708).
         """
         self.assert_enabled()
 
-        # TODO: (DM-28708) Finish implementation of selectSources.
-        raise NotImplementedError("This function is not supported yet (DM-28708).")
+        # This command may take some time to execute, so will send
+        # ack_in_progress with estimated timeout.
+        self.cmd_issueCorrection.ack_in_progress(
+            data, timeout=self.LONG_TIMEOUT, result="selectSources started.",
+        )
+
+        await self.model.select_sources(
+            ra=data.ra * u.hourangle.to(u.deg),
+            dec=data.decl,
+            sky_angle=data.pa,
+            obs_filter=FilterType(data.filter),
+            mode=data.mode,
+        )
 
     async def do_preProcess(self, data):
         """Pre-process image for WEP.
@@ -352,16 +348,21 @@ class MtaosCsc(salobj.ConfigurableCsc):
         ----------
         data : object
             Data for the command being executed.
-
-        Raises
-        ------
-        NotImplementedError
-            This function is not supported yet (DM-28708).
         """
         self.assert_enabled()
 
-        # TODO: (DM-28708) Finish implementation of preProcess.
-        raise NotImplementedError("This function is not supported yet (DM-28708).")
+        # This command may take some time to execute, so will send
+        # ack_in_progress with estimated timeout.
+        self.cmd_issueCorrection.ack_in_progress(
+            data, timeout=self.LONG_TIMEOUT, result="preProcess started.",
+        )
+
+        if data.useOCPS:
+            raise NotImplementedError("Use OCPS not implemented.")
+        else:
+            await self.model.pre_process(
+                visit_id=data.visitId, config=yaml.safe_load(data.config)
+            )
 
     async def do_runWEP(self, data):
         """Process wavefront data.
@@ -370,16 +371,26 @@ class MtaosCsc(salobj.ConfigurableCsc):
         ----------
         data : object
             Data for the command being executed.
-
-        Raises
-        ------
-        NotImplementedError
-            This function is not supported yet (DM-28710).
         """
         self.assert_enabled()
 
-        # TODO: (DM-28710) Initial implementation of runWEP command in MTAOS
-        raise NotImplementedError("This function is not supported yet (DM-28710).")
+        # This command may take some time to execute, so will send
+        # ack_in_progress with estimated timeout.
+        self.cmd_issueCorrection.ack_in_progress(
+            data, timeout=self.LONG_TIMEOUT, result="runWEP started.",
+        )
+
+        if data.useOCPS:
+            raise NotImplementedError("Use OCPS not implemented.")
+        else:
+            await self.model.run_wep(
+                visit_id=data.visitId,
+                extra_id=data.extraId if data.extraId > 0 else None,
+                config=yaml.safe_load(data.config),
+                log_time=self.execution_times,
+            )
+            while len(self.execution_times["RUN_WEP"]) > self.MAX_TIME_SAMPLE:
+                self.execution_times["RUN_WEP"].pop(0)
 
     async def do_runOFC(self, data):
         """Run OFC on the latest wavefront errors data. Before running this
@@ -410,9 +421,19 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         async with self.issue_correction_lock:
 
+            # Need to set user gain before computing corrections.
+            self.model.user_gain = data.userGain
             # If this call fails (raise an exeception), command will be
             # rejected.
-            self.model.calcCorrectionFromAvgWfErr()
+            # This is not a coroutine so it will block the event loop. Need
+            # to think about how to fix it, maybe run in executor?
+            self.model.calculate_corrections(log_time=self.execution_times)
+            while (
+                len(self.execution_times["CALCULATE_CORRECTIONS"])
+                > self.MAX_TIME_SAMPLE
+            ):
+                self.execution_times["CALCULATE_CORRECTIONS"].pop(0)
+
             self.log.debug("Calculate the subsystem correction successfully.")
 
             self.pubEvent_degreeOfFreedom()
@@ -814,7 +835,12 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        duration = self.model.getAvgCalcTimeWep()
+        duration = (
+            np.mean(self.execution_times["RUN_WEP"])
+            if "RUN_WEP" in self.execution_times
+            and len(self.execution_times["RUN_WEP"]) > 0
+            else 0.0
+        )
         self.tel_wepDuration.set_put(calcTime=duration)
 
     def pubTel_ofcDuration(self):
@@ -823,7 +849,12 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        duration = self.model.getAvgCalcTimeOfc()
+        duration = (
+            np.mean(self.execution_times["CALCULATE_CORRECTIONS"])
+            if "CALCULATE_CORRECTIONS" in self.execution_times
+            and len(self.execution_times["CALCULATE_CORRECTIONS"]) > 0
+            else 0.0
+        )
         self.tel_ofcDuration.set_put(calcTime=duration)
 
     @classmethod
