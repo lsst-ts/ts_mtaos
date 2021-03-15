@@ -2,6 +2,17 @@
 Version History
 ===============
 
+v0.5.1
+------
+
+* Refactor of the Model class to prepare it for integration with wep pipeline task.
+* Modernize naming conventions in Model class and remove unused methods.
+* Chance how execution time is calculated to use a decorator that stored the information in a dictionary and put that logic on the CSC instead.
+* Remove simulation mode and ModelSim
+* Implement new salobj configuration schema, replacing schema yaml file by string in a python module.
+* Add support to publish CSC version.
+* Update docs configuration.
+
 v0.5.0
 ------
 

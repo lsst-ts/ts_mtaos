@@ -19,14 +19,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from .Utility import *
-from .CalcTime import *
-from .Config import *
-from .CollOfListOfWfErr import *
-from .Model import *
-from .ModelSim import *
-from .MtaosCsc import *
-
 # The version file is gotten by the scons. However, the scons does not support
 # the build without unit tests. This is a needed function for the Jenkins to
 # use.
@@ -34,3 +26,10 @@ try:
     from .version import *
 except ImportError:
     __version__ = "?"
+
+from .CollOfListOfWfErr import *
+from .Config import *
+from .config_schema import *
+from .Model import *
+from .Utility import *
+from .MtaosCsc import *

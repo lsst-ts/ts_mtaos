@@ -27,8 +27,6 @@ import numpy as np
 
 from pathlib import Path
 
-from lsst.utils import getPackageDir
-
 from lsst.ts import salobj
 from lsst.ts import MTAOS
 
@@ -70,48 +68,14 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         return self.remote
 
     async def testBinScript(self):
-        cmdline_args = ["--simulate", "--logToFile", "--debugLevel", "20"]
+        cmdline_args = ["--logToFile", "--debugLevel", "20"]
         await self.check_bin_script(
             "MTAOS", 0, "run_mtaos.py", cmdline_args=cmdline_args
         )
 
-    async def testInitWithoutConfigDir(self):
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
-        ):
-
-            configDir = Path(getPackageDir("ts_config_mttcs"))
-            configDir = configDir.joinpath(MTAOS.getCscName(), "v1")
-
-            csc = self._getCsc()
-            self.assertEqual(csc.config_dir, configDir)
-
-    async def testInitWithConfigDir(self):
-        configDir = MTAOS.getModulePath().joinpath("tests", "testData")
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=configDir, simulation_mode=1
-        ):
-
-            csc = self._getCsc()
-            self.assertEqual(csc.config_dir, configDir)
-
-    async def testConfiguration(self):
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
-        ):
-            await self._startCsc()
-
-            csc = self._getCsc()
-            model = csc.getModel()
-            self.assertTrue(isinstance(model, MTAOS.ModelSim))
-
-    async def _startCsc(self):
-        remote = self._getRemote()
-        await salobj.set_summary_state(remote, salobj.State.ENABLED)
-
     async def testStandardStateTransitions(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
             enabled_commands = (
                 "resetCorrection",
@@ -129,9 +93,9 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     async def testResetCorrection(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
-            await self._startCsc()
+            await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
             remote = self._getRemote()
             await remote.cmd_resetCorrection.set_start(timeout=STD_TIMEOUT)
@@ -188,9 +152,9 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     async def testIssueCorrectionError(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
-            await self._startCsc()
+            await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
             remote = self._getRemote()
             with self.assertRaises(salobj.AckError):
@@ -221,9 +185,9 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
     @unittest.skip("Skip until commands implementation.")
     async def test_runWEP(self):
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
-            await self._startCsc()
+            await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
             # Set the timeout > 20 seconds for the long calculation time
             remote = self._getRemote()

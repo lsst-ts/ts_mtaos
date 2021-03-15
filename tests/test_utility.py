@@ -19,13 +19,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import asyncio
 import os
 import logging
 import tempfile
 import time
+import unittest
+
+import numpy as np
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
-import unittest
 
 from lsst.ts.wep.Utility import CamType
 from lsst.ts.ofc.Utility import InstName
@@ -56,12 +59,6 @@ class TestUtility(unittest.TestCase):
 
         ansConfigDir = MTAOS.getModulePath().joinpath("policy")
         self.assertEqual(MTAOS.getConfigDir(), ansConfigDir)
-
-    def testGetSchemaDir(self):
-
-        ansSchemaDir = MTAOS.getModulePath().joinpath("schema")
-        self.assertEqual(MTAOS.getSchemaDir(), ansSchemaDir)
-        self.assertTrue(ansSchemaDir.exists())
 
     def testGetLogDir(self):
 
@@ -132,6 +129,58 @@ class TestUtility(unittest.TestCase):
         files = [aItem for aItem in items if aItem.is_file()]
 
         return len(files)
+
+    def test_timeit(self):
+        @MTAOS.timeit
+        def my_retval(arg1, arg2, arg3, arg4, sleep_time, **kwargs):
+            time.sleep(sleep_time)
+            return arg1, arg2, arg3, arg4
+
+        @MTAOS.timeit
+        async def amy_retval(arg1, arg2, arg3, arg4, sleep_time, **kwargs):
+            await asyncio.sleep(sleep_time)
+            return arg1, arg2, arg3, arg4
+
+        exec_time = {}
+        sleep_time = 1.0
+
+        for i in range(10):
+            r_a1, r_a2, r_a3, r_a4 = my_retval(
+                arg1="this",
+                arg2="is",
+                arg3="a",
+                arg4="test",
+                sleep_time=sleep_time,
+                log_time=exec_time,
+            )
+            self.assertEqual(r_a1, "this")
+            self.assertEqual(r_a2, "is")
+            self.assertEqual(r_a3, "a")
+            self.assertEqual(r_a4, "test")
+
+        loop = asyncio.get_event_loop()
+
+        for i in range(10):
+            r_a1, r_a2, r_a3, r_a4 = loop.run_until_complete(
+                amy_retval(
+                    arg1="this",
+                    arg2="is",
+                    arg3="a",
+                    arg4="test",
+                    sleep_time=sleep_time,
+                    log_time=exec_time,
+                )
+            )
+            self.assertEqual(r_a1, "this")
+            self.assertEqual(r_a2, "is")
+            self.assertEqual(r_a3, "a")
+            self.assertEqual(r_a4, "test")
+
+        self.assertTrue("MY_RETVAL" in exec_time)
+        self.assertTrue("AMY_RETVAL" in exec_time)
+
+        self.assertAlmostEqual(sleep_time, np.mean(exec_time["MY_RETVAL"]), 2)
+        self.assertAlmostEqual(sleep_time, np.mean(exec_time["AMY_RETVAL"]), 2)
 
 
 if __name__ == "__main__":
