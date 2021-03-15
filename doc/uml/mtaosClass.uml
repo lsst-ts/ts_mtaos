@@ -1,7 +1,5 @@
 @startuml
-Model <|-- ModelSim
 Model *-- Config
-Model "1" *-- "2" CalcTime
 Model "1" *-- "2" CollOfListOfWfErr
 MtaosCsc *-- Model
 MtaosCsc ..> Config

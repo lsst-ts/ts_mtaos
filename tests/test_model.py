@@ -175,8 +175,8 @@ class TestModel(unittest.TestCase):
     def testResetWavefrontCorrection(self):
 
         data = [1, 2, 3]
-        self.model.wfe.append(data)
-        self.model.rej_wfe.append(data)
+        self.model.wavefront_errors.append(data)
+        self.model.rejected_wavefront_errors.append(data)
 
         self.model.resetWavefrontCorrection()
 

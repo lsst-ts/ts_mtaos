@@ -422,7 +422,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         async with self.issue_correction_lock:
 
             # Need to set user gain before computing corrections.
-            self.model.gain = data.userGain
+            self.model.user_gain = data.userGain
             # If this call fails (raise an exeception), command will be
             # rejected.
             # This is not a coroutine so it will block the event loop. Need
@@ -835,7 +835,12 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        duration = np.mean(self.execution_times["RUN_WEP"])
+        duration = (
+            np.mean(self.execution_times["RUN_WEP"])
+            if "RUN_WEP" in self.execution_times
+            and len(self.execution_times["RUN_WEP"]) > 0
+            else 0.0
+        )
         self.tel_wepDuration.set_put(calcTime=duration)
 
     def pubTel_ofcDuration(self):
@@ -844,7 +849,12 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        duration = np.mean(self.execution_times["CALCULATE_CORRECTIONS"])
+        duration = (
+            np.mean(self.execution_times["CALCULATE_CORRECTIONS"])
+            if "CALCULATE_CORRECTIONS" in self.execution_times
+            and len(self.execution_times["CALCULATE_CORRECTIONS"]) > 0
+            else 0.0
+        )
         self.tel_ofcDuration.set_put(calcTime=duration)
 
     @classmethod

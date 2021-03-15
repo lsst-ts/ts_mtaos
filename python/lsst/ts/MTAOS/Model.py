@@ -54,7 +54,7 @@ class Model:
             Configuration.
         state0Dof : `dict`
             Dictionary with state0 DoF data. None for default DoF.
-        log : `logging.Logger`
+        log : `logging.Logger` or `None`, optional
             Optional logging class to be used for logging operations. If
             `None`, creates a new logger.
 
@@ -64,12 +64,13 @@ class Model:
             Log facility.
         config : `lsst.ts.MTAOS.Config`
             Configuration.
-        wfe : `CollOfListOfWfErr`
+        wavefront_errors : `CollOfListOfWfErr`
             Object to manage list of wavefront errors.
-        rej_wfe : `CollOfListOfWfErr`
+        rejected_wavefront_errors : `CollOfListOfWfErr`
             Object to manage list of rejected wavefront errors.
-        gain : `float`
-            User provided gain for the OFC.
+        user_gain : `float`
+            User provided gain for the OFC. Value must be either -1, the gain
+            value will be dicided by PSSN, or between 0 and 1.
         fwhm_data : `list` of `FWHMSensorData`
             List of FWHM (full width at half maximum) sensor data.
         ofc : `lsst.ts.ofc.ctrlIntf.OFCCalculation`
@@ -92,15 +93,17 @@ class Model:
         # Configuration
         self.config = config
 
+        # Store user gain value in a private variable. Use self.user_gain to
+        # access the variable. Value is guarded and must be equal to -1 or
+        # between 0 and 1. Set to -1 to ignore user gain. In this case, the
+        # gain value will be dicided by PSSN
+        self._user_gain = -1
+
         # Collection of calculated list of wavefront error
-        self.wfe = CollOfListOfWfErr(self.MAX_LEN_QUEUE)
+        self.wavefront_errors = CollOfListOfWfErr(self.MAX_LEN_QUEUE)
 
         # Collection of calculated list of rejected wavefront error
-        self.rej_wfe = CollOfListOfWfErr(self.MAX_LEN_QUEUE)
-
-        # Gain value between 0 and 1. Set to -1 to ignore user gain. In this
-        # case, the gain value will be dicided by PSSN
-        self.gain = -1
+        self.rejected_wavefront_errors = CollOfListOfWfErr(self.MAX_LEN_QUEUE)
 
         # List of FWHM (full width at half maximum) sensor data
         self.fwhm_data = []
@@ -123,6 +126,28 @@ class Model:
         # M2 actuator correction
         self.m2_correction = M2Correction(np.zeros(M2Correction.NUM_OF_ACT))
 
+    @property
+    def user_gain(self):
+        """Return the user gain.
+        """
+        if self._user_gain == -1 or 0.0 <= self._user_gain <= 1.0:
+            return self._user_gain
+        else:
+            self.log.warning(f"Invalid user gain {self._user_gain}. Reseting to -1.")
+            self.user_gain = -1
+            return -1
+
+    @user_gain.setter
+    def user_gain(self, value):
+        """Set user gain.
+        """
+        if value == -1 or 0.0 <= value <= 1.0:
+            self._user_gain = value
+        else:
+            ValueError(
+                f"User gain must be either -1 or in the range (0., 1.). Received: {value}."
+            )
+
     def getListOfWavefrontError(self):
         """Get the list of wavefront error from the collection.
 
@@ -135,7 +160,7 @@ class Model:
             List of wavefront error data.
         """
 
-        return self.wfe.pop()
+        return self.wavefront_errors.pop()
 
     def getListOfWavefrontErrorRej(self):
         """Get the list of rejected wavefront error from the collection.
@@ -149,7 +174,7 @@ class Model:
             List of rejected wavefront error data.
         """
 
-        return self.rej_wfe.pop()
+        return self.rejected_wavefront_errors.pop()
 
     def getListOfFWHMSensorData(self):
         """Get the list of FWHM sensor data.
@@ -275,8 +300,8 @@ class Model:
         """Clear the collections of wavefront error contain the rejected one.
         """
 
-        self.wfe.clear()
-        self.rej_wfe.clear()
+        self.wavefront_errors.clear()
+        self.rejected_wavefront_errors.clear()
 
     def getM2HexCorr(self):
         """Get the M2 hexapod correction.
@@ -467,16 +492,18 @@ class Model:
         try:
             self.ofc.setFilter(filterType)
             self.ofc.setRotAng(rotAngInDeg)
-            if self.gain == -1:
+            if self.user_gain == -1:
                 if len(self.fwhm_data) == 0:
                     raise RuntimeError("No FWHM sensor data to use.")
                 else:
                     self.ofc.setGainByPSSN()
                     self.ofc.setFWHMSensorDataOfCam(self.fwhm_data)
             else:
-                self.ofc.setGainByUser(self.gain)
+                self.ofc.setGainByUser(self.user_gain)
 
-            listOfWfErrAvg = self.wfe.getListOfWavefrontErrorAvgInTakenData()
+            listOfWfErrAvg = (
+                self.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
+            )
             (
                 m2HexapodCorrection,
                 cameraHexapodCorrection,

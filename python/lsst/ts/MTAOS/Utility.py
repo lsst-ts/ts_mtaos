@@ -25,7 +25,6 @@ __all__ = [
     "MTHexapodIndex",
     "getModulePath",
     "getConfigDir",
-    "getSchemaDir",
     "getLogDir",
     "getIsrDirPath",
     "getCamType",
@@ -87,18 +86,6 @@ def getConfigDir():
     """
 
     return getModulePath().joinpath("policy")
-
-
-def getSchemaDir():
-    """Get the directory of schema files.
-
-    Returns
-    -------
-    pathlib.PosixPath
-        Directory of schema files.
-    """
-
-    return getModulePath().joinpath("schema")
 
 
 def getLogDir():
@@ -248,22 +235,43 @@ def timeit(func):
     """Decorator to compute execution time.
     """
 
-    async def timed(*args, **kwargs):
-        if asyncio.iscoroutinefunction(func):
+    if asyncio.iscoroutinefunction(func):
+
+        async def atimed(*args, **kwargs):
+            """Time execution of function `func`.
+
+            The method can either me a normal method or a coroutine.
+            """
             start_time = time.perf_counter()
             result = await func(*args, **kwargs)
             calc_time = time.perf_counter() - start_time
-        else:
-            # not a coroutine
-            result = func(*args, **kwargs)
-        if "log_time" in kwargs:
-            name = kwargs.get("log_name", func.__name__.upper())
-            if name not in kwargs["log_time"]:
-                kwargs["log_time"][name] = []
-            kwargs["log_time"][name].append(calc_time)
-        return result
+            if "log_time" in kwargs:
+                name = kwargs.get("log_name", func.__name__.upper())
+                if name not in kwargs["log_time"]:
+                    kwargs["log_time"][name] = []
+                kwargs["log_time"][name].append(calc_time)
+            return result
 
-    return timed
+        return atimed
+    else:
+
+        def timed(*args, **kwargs):
+            """Time execution of function `func`.
+
+            The method can either me a normal method or a coroutine.
+            """
+            start_time = time.perf_counter()
+            result = func(*args, **kwargs)
+            calc_time = time.perf_counter() - start_time
+
+            if "log_time" in kwargs:
+                name = kwargs.get("log_name", func.__name__.upper())
+                if name not in kwargs["log_time"]:
+                    kwargs["log_time"][name] = []
+                kwargs["log_time"][name].append(calc_time)
+            return result
+
+        return timed
 
 
 if __name__ == "__main__":
