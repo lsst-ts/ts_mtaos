@@ -2,7 +2,15 @@
 Version History
 ===============
 
-v0.5.1
+v0.5.3
+------
+
+* Implement addAberration command.
+* Remove `asynctest` and use `unittest.IsolatedAsyncioTestCase` instead.
+* Fix version history.
+* Minor documentation updates.
+
+v0.5.2
 ------
 
 * Refactor of the Model class to prepare it for integration with wep pipeline task.
@@ -12,6 +20,11 @@ v0.5.1
 * Implement new salobj configuration schema, replacing schema yaml file by string in a python module.
 * Add support to publish CSC version.
 * Update docs configuration.
+
+v0.5.1
+------
+
+* Fix reference to undefined name `issue_corrections_tasks` -> `issued_corrections`
 
 v0.5.0
 ------

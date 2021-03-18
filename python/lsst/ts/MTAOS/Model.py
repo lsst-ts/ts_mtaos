@@ -31,7 +31,9 @@ from lsst.ts.ofc.ctrlIntf.M1M3Correction import M1M3Correction
 from lsst.ts.ofc.ctrlIntf.M2Correction import M2Correction
 from lsst.ts.ofc.ctrlIntf.OFCCalculationFactory import OFCCalculationFactory
 from lsst.ts.ofc.ctrlIntf.FWHMSensorData import FWHMSensorData
+from lsst.ts.wep.ctrlIntf.SensorWavefrontError import SensorWavefrontError
 from lsst.ts.wep.Utility import FilterType
+from lsst.ts.wep.bsc.CamFactory import CamFactory
 
 from .CollOfListOfWfErr import CollOfListOfWfErr
 from .Utility import timeit
@@ -83,6 +85,8 @@ class Model:
             M1M3 correction.
         m2_correction : `M2Correction`
             M2 correction.
+        camera : `lsst.ts.wep.bsc.CameraData.CameraData`
+            Current camera instance.
         """
 
         if log is None:
@@ -92,6 +96,8 @@ class Model:
 
         # Configuration
         self.config = config
+
+        self.camera = CamFactory.createCam(self.config.getCamType())
 
         # Store user gain value in a private variable. Use self.user_gain to
         # access the variable. Value is guarded and must be equal to -1 or
@@ -504,19 +510,74 @@ class Model:
             listOfWfErrAvg = (
                 self.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
             )
-            (
-                m2HexapodCorrection,
-                cameraHexapodCorrection,
-                m1m3Correction,
-                m2Correction,
-            ) = self.ofc.calculateCorrections(listOfWfErrAvg)
 
-            # Need to add a step of checking the calculated correction
-            # in the future
-            self.m2_hexapod_correction = m2HexapodCorrection
-            self.cam_hexapod_correction = cameraHexapodCorrection
-            self.m1m3_correction = m1m3Correction
-            self.m2_correction = m2Correction
+            self._calculate_corrections(listOfWfErrAvg)
+
         finally:
             # Clear the queue
             self._clearCollectionsOfWfErr()
+
+    def add_correction(self, wavefront_errors, config=None):
+        """Compute ofc corrections from user-defined wavefront erros.
+
+        Parameters
+        ----------
+        wavefront_errors : `np.array` or `list` of `float`
+            Input wavefront errors (in um).
+        config : `dict`, optional
+            Optional additional configuration parameters to customize ofc.
+        """
+
+        self.log.debug(f"Currently configured with {self.config.getCamType()!r}")
+
+        # Get list of detectors. Since the method considers that aberration is
+        # uniform across all detectors, it will build a set of corrections
+        # based of this assumption. So need to get list of detectors.
+        detector_list = self.camera.getWfsCcdList()
+
+        # Get the intrinsic zernike coeffients. Will consider white light for
+        # now but may use last filter set in select sources in the future.
+        self.log.debug("Assuming white light filter to compute aberration.")
+
+        intrinsic_zk = self.ofc.ztaac.dataShare.getIntrinsicZk(
+            FilterType.REF, self.ofc.ztaac.dataShare.getFieldIdx(detector_list)
+        )
+
+        # Now compute the wavefront error matrix by summing the input with the
+        # intrinsic zernike coeffients.
+        sensor_ids = self.ofc.ztaac.mapSensorNameToId(detector_list)
+        all_sensor_wavefront_errors = []
+        for sid, zk in zip(sensor_ids, intrinsic_zk):
+            sensor_wavefront_errors = SensorWavefrontError(numOfZk=len(zk))
+            sensor_wavefront_errors.setSensorId(sid)
+            # Note that it subtracts the users input wavefront from the
+            # intrinsic data. The ofc will return corrections to remove the
+            # measured aberration. That means, if we want to "add" an
+            # aberration we have to pass the negative of what we want.
+            sensor_wavefront_errors.setAnnularZernikePoly(zk - wavefront_errors)
+            all_sensor_wavefront_errors.append(sensor_wavefront_errors)
+
+        self._calculate_corrections(all_sensor_wavefront_errors)
+
+    def _calculate_corrections(self, wavefront_errors):
+        """Utility method to calculate corrections using ofc.
+
+        Parameters
+        ----------
+        wavefront_errors : `list` of `SensorWavefrontError`
+
+        """
+
+        (
+            m2_hex_correction,
+            cam_hex_correction,
+            m1m3_correction,
+            m2_correction,
+        ) = self.ofc.calculateCorrections(wavefront_errors)
+
+        # Need to add a step of checking the calculated correction
+        # in the future
+        self.m2_hexapod_correction = m2_hex_correction
+        self.cam_hexapod_correction = cam_hex_correction
+        self.m1m3_correction = m1m3_correction
+        self.m2_correction = m2_correction

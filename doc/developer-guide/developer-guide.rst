@@ -28,19 +28,13 @@ The classes in module are listed below.
     :caption: Class diagram of MTAOS
 
 * **MtaosCsc** is a CSC class. It inherits from the *ts_salobj*'s **ConfigurableCsc**. *ts_salobj* provides interfaces for the SAL communication.
-* **CalcTime**: Calculation time class. Collects jobs running times for the performance analysis.
 * **CollOfListOfWfErr**: Collection of list of wave-front sensor data.
 * **Config**: Configuration class. Holds configuration values and provides functions to retrieve the configurable values.
 * **Model**: Model class containing the *ts_wep* and *ts_ofc* interface classes. Together with WEP and OFC it runs the wavefront analysis and corrects the hexapod position and mirror bending mode.
-* **ModelSim**: Simulation **Model** subclass. Supports **MtaosCsc** simulation mode.
 
 Only the **MtaosCsc** instance has knowledge of the high-level control logic and middleware layer provided by **ConfigurableCsc**.
 The business logic is implemented in the **Model**.
 This allows for testing **Model** without SAL integration.
-The CSC simulation mode is implemented in **ModelSim**.
-The **MtaosCsc** instance decides which class (**Model** or **ModelSim**) is created and run.
-For **Model** and **ModelSim** unit tests configuration values are read from the yaml files passed as filenames into **Config** instance.
-Otherwise, configuration data are read inside the *ts_salobj* module (from the *ts_config_mttcs* directory) and passed as object into **Config** instance.
 
 .. _API:
 
