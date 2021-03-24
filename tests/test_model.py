@@ -142,6 +142,73 @@ class TestModel(unittest.TestCase):
 
         return self.model.getDofVisit()
 
+    def test_add_correction(self):
+
+        wavefront_erros = np.zeros(19)
+
+        # Passing in zeros for wavefront_errors should return 0 in correction
+        self.model.add_correction(wavefront_erros)
+
+        x, y, z, u, v, w = self.model.getM2HexCorr()
+
+        self.assertEqual(x, 0)
+        self.assertEqual(y, 0)
+        self.assertEqual(z, 0)
+        self.assertEqual(u, 0)
+        self.assertEqual(v, 0)
+        self.assertEqual(w, 0)
+
+        x, y, z, u, v, w = self.model.getCamHexCorr()
+        self.assertEqual(x, 0)
+        self.assertEqual(y, 0)
+        self.assertEqual(z, 0)
+        self.assertEqual(u, 0)
+        self.assertEqual(v, 0)
+        self.assertEqual(w, 0)
+
+        actCorr = self.model.getM1M3ActCorr()
+        self.assertListEqual(actCorr.tolist(), np.zeros_like(actCorr).tolist())
+
+        actCorr = self.model.getM2ActCorr()
+        self.assertListEqual(actCorr.tolist(), np.zeros_like(actCorr).tolist())
+
+        # Give 0.1 um of focus correction. All values must be close to zero
+        # except z correction.
+
+        wavefront_erros[0] = 0.1
+        self.model.add_correction(wavefront_erros)
+
+        x, y, z_m2hex, u, v, w = self.model.getM2HexCorr()
+
+        self.assertAlmostEqual(x, 0, 3)
+        self.assertAlmostEqual(y, 0, 3)
+        self.assertAlmostEqual(u, 0, 3)
+        self.assertAlmostEqual(v, 0, 3)
+        self.assertAlmostEqual(w, 0, 3)
+
+        x, y, z_camhex, u, v, w = self.model.getCamHexCorr()
+
+        self.assertAlmostEqual(x, 0, 3)
+        self.assertAlmostEqual(y, 0, 3)
+        self.assertAlmostEqual(u, 0, 3)
+        self.assertAlmostEqual(v, 0, 3)
+        self.assertAlmostEqual(w, 0, 3)
+
+        # Expected total hexapod offset
+        self.assertAlmostEqual(z_m2hex + z_camhex, 4.16211, 3)
+
+        actCorr = self.model.getM1M3ActCorr()
+        self.assertTrue(
+            np.allclose(actCorr, np.zeros_like(actCorr), rtol=0.1, atol=0.1),
+            f"{actCorr} not almost close to 0.",
+        )
+
+        actCorr = self.model.getM2ActCorr()
+        self.assertTrue(
+            np.allclose(actCorr, np.zeros_like(actCorr), rtol=0.1, atol=0.1),
+            f"{actCorr} not almost close to 0.",
+        )
+
     def testGetM2HexCorr(self):
 
         x, y, z, u, v, w = self.model.getM2HexCorr()

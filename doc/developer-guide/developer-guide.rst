@@ -28,19 +28,13 @@ The classes in module are listed below.
     :caption: Class diagram of MTAOS
 
 * **MtaosCsc** is a CSC class. It inherits from the *ts_salobj*'s **ConfigurableCsc**. *ts_salobj* provides interfaces for the SAL communication.
-* **CalcTime**: Calculation time class. Collects jobs running times for the performance analysis.
 * **CollOfListOfWfErr**: Collection of list of wave-front sensor data.
 * **Config**: Configuration class. Holds configuration values and provides functions to retrieve the configurable values.
 * **Model**: Model class containing the *ts_wep* and *ts_ofc* interface classes. Together with WEP and OFC it runs the wavefront analysis and corrects the hexapod position and mirror bending mode.
-* **ModelSim**: Simulation **Model** subclass. Supports **MtaosCsc** simulation mode.
 
 Only the **MtaosCsc** instance has knowledge of the high-level control logic and middleware layer provided by **ConfigurableCsc**.
 The business logic is implemented in the **Model**.
 This allows for testing **Model** without SAL integration.
-The CSC simulation mode is implemented in **ModelSim**.
-The **MtaosCsc** instance decides which class (**Model** or **ModelSim**) is created and run.
-For **Model** and **ModelSim** unit tests configuration values are read from the yaml files passed as filenames into **Config** instance.
-Otherwise, configuration data are read inside the *ts_salobj* module (from the *ts_config_mttcs* directory) and passed as object into **Config** instance.
 
 .. _API:
 
@@ -97,6 +91,44 @@ Python *logging* package is used, with default log level set to *DEBUG*.
 The log level can be adjusted with *--debugLevel* argument.
 
 Stopping the CSC is done by SIG-INTing the process, usually by :kbd:`ctrl` + :kbd:`c`.
+
+Utilities
+=========
+
+This section provide some documentation of the utility methods available in MTAOS.
+
+timeit
+------
+
+MTAOS provides the :py:meth:`timeit <lsst.ts.MTAOS.Utility.timeit>` decorator that allows one compute and store execution times of methods and coroutines.
+To add the decorator the method must either support ``kwargs`` argument or contain an additional parameter named ``log_time``, which must receive a dictionary.
+The dictionary passed to ``log_time`` will receive a new item, with the name of the method in upper case as the key, and a list as value.
+The decorator will append the execution time to the list every time the method is called.
+
+You can use the :py:meth:`timeit <lsst.ts.MTAOS.Utility.timeit>` decorator as follows:
+
+.. code-block:: python
+
+  from lsst.ts.MTAOS import timeit
+
+  # timing a regular method.
+  @timeit
+  def my_method(arg1, arg2, **kwargs):
+    ...
+
+
+  # timing a coroutine
+  @timeit
+  async def my_coroutine(arg1, agr2, **kwargs):
+    ...
+
+  log_time = dict()
+
+  ret_val_1 = my_method(arg1=arg1, arg2=arg2, log_time=log_time)
+
+  ret_val_2 = await my_coroutine(arg1=arg1, arg2=arg2, log_time=log_time)
+
+The dictionary ``log_time``, will now contain two entries; ``MY_METHOD`` and ``MY_COROUTINE``, each containing a list with the execution time of each call.
 
 .. _Contributing:
 
