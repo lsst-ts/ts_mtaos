@@ -158,10 +158,8 @@ class TestUtility(unittest.TestCase):
             self.assertEqual(r_a3, "a")
             self.assertEqual(r_a4, "test")
 
-        loop = asyncio.get_event_loop()
-
         for i in range(10):
-            r_a1, r_a2, r_a3, r_a4 = loop.run_until_complete(
+            r_a1, r_a2, r_a3, r_a4 = asyncio.run(
                 amy_retval(
                     arg1="this",
                     arg2="is",

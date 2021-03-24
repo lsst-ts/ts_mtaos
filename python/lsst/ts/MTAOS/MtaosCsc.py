@@ -452,18 +452,20 @@ class MtaosCsc(salobj.ConfigurableCsc):
         ----------
         data : object
             Data for the command being executed.
-
-        Raises
-        -------
-        NotImplementedError
-            This command is not implemented yet (DM-28711).
         """
         self.assert_enabled()
 
-        # TODO: DM-28711
-        raise NotImplementedError(
-            "Command addAberration not implemented yet (DM-28711)."
+        self.model.add_correction(
+            wavefront_errors=data.wf, config=yaml.safe_load(data.config)
         )
+
+        await self.handle_corrections()
+
+        self.pubEvent_degreeOfFreedom()
+        self.pubEvent_m2HexapodCorrection()
+        self.pubEvent_cameraHexapodCorrection()
+        self.pubEvent_m1m3Correction()
+        self.pubEvent_m2Correction()
 
     async def handle_corrections(self):
         """Handle applying the corrections to all components.

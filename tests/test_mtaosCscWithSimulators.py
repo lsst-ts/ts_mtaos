@@ -19,9 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import os
 import asyncio
-import asynctest
 import unittest
 import numpy as np
 from pathlib import Path
@@ -32,8 +30,7 @@ from lsst.ts import MTAOS
 STD_TIMEOUT = 60
 
 
-@unittest.skip("Skip until commands implementation.")
-class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
+class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
         return MTAOS.MtaosCsc(
             config_dir=config_dir, simulation_mode=simulation_mode, log_to_file=True
@@ -41,17 +38,16 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     def setUp(self):
 
-        self.dataDir = MTAOS.getModulePath().joinpath("tests", "tmp")
-        self.isrDir = self.dataDir.joinpath("input")
-
-        # Let the MTAOS to set WEP based on this path variable
-        os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
-
         # Simulated CSCs
         self.cscM2Hex = None
         self.cscCamHex = None
         self.cscM1M3 = None
         self.cscM2 = None
+
+        self.m2_hex_corrections = []
+        self.cam_hex_corrections = []
+        self.m1m3_corrections = []
+        self.m2_corrections = []
 
         # Simulated CSC tasks
         self.taskM2Hex = None
@@ -61,15 +57,11 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
     def tearDown(self):
 
-        try:
-            os.environ.pop("ISRDIRPATH")
-        except KeyError:
-            pass
-
         logFile = Path(MTAOS.getLogDir()).joinpath("MTAOS.log")
         if logFile.exists():
             logFile.unlink()
 
+    @unittest.skip("Skip until commands implementation.")
     async def testIssueCorrection(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
@@ -89,6 +81,85 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 
             await self._cancelCSCs()
 
+    async def test_addAberration(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
+        ):
+            await self._simulateCSCs()
+
+            await self._startCsc()
+
+            # Set the timeout > 20 seconds for the long calculation time
+            remote = self._getRemote()
+
+            await remote.cmd_addAberration.set_start(wf=np.zeros(19), timeout=10.0)
+
+            # There must be 1 correction for each component
+            self.assertEqual(len(self.m2_hex_corrections), 1)
+            self.assertEqual(len(self.cam_hex_corrections), 1)
+            self.assertEqual(len(self.m1m3_corrections), 1)
+            self.assertEqual(len(self.m2_corrections), 1)
+
+            # Check values. They should all be zeros.
+
+            for axis in "xyzuvw":
+                self.assertEqual(getattr(self.m2_hex_corrections[0], axis), 0)
+                self.assertEqual(getattr(self.cam_hex_corrections[0], axis), 0)
+
+            # Check sync flag
+            self.assertTrue(self.m2_hex_corrections[0].sync)
+            self.assertTrue(self.cam_hex_corrections[0].sync)
+
+            self.assertTrue(
+                np.allclose(self.m1m3_corrections[0].zForces, 0.0),
+                f"Not all M1M3 forces are close to zero {self.m1m3_corrections[0].zForces}",
+            )
+            self.assertTrue(
+                np.allclose(self.m2_corrections[0].axial, 0.0),
+                f"Not all M2 forces are close to zero {self.m2_corrections[0].axial}",
+            )
+
+            # Test it works if one of the forces get rejected
+            self.cscM1M3.cmd_applyActiveOpticForces.callback = (
+                self.m1m3_apply_forces_fail_callbck
+            )
+
+            wf = np.random.rand(19) * 0.1
+
+            with self.assertRaises(salobj.AckError):
+                await remote.cmd_addAberration.set_start(wf=wf, timeout=10.0)
+
+            # There must be 3 corrections for each component except for m1m3
+            # which got rejected. The corrections are 1 from the previous test,
+            # 1 from trying to apply correction and 1 for removing the
+            # correction
+
+            self.assertEqual(len(self.m2_hex_corrections), 3)
+            self.assertEqual(len(self.cam_hex_corrections), 3)
+            self.assertEqual(len(self.m1m3_corrections), 1)
+            self.assertEqual(len(self.m2_corrections), 3)
+
+            # Check values.
+            for axis in "xyzuvw":
+                self.assertEqual(
+                    getattr(self.m2_hex_corrections[1], axis),
+                    -getattr(self.m2_hex_corrections[2], axis),
+                )
+                self.assertEqual(
+                    getattr(self.cam_hex_corrections[1], axis),
+                    -getattr(self.cam_hex_corrections[2], axis),
+                )
+
+            self.assertTrue(
+                np.all(
+                    np.array(self.m2_corrections[1].axial)
+                    == -np.array(self.m2_corrections[2].axial)
+                )
+            )
+
+    async def asyncTearDown(self):
+        await self._cancelCSCs()
+
     async def _simulateCSCs(self):
 
         # Mock controller that uses callback functions defined below
@@ -103,47 +174,45 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         self.cscM2Hex = salobj.Controller(
             "MTHexapod", index=MTAOS.Utility.MTHexapodIndex.M2.value
         )
-        self.cscM2Hex.cmd_move.callback = self._checkDataHex
+        self.cscM2Hex.cmd_move.callback = self.hexapod_move_callbck
 
-    def _checkDataHex(self, data):
+    def hexapod_move_callbck(self, data):
 
-        self.assertNotEqual(data.x, 0)
-        self.assertNotEqual(data.y, 0)
-        self.assertNotEqual(data.z, 0)
-        self.assertNotEqual(data.u, 0)
-        self.assertNotEqual(data.v, 0)
-
-        self.assertEqual(data.w, 0)
-        self.assertEqual(data.sync, True)
+        if data.MTHexapodID == MTAOS.Utility.MTHexapodIndex.M2.value:
+            self.m2_hex_corrections.append(data)
+        else:
+            self.cam_hex_corrections.append(data)
 
     async def _simulateCamHex(self):
 
         self.cscCamHex = salobj.Controller(
             "MTHexapod", index=MTAOS.Utility.MTHexapodIndex.Camera.value
         )
-        self.cscCamHex.cmd_move.callback = self._checkDataHex
+        self.cscCamHex.cmd_move.callback = self.hexapod_move_callbck
 
     async def _simulateM1M3(self):
 
         self.cscM1M3 = salobj.Controller("MTM1M3")
-        self.cscM1M3.cmd_applyActiveOpticForces.callback = self._callbackM1M3
+        self.cscM1M3.cmd_applyActiveOpticForces.callback = (
+            self.m1m3_apply_forces_callbck
+        )
 
-    def _callbackM1M3(self, data):
+    def m1m3_apply_forces_callbck(self, data):
 
-        self._checkActForce(data.zForces)
+        self.m1m3_corrections.append(data)
 
-    def _checkActForce(self, forceData):
+    def m1m3_apply_forces_fail_callbck(self, data):
 
-        self.assertNotEqual(np.sum(np.abs(forceData)), 0)
+        raise RuntimeError("This is a test.")
 
     async def _simulateM2(self):
 
         self.cscM2 = salobj.Controller("MTM2")
-        self.cscM2.cmd_applyForces.callback = self._callbackM2
+        self.cscM2.cmd_applyForces.callback = self.m2_apply_forces_callbck
 
-    def _callbackM2(self, data):
+    def m2_apply_forces_callbck(self, data):
 
-        self._checkActForce(data.axial)
+        self.m2_corrections.append(data)
 
     async def _startCsc(self):
         remote = self._getRemote()
@@ -169,4 +238,4 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
 if __name__ == "__main__":
 
     # Do the unit test
-    asynctest.main()
+    unittest.main()

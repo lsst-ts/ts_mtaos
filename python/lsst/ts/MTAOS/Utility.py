@@ -233,6 +233,53 @@ def addRotFileHandler(log, filePath, debugLevel, maxBytes=1e6, backupCount=5):
 
 def timeit(func):
     """Decorator to compute execution time.
+
+    Add this decorator to a method to allow computing execution times.
+
+    Parameters
+    ----------
+    func : `function` or `coroutine`
+        Method to be decorated.
+
+    Usage
+    -----
+
+    This decorator allows one to compute and store execution times of methods
+    and coroutines. To add the decorator the method must either support
+    `kwargs` argument or contain an additional parameter named `log_time`,
+    which must receive a dictionary. The dictionary passed to `log_time` will
+    receive a new item, with the name of the method in upper case as the key,
+    and a list as value. The decorator will append the execution time to the
+    list every time the method is called.
+
+    Examples
+    --------
+
+    Timing a regular method.
+
+    >>> @timeit
+        def my_method(arg1, arg2, **kwargs):
+            # Do something here....
+
+    Timing a coroutine
+
+    >>> @timeit
+        async def my_coroutine(arg1, arg2, **kwargs):
+            # Do something here....
+
+    >>> log_time = dict()
+
+    >>> ret_val_1 = my_method(arg1=arg1, arg2=arg2, log_time=log_time)
+
+    >>> log_time
+    {'MY_METHOD': [6.699992809444666e-06]}
+
+    >>> ret_val_2 = await my_coroutine(arg1=arg1, arg2=arg2, log_time=log_time)
+
+    >>> log_time
+    {'MY_METHOD': [6.699992809444666e-06],
+    'MY_COROUTINE': [1.2299977242946625e-05]}
+
     """
 
     if asyncio.iscoroutinefunction(func):
