@@ -85,7 +85,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
-
             await self._simulateCSCs()
 
             await self._startCsc()
@@ -96,7 +95,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await remote.cmd_addAberration.set_start(wf=np.zeros(19), timeout=10.0)
 
             # There must be 1 correction for each component
-
             self.assertEqual(len(self.m2_hex_corrections), 1)
             self.assertEqual(len(self.cam_hex_corrections), 1)
             self.assertEqual(len(self.m1m3_corrections), 1)
@@ -126,8 +124,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.m1m3_apply_forces_fail_callbck
             )
 
+            wf = np.random.rand(19) * 0.1
+
             with self.assertRaises(salobj.AckError):
-                await remote.cmd_addAberration.set_start(wf=np.zeros(19), timeout=10.0)
+                await remote.cmd_addAberration.set_start(wf=wf, timeout=10.0)
 
             # There must be 3 corrections for each component except for m1m3
             # which got rejected. The corrections are 1 from the previous test,
@@ -139,7 +139,26 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(self.m1m3_corrections), 1)
             self.assertEqual(len(self.m2_corrections), 3)
 
-            await self._cancelCSCs()
+            # Check values.
+            for axis in "xyzuvw":
+                self.assertEqual(
+                    getattr(self.m2_hex_corrections[1], axis),
+                    -getattr(self.m2_hex_corrections[2], axis),
+                )
+                self.assertEqual(
+                    getattr(self.cam_hex_corrections[1], axis),
+                    -getattr(self.cam_hex_corrections[2], axis),
+                )
+
+            self.assertTrue(
+                np.all(
+                    np.array(self.m2_corrections[1].axial)
+                    == -np.array(self.m2_corrections[2].axial)
+                )
+            )
+
+    async def asyncTearDown(self):
+        await self._cancelCSCs()
 
     async def _simulateCSCs(self):
 

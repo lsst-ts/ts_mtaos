@@ -24,7 +24,7 @@ v0.5.2
 v0.5.1
 ------
 
-* Fix reference to undefined name `issue_corrections_tasks` -> `issued_corrections`
+* Fix reference to undefined name `issue_corrections_tasks` -> `issued_corrections`.
 
 v0.5.0
 ------

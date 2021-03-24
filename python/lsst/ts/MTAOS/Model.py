@@ -517,15 +517,39 @@ class Model:
             # Clear the queue
             self._clearCollectionsOfWfErr()
 
+    def _calculate_corrections(self, wavefront_errors):
+        """Utility method to calculate corrections using ofc.
+
+        Parameters
+        ----------
+        wavefront_errors : `list` of `SensorWavefrontError`
+        """
+
+        (
+            m2_hex_correction,
+            cam_hex_correction,
+            m1m3_correction,
+            m2_correction,
+        ) = self.ofc.calculateCorrections(wavefront_errors)
+
+        # Need to add a step of checking the calculated correction
+        # in the future
+        self.m2_hexapod_correction = m2_hex_correction
+        self.cam_hexapod_correction = cam_hex_correction
+        self.m1m3_correction = m1m3_correction
+        self.m2_correction = m2_correction
+
     def add_correction(self, wavefront_errors, config=None):
         """Compute ofc corrections from user-defined wavefront erros.
 
         Parameters
         ----------
         wavefront_errors : `np.array` or `list` of `float`
-            Input wavefront errors (in um).
+            Input wavefront errors (in um). If an array or list it must have
+            the same number of elements of the intrinsic zernike coeffients.
         config : `dict`, optional
             Optional additional configuration parameters to customize ofc.
+            Default is `None`.
         """
 
         self.log.debug(f"Currently configured with {self.config.getCamType()!r}")
@@ -558,26 +582,3 @@ class Model:
             all_sensor_wavefront_errors.append(sensor_wavefront_errors)
 
         self._calculate_corrections(all_sensor_wavefront_errors)
-
-    def _calculate_corrections(self, wavefront_errors):
-        """Utility method to calculate corrections using ofc.
-
-        Parameters
-        ----------
-        wavefront_errors : `list` of `SensorWavefrontError`
-
-        """
-
-        (
-            m2_hex_correction,
-            cam_hex_correction,
-            m1m3_correction,
-            m2_correction,
-        ) = self.ofc.calculateCorrections(wavefront_errors)
-
-        # Need to add a step of checking the calculated correction
-        # in the future
-        self.m2_hexapod_correction = m2_hex_correction
-        self.cam_hexapod_correction = cam_hex_correction
-        self.m1m3_correction = m1m3_correction
-        self.m2_correction = m2_correction
