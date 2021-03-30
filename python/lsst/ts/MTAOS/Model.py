@@ -134,8 +134,7 @@ class Model:
 
     @property
     def user_gain(self):
-        """Return the user gain.
-        """
+        """Return the user gain."""
         if self._user_gain == -1 or 0.0 <= self._user_gain <= 1.0:
             return self._user_gain
         else:
@@ -145,8 +144,7 @@ class Model:
 
     @user_gain.setter
     def user_gain(self, value):
-        """Set user gain.
-        """
+        """Set user gain."""
         if value == -1 or 0.0 <= value <= 1.0:
             self._user_gain = value
         else:
@@ -303,8 +301,7 @@ class Model:
         ) = self.ofc.resetOfcState()
 
     def _clearCollectionsOfWfErr(self):
-        """Clear the collections of wavefront error contain the rejected one.
-        """
+        """Clear the collections of wavefront error contain the rejected one."""
 
         self.wavefront_errors.clear()
         self.rejected_wavefront_errors.clear()
