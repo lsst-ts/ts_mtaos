@@ -286,7 +286,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
         self.cmd_issueCorrection.ack_in_progress(
-            data, timeout=self.DEFAULT_TIMEOUT, result="issueCorrection started.",
+            data,
+            timeout=self.DEFAULT_TIMEOUT,
+            result="issueCorrection started.",
         )
 
         # We don't want multiple commands to be executed at the same time.
@@ -330,7 +332,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
         self.cmd_issueCorrection.ack_in_progress(
-            data, timeout=self.LONG_TIMEOUT, result="selectSources started.",
+            data,
+            timeout=self.LONG_TIMEOUT,
+            result="selectSources started.",
         )
 
         await self.model.select_sources(
@@ -354,7 +358,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
         self.cmd_issueCorrection.ack_in_progress(
-            data, timeout=self.LONG_TIMEOUT, result="preProcess started.",
+            data,
+            timeout=self.LONG_TIMEOUT,
+            result="preProcess started.",
         )
 
         if data.useOCPS:
@@ -377,7 +383,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
         self.cmd_issueCorrection.ack_in_progress(
-            data, timeout=self.LONG_TIMEOUT, result="runWEP started.",
+            data,
+            timeout=self.LONG_TIMEOUT,
+            result="runWEP started.",
         )
 
         if data.useOCPS:
@@ -411,7 +419,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
         self.cmd_issueCorrection.ack_in_progress(
-            data, timeout=self.LONG_TIMEOUT, result="runOFC started.",
+            data,
+            timeout=self.LONG_TIMEOUT,
+            result="runOFC started.",
         )
 
         if len(data.config) > 0:
@@ -674,7 +684,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         for wavefrontError in listOfWfErr:
             sensorId, zk = self._getIdAndZkFromWavefrontErr(wavefrontError)
             self.evt_wavefrontError.set_put(
-                sensorId=sensorId, annularZernikeCoeff=zk, force_output=True,
+                sensorId=sensorId,
+                annularZernikeCoeff=zk,
+                force_output=True,
             )
 
     def _getIdAndZkFromWavefrontErr(self, wavefrontError):
@@ -711,7 +723,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         for wavefrontError in listOfWfErrRej:
             sensorId, zk = self._getIdAndZkFromWavefrontErr(wavefrontError)
             self.evt_rejectedWavefrontError.set_put(
-                sensorId=sensorId, annularZernikeCoeff=zk, force_output=True,
+                sensorId=sensorId,
+                annularZernikeCoeff=zk,
+                force_output=True,
             )
 
     def pubEvent_degreeOfFreedom(self):
@@ -725,7 +739,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         dofAggr = self.model.getDofAggr()
         dofVisit = self.model.getDofVisit()
         self.evt_degreeOfFreedom.set_put(
-            aggregatedDoF=dofAggr, visitDoF=dofVisit, force_output=True,
+            aggregatedDoF=dofAggr,
+            visitDoF=dofVisit,
+            force_output=True,
         )
 
     def pubEvent_rejectedDegreeOfFreedom(self):
@@ -740,7 +756,9 @@ class MtaosCsc(salobj.ConfigurableCsc):
         dofAggr = self.model.getDofAggr()
         dofVisit = self.model.getDofVisit()
         self.evt_rejectedDegreeOfFreedom.set_put(
-            aggregatedDoF=dofAggr, visitDoF=dofVisit, force_output=True,
+            aggregatedDoF=dofAggr,
+            visitDoF=dofVisit,
+            force_output=True,
         )
 
     def pubEvent_m2HexapodCorrection(self):
@@ -832,8 +850,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         self.evt_rejectedM2Correction.set_put(zForces=zForces, force_output=True)
 
     def pubTel_wepDuration(self):
-        """Publish the duration of the WEP calculation as telemetry.
-        """
+        """Publish the duration of the WEP calculation as telemetry."""
 
         self._logExecFunc()
 
@@ -846,8 +863,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         self.tel_wepDuration.set_put(calcTime=duration)
 
     def pubTel_ofcDuration(self):
-        """Publish the duration of the OFC calculation as telemetry.
-        """
+        """Publish the duration of the OFC calculation as telemetry."""
 
         self._logExecFunc()
 

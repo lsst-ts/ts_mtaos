@@ -87,7 +87,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 "addAberration",
             )
             await self.check_standard_state_transitions(
-                enabled_commands=enabled_commands, timeout=STD_TIMEOUT,
+                enabled_commands=enabled_commands,
+                timeout=STD_TIMEOUT,
             )
 
     async def testResetCorrection(self):
@@ -191,7 +192,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # Set the timeout > 20 seconds for the long calculation time
             remote = self._getRemote()
             await remote.cmd_runWEP.set_start(
-                timeout=2 * STD_TIMEOUT, visitId=0, extraId=1,
+                timeout=2 * STD_TIMEOUT,
+                visitId=0,
+                extraId=1,
             )
 
             csc = self._getCsc()

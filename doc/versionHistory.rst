@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.5.4
+------
+
+* Reformat code using black 20.
+
 v0.5.3
 ------
 
