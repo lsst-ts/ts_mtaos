@@ -2,6 +2,16 @@
 Version History
 ===============
 
+v0.5.6
+------
+
+* Fixed a trailing space.
+
+v0.5.5
+------
+
+* Fixed a too long comment line.
+
 v0.5.4
 ------
 
