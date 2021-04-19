@@ -301,7 +301,8 @@ class Model:
         ) = self.ofc.resetOfcState()
 
     def _clearCollectionsOfWfErr(self):
-        """Clear the collections of wavefront error contain the rejected one."""
+        """Clear the collections of wavefront error contain the rejected 
+        one."""
 
         self.wavefront_errors.clear()
         self.rejected_wavefront_errors.clear()
