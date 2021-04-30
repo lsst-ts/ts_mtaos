@@ -24,30 +24,30 @@ import unittest
 
 from lsst.ts.wep.ctrlIntf.SensorWavefrontData import SensorWavefrontData
 
-from lsst.ts import MTAOS
+from lsst.ts.MTAOS import WavefrontCollection
 
 
-class TestCollOfListOfWfErr(unittest.TestCase):
+class TestWavefrontCollection(unittest.TestCase):
     """Test the CollOfListOfWfErr class."""
 
     def setUp(self):
 
-        self.collOfListOfWfErr = MTAOS.CollOfListOfWfErr(10)
+        self.wavefront_collection = WavefrontCollection(10)
 
     def testGetNumOfData(self):
 
-        self.assertEqual(self.collOfListOfWfErr.getNumOfData(), 0)
+        self.assertEqual(self.wavefront_collection.getNumOfData(), 0)
 
     def testGetNumOfDataTaken(self):
 
-        self.assertEqual(self.collOfListOfWfErr.getNumOfDataTaken(), 0)
+        self.assertEqual(self.wavefront_collection.getNumOfDataTaken(), 0)
 
     def testAppend(self):
 
         listOfWfErr = self._prepareListOfWfErr()
-        self.collOfListOfWfErr.append(listOfWfErr)
+        self.wavefront_collection.append(listOfWfErr)
 
-        self.assertEqual(self.collOfListOfWfErr.getNumOfData(), 1)
+        self.assertEqual(self.wavefront_collection.getNumOfData(), 1)
 
     def _prepareListOfWfErr(self):
 
@@ -69,49 +69,52 @@ class TestCollOfListOfWfErr(unittest.TestCase):
 
     def testPopWithoutData(self):
 
-        self.assertEqual(self.collOfListOfWfErr.pop(), [])
+        self.assertEqual(self.wavefront_collection.pop(), [])
 
     def testPopWithData(self):
 
-        self.assertEqual(self.collOfListOfWfErr.getNumOfDataTaken(), 0)
+        self.assertEqual(self.wavefront_collection.getNumOfDataTaken(), 0)
 
         listOfWfErr = self._prepareListOfWfErr()
-        self.collOfListOfWfErr.append(listOfWfErr)
+        self.wavefront_collection.append(listOfWfErr)
 
-        listOfWfErrPop = self.collOfListOfWfErr.pop()
+        listOfWfErrPop = self.wavefront_collection.pop()
         self.assertEqual(len(listOfWfErrPop), 2)
         self.assertEqual(listOfWfErrPop[0].getSensorId(), 1)
         self.assertEqual(listOfWfErrPop[1].getSensorId(), 2)
 
-        self.assertEqual(self.collOfListOfWfErr.getNumOfDataTaken(), 1)
+        self.assertEqual(self.wavefront_collection.getNumOfDataTaken(), 1)
 
     def testClear(self):
 
         listOfWfErr = self._prepareListOfWfErr()
         for idx in range(3):
-            self.collOfListOfWfErr.append(listOfWfErr)
-        self.collOfListOfWfErr.pop()
+            self.wavefront_collection.append(listOfWfErr)
+        self.wavefront_collection.pop()
 
-        self.assertEqual(self.collOfListOfWfErr.getNumOfData(), 2)
-        self.assertEqual(self.collOfListOfWfErr.getNumOfDataTaken(), 1)
+        self.assertEqual(self.wavefront_collection.getNumOfData(), 2)
+        self.assertEqual(self.wavefront_collection.getNumOfDataTaken(), 1)
 
-        self.collOfListOfWfErr.clear()
+        self.wavefront_collection.clear()
 
-        self.assertEqual(self.collOfListOfWfErr.getNumOfData(), 0)
-        self.assertEqual(self.collOfListOfWfErr.getNumOfDataTaken(), 0)
+        self.assertEqual(self.wavefront_collection.getNumOfData(), 0)
+        self.assertEqual(self.wavefront_collection.getNumOfDataTaken(), 0)
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithoutData(self):
 
         self.assertRaises(
-            RuntimeError, self.collOfListOfWfErr.getListOfWavefrontErrorAvgInTakenData
+            RuntimeError,
+            self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData,
         )
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithSglData(self):
 
         self._collectListOfWfErrForAvgTest()
-        self.collOfListOfWfErr.pop()
+        self.wavefront_collection.pop()
 
-        listOfWfErrAvg = self.collOfListOfWfErr.getListOfWavefrontErrorAvgInTakenData()
+        listOfWfErrAvg = (
+            self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData()
+        )
 
         self.assertEqual(len(listOfWfErrAvg), 3)
         self.assertEqual(listOfWfErrAvg[0].getAnnularZernikePoly()[0], 1)
@@ -125,15 +128,17 @@ class TestCollOfListOfWfErr(unittest.TestCase):
     def _collectListOfWfErrForAvgTestSgl(self, listSensorId, listSensorZk):
 
         listOfWfErr = self._getListOfWfErr(listSensorId, listSensorZk)
-        self.collOfListOfWfErr.append(listOfWfErr)
+        self.wavefront_collection.append(listOfWfErr)
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithMultiData(self):
 
         self._collectListOfWfErrForAvgTest()
         for idx in range(3):
-            self.collOfListOfWfErr.pop()
+            self.wavefront_collection.pop()
 
-        listOfWfErrAvg = self.collOfListOfWfErr.getListOfWavefrontErrorAvgInTakenData()
+        listOfWfErrAvg = (
+            self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData()
+        )
 
         self.assertEqual(len(listOfWfErrAvg), 3)
         self.assertEqual(listOfWfErrAvg[0].getAnnularZernikePoly()[0], 2)
@@ -145,12 +150,14 @@ class TestCollOfListOfWfErr(unittest.TestCase):
 
         # There are only 2 sensor data here
         listOfWfErr = self._prepareListOfWfErr()
-        self.collOfListOfWfErr.append(listOfWfErr)
+        self.wavefront_collection.append(listOfWfErr)
 
         for idx in range(4):
-            self.collOfListOfWfErr.pop()
+            self.wavefront_collection.pop()
 
-        listOfWfErrAvg = self.collOfListOfWfErr.getListOfWavefrontErrorAvgInTakenData()
+        listOfWfErrAvg = (
+            self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData()
+        )
 
         self.assertEqual(len(listOfWfErrAvg), 2)
         for idx in range(2):

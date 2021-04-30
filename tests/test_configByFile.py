@@ -23,7 +23,6 @@ import os
 import unittest
 
 from lsst.ts.wep.Utility import CamType
-from lsst.ts.ofc.Utility import InstName
 
 from lsst.ts import MTAOS
 
@@ -53,7 +52,7 @@ class TestConfigByFile(unittest.TestCase):
     def testGetInstName(self):
 
         instName = self.config.getInstName()
-        self.assertEqual(instName, InstName.COMCAM)
+        self.assertEqual(instName, "comcam")
 
     def testGetIsrDirWithEnvPath(self):
 

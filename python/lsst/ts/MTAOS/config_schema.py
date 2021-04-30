@@ -46,20 +46,6 @@ properties:
     enum: [lsst, comcam, sh, cmos]
     default: comcam
 
-  defaultIsrDir:
-    description: >
-      Default instrument signature removal (ISR) directory.
-      This setting will be override by the 'ISRDIRPATH' path variable.
-    type: string
-    default: /home/lsst/input
-
-  defaultSkyFilePath:
-    description: >
-      Default sky file path relative to the root of module.
-      This is for the test only.
-    type: string
-    default: tests/testData/phosimOutput/realComCam/skyComCamInfo.txt
-
 required:
   - camera
   - instrument

@@ -25,18 +25,11 @@ import logging
 
 import numpy as np
 
-from lsst.ts.ofc.ctrlIntf.M2HexapodCorrection import M2HexapodCorrection
-from lsst.ts.ofc.ctrlIntf.CameraHexapodCorrection import CameraHexapodCorrection
-from lsst.ts.ofc.ctrlIntf.M1M3Correction import M1M3Correction
-from lsst.ts.ofc.ctrlIntf.M2Correction import M2Correction
-from lsst.ts.ofc.ctrlIntf.OFCCalculationFactory import OFCCalculationFactory
-from lsst.ts.ofc.ctrlIntf.FWHMSensorData import FWHMSensorData
-from lsst.ts.wep.ctrlIntf.SensorWavefrontError import SensorWavefrontError
-from lsst.ts.wep.Utility import FilterType
+from lsst.ts.ofc import OFC
 from lsst.ts.wep.bsc.CamFactory import CamFactory
 
-from .CollOfListOfWfErr import CollOfListOfWfErr
-from .Utility import timeit
+from .wavefront_collection import WavefrontCollection
+from .utility import timeit
 
 
 class Model:
@@ -44,7 +37,7 @@ class Model:
     # Maximum length of queue for wavefront error
     MAX_LEN_QUEUE = 10
 
-    def __init__(self, config, state0Dof, log=None):
+    def __init__(self, config, ofc_data, log=None):
         """MTAOS model class.
 
         This class implements a model for the MTAOS operations. It encapsulates
@@ -54,8 +47,8 @@ class Model:
         ----------
         config : `lsst.ts.MTAOS.Config`
             Configuration.
-        state0Dof : `dict`
-            Dictionary with state0 DoF data. None for default DoF.
+        ofc_data : `OFCData`
+            OFC data container class.
         log : `logging.Logger` or `None`, optional
             Optional logging class to be used for logging operations. If
             `None`, creates a new logger.
@@ -66,16 +59,16 @@ class Model:
             Log facility.
         config : `lsst.ts.MTAOS.Config`
             Configuration.
-        wavefront_errors : `CollOfListOfWfErr`
+        wavefront_errors : `WavefrontCollection`
             Object to manage list of wavefront errors.
-        rejected_wavefront_errors : `CollOfListOfWfErr`
+        rejected_wavefront_errors : `WavefrontCollection`
             Object to manage list of rejected wavefront errors.
         user_gain : `float`
             User provided gain for the OFC. Value must be either -1, the gain
             value will be dicided by PSSN, or between 0 and 1.
         fwhm_data : `list` of `FWHMSensorData`
             List of FWHM (full width at half maximum) sensor data.
-        ofc : `lsst.ts.ofc.ctrlIntf.OFCCalculation`
+        ofc : `lsst.ts.ofc.OFC`
             Optical feedback control object.
         m2_hexapod_correction : `M2HexapodCorrection`
             M2 hexapod correction.
@@ -99,60 +92,87 @@ class Model:
 
         self.camera = CamFactory.createCam(self.config.getCamType())
 
-        # Store user gain value in a private variable. Use self.user_gain to
-        # access the variable. Value is guarded and must be equal to -1 or
-        # between 0 and 1. Set to -1 to ignore user gain. In this case, the
-        # gain value will be dicided by PSSN
-        self._user_gain = -1
-
         # Collection of calculated list of wavefront error
-        self.wavefront_errors = CollOfListOfWfErr(self.MAX_LEN_QUEUE)
+        self.wavefront_errors = WavefrontCollection(self.MAX_LEN_QUEUE)
 
         # Collection of calculated list of rejected wavefront error
-        self.rejected_wavefront_errors = CollOfListOfWfErr(self.MAX_LEN_QUEUE)
+        self.rejected_wavefront_errors = WavefrontCollection(self.MAX_LEN_QUEUE)
 
         # List of FWHM (full width at half maximum) sensor data
-        self.fwhm_data = []
+        self._fwhm_data = dict()
 
         # Optical feedback control
-        instName = self.config.getInstName()
-        self.ofc = OFCCalculationFactory.getCalculator(instName, state0Dof)
+        self.ofc = OFC(ofc_data)
 
         # M2 hexapod correction
-        self.m2_hexapod_correction = M2HexapodCorrection(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        self.m2_hexapod_correction = None
 
         # Camera hexapod correction
-        self.cam_hexapod_correction = CameraHexapodCorrection(
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-        )
+        self.cam_hexapod_correction = None
 
         # M1M3 actuator correction
-        self.m1m3_correction = M1M3Correction(np.zeros(M1M3Correction.NUM_OF_ACT))
+        self.m1m3_correction = None
 
         # M2 actuator correction
-        self.m2_correction = M2Correction(np.zeros(M2Correction.NUM_OF_ACT))
+        self.m2_correction = None
+
+        self.reset_wfe_correction()
 
     @property
     def user_gain(self):
         """Return the user gain."""
-        if self._user_gain == -1 or 0.0 <= self._user_gain <= 1.0:
-            return self._user_gain
-        else:
-            self.log.warning(f"Invalid user gain {self._user_gain}. Reseting to -1.")
-            self.user_gain = -1
-            return -1
+        return self.ofc.ofc_controller.gain
 
     @user_gain.setter
     def user_gain(self, value):
         """Set user gain."""
-        if value == -1 or 0.0 <= value <= 1.0:
-            self._user_gain = value
-        else:
-            ValueError(
-                f"User gain must be either -1 or in the range (0., 1.). Received: {value}."
+        self.ofc_ofc_controller.gain = value
+
+    def get_fwhm_sensors(self):
+        """Get list of fwhm sensor ids."""
+        return [key for key in self._fwhm_data.keys()]
+
+    def get_fwhm_data(self):
+        """Get an ndarray with the fwhm data.
+
+        Returns
+        -------
+        `np.ndarray`
+            Fwhm data.
+        """
+
+        return np.array(
+            [self._fwhm_data[sensor_id] for sensor_id in self._fwhm_data],
+            ndmin=1,
+            dtype=object,
+        )
+
+    def set_fwhm_data(self, sensor_id, fwhm_data):
+        """Set the FWHM sensor data.
+
+        FWHM: Full width at half maximum.
+
+        Parameters
+        ----------
+        sensorId : int
+            Sensor Id.
+        fwhm_data : numpy.ndarray
+            FWHM values for this sensor.
+        """
+
+        if sensor_id not in self.ofc.ofc_data.field_idx.values():
+            raise RuntimeError(
+                f"Sensor {sensor_id} not in the list of wavefront sensors "
+                f"{self.ofc.ofc_data.field_idx.values()}."
             )
 
-    def getListOfWavefrontError(self):
+        self._fwhm_data[sensor_id] = np.array(fwhm_data)
+
+    def reset_fwhm_data(self):
+        """Reset fhwm data."""
+        self._fwhm_data = dict()
+
+    def get_wfe(self):
         """Get the list of wavefront error from the collection.
 
         This is to let MtaosCsc to publish the latest calculated wavefront
@@ -166,7 +186,7 @@ class Model:
 
         return self.wavefront_errors.pop()
 
-    def getListOfWavefrontErrorRej(self):
+    def get_rejected_wfe(self):
         """Get the list of rejected wavefront error from the collection.
 
         This is to let MtaosCsc to publish the latest rejected wavefront
@@ -180,72 +200,7 @@ class Model:
 
         return self.rejected_wavefront_errors.pop()
 
-    def getListOfFWHMSensorData(self):
-        """Get the list of FWHM sensor data.
-
-        FWHM: Full width at half maximum.
-
-        Returns
-        -------
-        list[lsst.ts.ofc.ctrlIntf.FWHMSensorData]
-            List of FWHM sensor data.
-        """
-
-        return self.fwhm_data
-
-    def setFWHMSensorData(self, sensorId, fwhmValues):
-        """Set the FWHM sensor data.
-
-        FWHM: Full width at half maximum.
-
-        Parameters
-        ----------
-        sensorId : int
-            Sensor Id.
-        fwhmValues : numpy.ndarray
-            FWHM values for this sensor.
-        """
-
-        sensorData = self._getFWHMSensorDataInList(sensorId)
-
-        if sensorData is None:
-            sensorDataNew = FWHMSensorData(sensorId, fwhmValues)
-            self.fwhm_data.append(sensorDataNew)
-        else:
-            sensorData.setFwhmValues(fwhmValues)
-
-    def _getFWHMSensorDataInList(self, sensorId):
-        """Get the FWHM sensor data of specified sensor Id in list.
-
-        FWHM: Full width at half maximum.
-
-        Parameters
-        ----------
-        sensorId : int
-            Sensor Id.
-
-        Returns
-        -------
-        lsst.ts.ofc.ctrlIntf.FWHMSensorData or None
-            Return the object of FWHMSensorData if found in list. Otherwise,
-            return None.
-        """
-
-        for fwhmSensorData in self.fwhm_data:
-            if fwhmSensorData.getSensorId() == sensorId:
-                return fwhmSensorData
-
-        return None
-
-    def resetFWHMSensorData(self):
-        """Reset the FWHM sensor data to be empty.
-
-        FWHM: Full width at half maximum.
-        """
-
-        self.fwhm_data = []
-
-    def getDofAggr(self):
+    def get_aggr_dof(self):
         """Get the aggregated DOF.
 
         DOF: Degree of freedom.
@@ -256,9 +211,9 @@ class Model:
             Aggregated DOF.
         """
 
-        return self.ofc.getStateAggregated()
+        return self.ofc.ofc_controller.dof_state[self.ofc.ofc_data.dof_idx]
 
-    def getDofVisit(self):
+    def get_lv_dof(self):
         """Get the DOF correction from the last visit.
 
         DOF: Degree of freedom.
@@ -269,107 +224,38 @@ class Model:
             DOF correction from the last visit.
         """
 
-        return self.ofc.getStateCorrectionFromLastVisit()
+        return self.ofc.lv_dof
 
-    def rejCorrection(self):
+    def reject_correction(self):
         """Reject the correction of subsystems."""
 
-        ztaac = self.ofc.getZtaac()
+        lv_dof = self.get_lv_dof()
 
-        paramData = ztaac.getParamData()
-        dofIdx = paramData.getDofIdx()
+        self.ofc.ofc_controller.aggregate_state(-lv_dof, self.ofc.ofc_data.dof_idx)
 
-        dofVisit = self.getDofVisit()
+        self.ofc.init_lv_dof()
 
-        ztaac.aggState(-dofVisit[dofIdx])
-
-        self.ofc.initDofFromLastVisit()
-
-    def resetWavefrontCorrection(self):
+    def reset_wfe_correction(self):
         """Reset the current calculation contains the wavefront error and
         subsystem corrections to be empty.
 
         This function is needed for the long slew angle of telescope.
         """
 
-        self._clearCollectionsOfWfErr()
+        self._clear_wfe_collections()
         (
             self.m2_hexapod_correction,
             self.cam_hexapod_correction,
             self.m1m3_correction,
             self.m2_correction,
-        ) = self.ofc.resetOfcState()
+        ) = self.ofc.reset()
 
-    def _clearCollectionsOfWfErr(self):
+    def _clear_wfe_collections(self):
         """Clear the collections of wavefront error contain the rejected
         one."""
 
         self.wavefront_errors.clear()
         self.rejected_wavefront_errors.clear()
-
-    def getM2HexCorr(self):
-        """Get the M2 hexapod correction.
-
-        Returns
-        -------
-        float
-            X position offset in um.
-        float
-            Y position offset in um.
-        float
-            Z position offset in um.
-        float
-            X rotation offset in deg.
-        float
-            Y rotation offset in deg.
-        float
-            Z rotation offset in deg.
-        """
-
-        return self.m2_hexapod_correction.getCorrection()
-
-    def getCamHexCorr(self):
-        """Get the camera hexapod correction.
-
-        Returns
-        -------
-        float
-            X position offset in um.
-        float
-            Y position offset in um.
-        float
-            Z position offset in um.
-        float
-            X rotation offset in deg.
-        float
-            Y rotation offset in deg.
-        float
-            Z rotation offset in deg.
-        """
-
-        return self.cam_hexapod_correction.getCorrection()
-
-    def getM1M3ActCorr(self):
-        """Get the M1M3 actuator force correction.
-
-        Returns
-        -------
-        numpy.ndarray
-            The forces to apply to the 156 force actuators in N.
-        """
-
-        return self.m1m3_correction.getZForces()
-
-    def getM2ActCorr(self):
-        """Get the M2 actuator force correction.
-
-        Returns
-        -------
-        numpy.ndarray
-            The forces to apply to the 72 axial actuators in N.
-        """
-
-        return self.m2_correction.getZForces()
 
     async def select_sources(self, ra, dec, sky_angle, obs_filter, mode):
         """Setup and run source selection algorithm.
@@ -455,7 +341,7 @@ class Model:
         # TODO: (DM-28710) Initial implementation of runWEP command in MTAOS
         raise NotImplementedError("This function is not supported yet (DM-28710).")
 
-    def rejWavefrontErrorUnreasonable(self, listOfWfErr):
+    def reject_unreasonable_wfe(self, listOfWfErr):
         """Reject the wavefront error that is unreasonable.
 
         The input listOfWfErr might be updated after calling this function.
@@ -487,15 +373,7 @@ class Model:
         RuntimeError
             No FWHM sensor data to use.
         """
-        # FIXME: (DM-28710) Once we implement run_wep we will be able to get
-        # this information from it. Right now there is no way of knowing it
-        # for sure. This will come from the images metadata.
-        filterType = FilterType.REF
-        rotAngInDeg = 0
-
         try:
-            self.ofc.setFilter(filterType)
-            self.ofc.setRotAng(rotAngInDeg)
             if self.user_gain == -1:
                 if len(self.fwhm_data) == 0:
                     raise RuntimeError("No FWHM sensor data to use.")
@@ -505,37 +383,47 @@ class Model:
             else:
                 self.ofc.setGainByUser(self.user_gain)
 
-            listOfWfErrAvg = (
+            wfe_data_container = (
                 self.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
             )
 
-            self._calculate_corrections(listOfWfErrAvg)
+            field_idx = np.array(
+                [wfe_data.getSensorId() for wfe_data in wfe_data_container]
+            )
+
+            wfe = np.array(
+                [wfe_data.getAnnularZernikePoly() for wfe_data in wfe_data_container]
+            )
+
+            self._calculate_corrections(wfe=wfe, field_idx=field_idx, **kwargs)
 
         finally:
             # Clear the queue
-            self._clearCollectionsOfWfErr()
+            self._clear_wfe_collections()
 
-    def _calculate_corrections(self, wavefront_errors):
-        """Utility method to calculate corrections using ofc.
+    def _calculate_corrections(self, wfe, field_idx, **kwargs):
+        """"""
+        gain = kwargs.get("gain", -1.0)
+        rot = kwargs.get("rot", 0.0)
+        filter_name = kwargs.get("filter_name", "")
 
-        Parameters
-        ----------
-        wavefront_errors : `list` of `SensorWavefrontError`
-        """
+        if gain < 0.0:
+            try:
+                self.ofc.set_pssn_gain()
+            except RuntimeError:
+                self.log.debug(
+                    f"Error setting pssn gain. Using default: {self.ofc.default_gain}."
+                )
+                gain = self.ofc.default_gain
 
         (
-            m2_hex_correction,
-            cam_hex_correction,
-            m1m3_correction,
-            m2_correction,
-        ) = self.ofc.calculateCorrections(wavefront_errors)
-
-        # Need to add a step of checking the calculated correction
-        # in the future
-        self.m2_hexapod_correction = m2_hex_correction
-        self.cam_hexapod_correction = cam_hex_correction
-        self.m1m3_correction = m1m3_correction
-        self.m2_correction = m2_correction
+            self.m2_hexapod_correction,
+            self.cam_hexapod_correction,
+            self.m1m3_correction,
+            self.m2_correction,
+        ) = self.ofc.calculate_corrections(
+            wfe=wfe, field_idx=field_idx, filter_name=filter_name, gain=gain, rot=rot
+        )
 
     def add_correction(self, wavefront_errors, config=None):
         """Compute ofc corrections from user-defined wavefront erros.
@@ -552,31 +440,54 @@ class Model:
 
         self.log.debug(f"Currently configured with {self.config.getCamType()!r}")
 
-        # Get list of detectors. Since the method considers that aberration is
-        # uniform across all detectors, it will build a set of corrections
-        # based of this assumption. So need to get list of detectors.
-        detector_list = self.camera.getWfsCcdList()
-
         # Get the intrinsic zernike coeffients. Will consider white light for
         # now but may use last filter set in select sources in the future.
         self.log.debug("Assuming white light filter to compute aberration.")
 
-        intrinsic_zk = self.ofc.ztaac.dataShare.getIntrinsicZk(
-            FilterType.REF, self.ofc.ztaac.dataShare.getFieldIdx(detector_list)
+        # Note that it subtracts the users input wavefront from the intrinsic
+        # data. The ofc will return corrections to remove the measured
+        # aberration. That means, if we want to "add" an aberration we have to
+        # pass the negative of what we want.
+        final_wfe = np.copy(self.ofc.ofc_data.get_intrinsic_zk(filter_name=""))
+
+        for wfe in final_wfe:
+            wfe -= np.array(wavefront_errors)
+
+        field_idx = np.arange(final_wfe.shape[0])
+
+        self._calculate_corrections(
+            wfe=final_wfe,
+            field_idx=field_idx,
+            **(config if config is not None else dict()),
         )
 
-        # Now compute the wavefront error matrix by summing the input with the
-        # intrinsic zernike coeffients.
-        sensor_ids = self.ofc.ztaac.mapSensorNameToId(detector_list)
-        all_sensor_wavefront_errors = []
-        for sid, zk in zip(sensor_ids, intrinsic_zk):
-            sensor_wavefront_errors = SensorWavefrontError(numOfZk=len(zk))
-            sensor_wavefront_errors.setSensorId(sid)
-            # Note that it subtracts the users input wavefront from the
-            # intrinsic data. The ofc will return corrections to remove the
-            # measured aberration. That means, if we want to "add" an
-            # aberration we have to pass the negative of what we want.
-            sensor_wavefront_errors.setAnnularZernikePoly(zk - wavefront_errors)
-            all_sensor_wavefront_errors.append(sensor_wavefront_errors)
+    async def set_ofc_data_values(self, **kwargs):
+        """Set ofc data values.
 
-        self._calculate_corrections(all_sensor_wavefront_errors)
+        Parameters
+        ----------
+        kwargs :
+
+        Returns
+        -------
+        original_ofc_data_values : `dict`
+        """
+
+        original_ofc_data_values = dict()
+
+        try:
+            for key in kwargs:
+                if hasattr(self.ofc.ofc_data, key):
+                    original_ofc_data_values[key] = getattr(self.ofc.ofc_data, key)
+                    setattr(self.ofc.ofc_data, key, kwargs[key])
+        except Exception as e:
+            self.log.error(
+                "Error setting value in ofc_data. Restoring original values."
+            )
+            for key in original_ofc_data_values:
+                setattr(self.ofc.ofc_data, key, original_ofc_data_values[key])
+            raise e
+        else:
+            return original_ofc_data_values
+        finally:
+            await self.ofc.ofc_data._configure_task

@@ -31,7 +31,6 @@ from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
 from lsst.ts.wep.Utility import CamType
-from lsst.ts.ofc.Utility import InstName
 
 from lsst.ts import MTAOS
 
@@ -88,15 +87,6 @@ class TestUtility(unittest.TestCase):
         self.assertEqual(MTAOS.getCamType("comcam"), CamType.ComCam)
 
         self.assertRaises(ValueError, MTAOS.getCamType, "wrongType")
-
-    def testGetInst(self):
-
-        self.assertEqual(MTAOS.getInstName("lsst"), InstName.LSST)
-        self.assertEqual(MTAOS.getInstName("comcam"), InstName.COMCAM)
-        self.assertEqual(MTAOS.getInstName("sh"), InstName.SH)
-        self.assertEqual(MTAOS.getInstName("cmos"), InstName.CMOS)
-
-        self.assertRaises(ValueError, MTAOS.getInstName, "wrongName")
 
     def testGetCscName(self):
 

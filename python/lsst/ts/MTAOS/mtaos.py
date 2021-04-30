@@ -24,7 +24,6 @@ __all__ = ["MtaosCsc"]
 import inspect
 import asyncio
 import logging
-import sys
 import yaml
 
 from astropy import units as u
@@ -33,11 +32,12 @@ import numpy as np
 
 from lsst.ts import salobj
 from lsst.ts.idl.enums.MTAOS import FilterType
+from lsst.ts.ofc import OFCData
 
-from .config_schema import CONFIG_SCHEMA, TELESCOPE_DOF_SCHEMA
-from .Config import Config
-from .Model import Model
-from . import Utility
+from . import CONFIG_SCHEMA, TELESCOPE_DOF_SCHEMA
+from . import Config
+from . import Model
+from . import utility
 from . import __version__
 
 
@@ -53,7 +53,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
     MAX_TIME_SAMPLE = 100
 
     def __init__(
-        self, config_dir=None, log_to_file=False, debug_level=None, simulation_mode=0
+        self, config_dir=None, log_to_file=False, log_level=None, simulation_mode=0
     ):
         """Initialize the MTAOS CSC class.
 
@@ -109,7 +109,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
             Maximum samples of execution times to store.
         """
 
-        cscName = Utility.getCscName()
+        cscName = utility.getCscName()
 
         super().__init__(
             cscName,
@@ -121,10 +121,13 @@ class MtaosCsc(salobj.ConfigurableCsc):
         )
 
         # Logger attribute comes from the upstream Controller class
-        self.log = self._addLogWithFileHandlerIfDebug(
-            logging.DEBUG if debug_level is None else debug_level,
-            outputLogFile=log_to_file,
-        )
+        if log_to_file:
+            log_dir = utility.getLogDir()
+            log_path = log_dir.joinpath(self.LOG_FILE_NAME)
+            utility.addRotFileHandler(
+                self.log, log_path, logging.DEBUG if log_level is None else log_level
+            )
+
         self.log.info("Prepare MTAOS CSC.")
 
         self.state0DofValidator = salobj.DefaultingValidator(
@@ -139,13 +142,13 @@ class MtaosCsc(salobj.ConfigurableCsc):
             "m2hex": salobj.Remote(
                 self.domain,
                 "MTHexapod",
-                index=Utility.MTHexapodIndex.M2.value,
+                index=utility.MTHexapodIndex.M2.value,
                 include=[],
             ),
             "camhex": salobj.Remote(
                 self.domain,
                 "MTHexapod",
-                index=Utility.MTHexapodIndex.Camera.value,
+                index=utility.MTHexapodIndex.Camera.value,
                 include=[],
             ),
             "m1m3": salobj.Remote(self.domain, "MTM1M3", include=[]),
@@ -173,48 +176,41 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self.log.info("MTAOS CSC is ready.")
 
-    def _addLogWithFileHandlerIfDebug(self, debugLevel, outputLogFile=False):
-        """Add the internal logger with file handler if doing the debug.
-
-        Note: This logger attribute comes from the upstream Controller class.
-
-        Parameters
-        ----------
-        debugLevel : int or str
-            Logging level of file handler.
-        outputLogFile : bool, optional
-            Output the log file or not. (the default is False.)
-
-        Returns
-        -------
-        logging.Logger
-            Logger object.
-        """
-
-        if outputLogFile:
-            fileDir = Utility.getLogDir()
-            filePath = fileDir.joinpath(self.LOG_FILE_NAME)
-            Utility.addRotFileHandler(self.log, filePath, debugLevel)
-        else:
-            logging.basicConfig(stream=sys.stdout, level=debugLevel)
-
-        return self.log
-
     async def configure(self, config):
 
         self._logExecFunc()
-        self.log.info("Begin to configure MTAOS CSC.")
+        self.log.debug("MTAOS configuration started.")
 
-        configObj = Config(config)
-        state0DofFile = configObj.getState0DofFile()
-        if state0DofFile is None:
-            state0Dof = None
+        config_obj = Config(config)
+        state0_dof_file = config_obj.getState0DofFile()
+        dof_state0 = None
+
+        if state0_dof_file is not None:
+            with open(state0_dof_file) as fp:
+                dof_state0 = self.state0DofValidator.validate(yaml.safe_load(fp))
+
+        ofc_config_dir = self.config_dir / "ofc"
+        if ofc_config_dir.exists():
+            self.log.debug(f"Setting OFC configuration directory to {ofc_config_dir!r}")
         else:
-            state0Dof = self.state0DofValidator.validate(
-                yaml.safe_load(open(state0DofFile).read())
-            )
+            self.log.debug("Using default OFC configuration directory.")
+            ofc_config_dir = None
 
-        self.model = Model(configObj, state0Dof, log=self.log)
+        ofc_data = OFCData(
+            name=config.instrument,
+            config_dir=ofc_config_dir,
+            log=self.log,
+        )
+
+        await ofc_data._configure_task
+
+        self.log.debug("ofc data ready. Creating model")
+        self.model = Model(config_obj, ofc_data, log=self.log)
+
+        if dof_state0 is not None:
+            self.model.ofc_data.dof_state0 = dof_state0
+
+        self.log.debug("MTAOS configuration completed.")
 
     def _logExecFunc(self):
         """Log the executed function."""
@@ -232,17 +228,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         await super().start()
-
-    def getModel(self):
-        """Get the model.
-
-        Returns
-        -------
-        Model or ModelSim
-            Model object.
-        """
-
-        return self.model
 
     async def do_resetCorrection(self, data):
         """Command to reset the current wavefront error calculations.
@@ -262,7 +247,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         # If resetting wavefront error fails (e.g. raise an exception) command
         # will be rejected. Events will not be published.
-        self.model.resetWavefrontCorrection()
+        self.model.reset_wfe_correction()
 
         self.pubEvent_degreeOfFreedom()
         self.pubEvent_m2HexapodCorrection()
@@ -315,7 +300,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         self.assert_enabled()
 
         self.pubEvent_rejectedDegreeOfFreedom()
-        self.model.rejCorrection()
+        self.model.reject_correction()
 
     async def do_selectSources(self, data):
         """Run source selection algorithm for a specific field and visit
@@ -465,17 +450,33 @@ class MtaosCsc(salobj.ConfigurableCsc):
         """
         self.assert_enabled()
 
-        self.model.add_correction(
-            wavefront_errors=data.wf, config=yaml.safe_load(data.config)
-        )
+        # We don't want multiple commands to be executed at the same time.
+        # This lock will block any subsequent command from being executed until
+        # this one is done.
+        async with self.issue_correction_lock:
 
-        await self.handle_corrections()
+            config = yaml.safe_load(data.config)
 
-        self.pubEvent_degreeOfFreedom()
-        self.pubEvent_m2HexapodCorrection()
-        self.pubEvent_cameraHexapodCorrection()
-        self.pubEvent_m1m3Correction()
-        self.pubEvent_m2Correction()
+            if config is not None:
+                self.log.debug("Customizing OFC parameters.")
+                original_ofc_data_values = await self.model.set_ofc_data_values(
+                    **config
+                )
+            else:
+                original_ofc_data_values = dict()
+
+            try:
+                self.model.add_correction(wavefront_errors=data.wf, config=config)
+            finally:
+                if len(original_ofc_data_values) > 0:
+                    self.log.debug("Restoring ofc_data values.")
+                    await self.model.set_ofc_data_values(**original_ofc_data_values)
+
+            self.pubEvent_degreeOfFreedom()
+            self.pubEvent_m2HexapodCorrection()
+            self.pubEvent_cameraHexapodCorrection()
+            self.pubEvent_m1m3Correction()
+            self.pubEvent_m2Correction()
 
     async def handle_corrections(self):
         """Handle applying the corrections to all components.
@@ -511,7 +512,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
             [task.exception() is not None for task in issue_corrections_tasks.values()]
         ):
             self.pubEvent_rejectedDegreeOfFreedom()
-            self.model.rejCorrection()
+            self.model.reject_correction()
 
             # Undo corrections that completed.
             error_repor = await self.handle_undo_corrections(issue_corrections_tasks)
@@ -575,7 +576,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
             If `True` apply the negative value of each correction.
         """
 
-        x, y, z, u, v, w = self.model.getM2HexCorr()
+        x, y, z, u, v, w = self.model.m2_hexapod_correction()
 
         if undo:
             x, y, z, u, v, w = -x, -y, -z, -u, -v, -w
@@ -601,7 +602,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
             If `True` apply the negative value of each correction.
         """
 
-        x, y, z, u, v, w = self.model.getCamHexCorr()
+        x, y, z, u, v, w = self.model.cam_hexapod_correction()
 
         if undo:
             x, y, z, u, v, w = -x, -y, -z, -u, -v, -w
@@ -628,7 +629,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         """
 
-        z_forces = self.model.getM1M3ActCorr()
+        z_forces = self.model.m1m3_correction()
 
         if undo:
             z_forces = np.negative(z_forces)
@@ -655,7 +656,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         """
 
-        z_forces = self.model.getM2ActCorr()
+        z_forces = self.model.m2_correction()
 
         if undo:
             z_forces = np.negative(z_forces)
@@ -736,8 +737,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        dofAggr = self.model.getDofAggr()
-        dofVisit = self.model.getDofVisit()
+        dofAggr = self.model.get_aggr_dof()
+        dofVisit = self.model.get_lv_dof()
         self.evt_degreeOfFreedom.set_put(
             aggregatedDoF=dofAggr,
             visitDoF=dofVisit,
@@ -753,8 +754,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        dofAggr = self.model.getDofAggr()
-        dofVisit = self.model.getDofVisit()
+        dofAggr = self.model.get_aggr_dof()
+        dofVisit = self.model.get_lv_dof()
         self.evt_rejectedDegreeOfFreedom.set_put(
             aggregatedDoF=dofAggr,
             visitDoF=dofVisit,
@@ -768,7 +769,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        x, y, z, u, v, w = self.model.getM2HexCorr()
+        x, y, z, u, v, w = self.model.m2_hexapod_correction()
         self.evt_m2HexapodCorrection.set_put(
             x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
         )
@@ -780,7 +781,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        x, y, z, u, v, w = self.model.getM2HexCorr()
+        x, y, z, u, v, w = self.model.m2_hexapod_correction()
         self.evt_rejectedM2HexapodCorrection.set_put(
             x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
         )
@@ -792,7 +793,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        x, y, z, u, v, w = self.model.getCamHexCorr()
+        x, y, z, u, v, w = self.model.cam_hexapod_correction()
         self.evt_cameraHexapodCorrection.set_put(
             x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
         )
@@ -804,7 +805,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        x, y, z, u, v, w = self.model.getCamHexCorr()
+        x, y, z, u, v, w = self.model.cam_hexapod_correction()
         self.evt_rejectedCameraHexapodCorrection.set_put(
             x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
         )
@@ -816,7 +817,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        zForces = self.model.getM1M3ActCorr()
+        zForces = self.model.m1m3_correction()
         self.evt_m1m3Correction.set_put(zForces=zForces, force_output=True)
 
     def pubEvent_rejectedM1M3Correction(self):
@@ -826,7 +827,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        zForces = self.model.getM1M3ActCorr()
+        zForces = self.model.m1m3_correction()
         self.evt_rejectedM1M3Correction.set_put(zForces=zForces, force_output=True)
 
     def pubEvent_m2Correction(self):
@@ -836,7 +837,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        zForces = self.model.getM2ActCorr()
+        zForces = self.model.m2_correction()
         self.evt_m2Correction.set_put(zForces=zForces, force_output=True)
 
     def pubEvent_rejectedM2Correction(self):
@@ -846,7 +847,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        zForces = self.model.getM2ActCorr()
+        zForces = self.model.m2_correction()
         self.evt_rejectedM2Correction.set_put(zForces=zForces, force_output=True)
 
     def pubTel_wepDuration(self):
@@ -879,25 +880,21 @@ class MtaosCsc(salobj.ConfigurableCsc):
     def add_arguments(cls, parser):
         super(MtaosCsc, cls).add_arguments(parser)
         parser.add_argument(
-            "--logToFile",
+            "--log-to-file",
             action="store_true",
-            help="""
-                            Output the log to files. The files will be in logs
-                            directory. The default debug level is "DEBUG".
-                            """,
+            default=False,
+            help="Output the log to files. The files will be in logs directory. "
+            "The default log level is DEBUG.",
         )
         parser.add_argument(
-            "--debugLevel",
+            "--log-level",
             type=int,
-            help="""
-                            Debug level of log files. It can be "DEBUG" (10),
-                            "INFO" (20), "WARNING" (30), "ERROR" (40), or
-                            "CRITICAL" (50).
-                            """,
+            help="Debug level of log files. It can be DEBUG (10), INFO (20), "
+            "WARNING (30), ERROR (40), or CRITICAL (50).",
         )
 
     @classmethod
     def add_kwargs_from_args(cls, args, kwargs):
         super(MtaosCsc, cls).add_kwargs_from_args(args, kwargs)
-        kwargs["log_to_file"] = args.logToFile
-        kwargs["debug_level"] = args.debugLevel
+        kwargs["log_to_file"] = args.log_to_file
+        kwargs["log_level"] = args.log_level
