@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["MtaosCsc"]
+__all__ = ["MTAOS"]
 
 import inspect
 import asyncio
@@ -41,7 +41,7 @@ from . import utility
 from . import __version__
 
 
-class MtaosCsc(salobj.ConfigurableCsc):
+class MTAOS(salobj.ConfigurableCsc):
 
     # Class attribute comes from the upstream BaseCsc class
     valid_simulation_modes = (0,)
@@ -70,7 +70,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
         log_to_file : bool, optional
             Output the log to files. The files will be in logs directory. (the
             default is False.)
-        debug_level : int or str, optional
+        log_level : int or str, optional
             Logging level of file handler. It can be "DEBUG" (10), "INFO" (20),
             "WARNING" (30), "ERROR" (40), or "CRITICAL" (50). (the default is
             None.)
@@ -197,12 +197,11 @@ class MtaosCsc(salobj.ConfigurableCsc):
             ofc_config_dir = None
 
         ofc_data = OFCData(
-            name=config.instrument,
             config_dir=ofc_config_dir,
             log=self.log,
         )
 
-        await ofc_data._configure_task
+        await ofc_data.configure_instrument(config.instrument)
 
         self.log.debug("ofc data ready. Creating model")
         self.model = Model(config_obj, ofc_data, log=self.log)
@@ -449,6 +448,14 @@ class MtaosCsc(salobj.ConfigurableCsc):
             Data for the command being executed.
         """
         self.assert_enabled()
+
+        # This command may take some time to execute, so will send
+        # ack_in_progress with estimated timeout.
+        self.cmd_addAberration.ack_in_progress(
+            data,
+            timeout=self.LONG_TIMEOUT,
+            result="addAberration started.",
+        )
 
         # We don't want multiple commands to be executed at the same time.
         # This lock will block any subsequent command from being executed until
@@ -737,8 +744,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        dofAggr = self.model.get_aggr_dof()
-        dofVisit = self.model.get_lv_dof()
+        dofAggr = self.model.get_dof_aggr()
+        dofVisit = self.model.get_dof_lv()
         self.evt_degreeOfFreedom.set_put(
             aggregatedDoF=dofAggr,
             visitDoF=dofVisit,
@@ -754,8 +761,8 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        dofAggr = self.model.get_aggr_dof()
-        dofVisit = self.model.get_lv_dof()
+        dofAggr = self.model.get_dof_aggr()
+        dofVisit = self.model.get_dof_lv()
         self.evt_rejectedDegreeOfFreedom.set_put(
             aggregatedDoF=dofAggr,
             visitDoF=dofVisit,
@@ -878,7 +885,7 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
     @classmethod
     def add_arguments(cls, parser):
-        super(MtaosCsc, cls).add_arguments(parser)
+        super(MTAOS, cls).add_arguments(parser)
         parser.add_argument(
             "--log-to-file",
             action="store_true",
@@ -895,6 +902,6 @@ class MtaosCsc(salobj.ConfigurableCsc):
 
     @classmethod
     def add_kwargs_from_args(cls, args, kwargs):
-        super(MtaosCsc, cls).add_kwargs_from_args(args, kwargs)
+        super(MTAOS, cls).add_kwargs_from_args(args, kwargs)
         kwargs["log_to_file"] = args.log_to_file
         kwargs["log_level"] = args.log_level

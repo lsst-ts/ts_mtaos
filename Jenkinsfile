@@ -14,6 +14,7 @@ pipeline {
 
     options {
       disableConcurrentBuilds()
+      skipDefaultCheckout()
     }
 
     triggers {
@@ -59,17 +60,28 @@ pipeline {
             }
         }
 
+        stage ('Cloning Repos') {
+            steps {
+                dir(env.WORKSPACE + '/ts_MTAOS') {
+                    checkout scm
+                }
+                dir(env.WORKSPACE + '/phosim_utils') {
+                    git branch: 'master', url: 'https://github.com/lsst-dm/phosim_utils.git'
+                }
+                dir(env.WORKSPACE + '/ts_wep') {
+                    git branch: "${BRANCH}", url: 'https://github.com/lsst-ts/ts_wep.git'
+                }
+                dir(env.WORKSPACE + '/ts_ofc') {
+                    git branch: "${BRANCH}", url: 'https://github.com/lsst-ts/ts_ofc.git'
+                }
+            }
+        }
+
         stage ('Building the Dependencies') {
             steps {
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
-
-                        cd ${env.SAL_USERS_HOME}
-
-                        git clone --branch master --depth 1 --single-branch https://github.com/lsst-dm/phosim_utils.git
-                        git clone --branch ${BRANCH} --depth 1 --single-branch https://github.com/lsst-ts/ts_wep.git
-                        git clone --branch ${BRANCH} --depth 1 --single-branch https://github.com/lsst-ts/ts_ofc.git
 
                         cd phosim_utils/
                         setup -k -r . -t ${env.STACK_VERSION}
@@ -117,14 +129,13 @@ pipeline {
                 }
             }
         }
+
         stage ('Unit Tests and Coverage Analysis') {
             steps {
                 // Pytest needs to export the junit report.
                 withEnv(["HOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
-
-                        cd ${env.SAL_USERS_HOME}
 
                         cd phosim_utils/
                         setup -k -r . -t ${env.STACK_VERSION}
@@ -135,9 +146,9 @@ pipeline {
                         cd ../ts_ofc/
                         setup -k -r .
 
-                        cd ${HOME}
+                        cd ../ts_MTAOS/
                         setup -k -r .
-                        pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT}
+                        pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.WORKSPACE}/${env.XML_REPORT}
                     """
                 }
             }
@@ -149,8 +160,6 @@ pipeline {
                     sh """
                         source ${env.SAL_SETUP_FILE}
 
-                        cd ${env.SAL_USERS_HOME}
-
                         cd phosim_utils/
                         setup -k -r . -t ${env.STACK_VERSION}
 
@@ -160,11 +169,11 @@ pipeline {
                         cd ../ts_ofc/
                         setup -k -r .
 
-                        cd ${HOME}
+                        cd ../ts_MTAOS/
                         setup -k -r .
 
                         package-docs build
-                        ltd upload --product ${env.DOCUMENT_NAME} --git-ref ${GIT_BRANCH} --dir doc/_build/html
+                        ltd upload --product ${env.DOCUMENT_NAME} --git-ref ${BRANCH} --dir doc/_build/html
                     """
                 }
             }
@@ -192,7 +201,7 @@ pipeline {
                 allowMissing: false,
                 alwaysLinkToLastBuild: false,
                 keepAll: true,
-                reportDir: 'htmlcov',
+                reportDir: 'ts_MTAOS/htmlcov',
                 reportFiles: 'index.html',
                 reportName: "Coverage Report"
             ])

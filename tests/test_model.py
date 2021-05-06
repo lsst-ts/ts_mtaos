@@ -85,6 +85,25 @@ class TestModel(unittest.TestCase):
         self.assertTrue(isinstance(self.model.ofc, OFC))
         self.assertEqual(self.model.ofc.ofc_data.name, "comcam")
 
+    def test_user_gain(self):
+
+        self.assertTrue(self.model.user_gain is not None)
+
+        self.model.user_gain = 0.0
+        self.assertEqual(self.model.user_gain, 0.0)
+
+        self.model.user_gain = 0.5
+        self.assertEqual(self.model.user_gain, 0.5)
+
+        self.model.user_gain = 1.0
+        self.assertEqual(self.model.user_gain, 1.0)
+
+        with self.assertRaises(ValueError):
+            self.model.user_gain = -0.1
+
+        with self.assertRaises(ValueError):
+            self.model.user_gain = 1.1
+
     def test_get_wfe(self):
 
         self.assertEqual(self.model.get_wfe(), [])
@@ -136,13 +155,13 @@ class TestModel(unittest.TestCase):
         fwhm_data = self.model.get_fwhm_data()
         self.assertEqual(len(fwhm_data), 0)
 
-    def test_get_aggr_dof(self):
+    def test_get_dof_aggr(self):
 
-        self.assertEqual(len(self.model.get_aggr_dof()), 50)
+        self.assertEqual(len(self.model.get_dof_aggr()), 50)
 
-    def test_get_lv_dof(self):
+    def test_get_dof(self):
 
-        self.assertEqual(len(self.model.get_lv_dof()), 50)
+        self.assertEqual(len(self.model.get_dof_lv()), 50)
 
     def test_add_correction(self):
 
