@@ -98,7 +98,7 @@ class Model:
         # Collection of calculated list of rejected wavefront error
         self.rejected_wavefront_errors = WavefrontCollection(self.MAX_LEN_QUEUE)
 
-        # List of FWHM (full width at half maximum) sensor data
+        # Dictionary of FWHM (full width at half maximum) sensor data
         self._fwhm_data = dict()
 
         # Optical feedback control
@@ -126,21 +126,35 @@ class Model:
     @user_gain.setter
     def user_gain(self, value):
         """Set user gain."""
-        self.ofc_ofc_controller.gain = value
+        self.ofc.ofc_controller.gain = value
 
     def get_fwhm_sensors(self):
-        """Get list of fwhm sensor ids."""
-        return [key for key in self._fwhm_data.keys()]
+        """Get list of fwhm sensor ids.
+
+        Returns
+        -------
+        `list`
+            List with the fwhm sensors ids.
+        """
+        return list(self._fwhm_data.keys())
 
     def get_fwhm_data(self):
-        """Get an ndarray with the fwhm data.
+        """Get an ndarray with the FWHM data for all the sensors.
+
+        FWHM: Full width at half maximum.
 
         Returns
         -------
         `np.ndarray`
-            Fwhm data.
+            2-D array with the fwhm data. Each element of the array contains an
+            array with the fwhm data (in arcsec).
         """
 
+        # Note that the array dtype bellow is object instead of float. The
+        # reason is that we need to be able to support vectors with different
+        # sizes. For instance, say you have 5 measurements for sensor 1, 7 for
+        # sensor 2 and so on. Numpy does not support arrays of arrays with
+        # different sizes of type float.
         return np.array(
             [self._fwhm_data[sensor_id] for sensor_id in self._fwhm_data],
             ndmin=1,
@@ -158,6 +172,12 @@ class Model:
             Sensor Id.
         fwhm_data : numpy.ndarray
             FWHM values for this sensor.
+
+        Raises
+        ------
+        RuntimeError
+            If input `sensor_id` is not in the list of ids for the configured
+            camera.
         """
 
         if sensor_id not in self.ofc.ofc_data.field_idx.values():
@@ -200,7 +220,7 @@ class Model:
 
         return self.rejected_wavefront_errors.pop()
 
-    def get_aggr_dof(self):
+    def get_dof_aggr(self):
         """Get the aggregated DOF.
 
         DOF: Degree of freedom.
@@ -211,9 +231,9 @@ class Model:
             Aggregated DOF.
         """
 
-        return self.ofc.ofc_controller.dof_state[self.ofc.ofc_data.dof_idx]
+        return self.ofc.ofc_controller.aggregated_state
 
-    def get_lv_dof(self):
+    def get_dof_lv(self):
         """Get the DOF correction from the last visit.
 
         DOF: Degree of freedom.
@@ -229,7 +249,7 @@ class Model:
     def reject_correction(self):
         """Reject the correction of subsystems."""
 
-        lv_dof = self.get_lv_dof()
+        lv_dof = self.get_dof_lv()
 
         self.ofc.ofc_controller.aggregate_state(-lv_dof, self.ofc.ofc_data.dof_idx)
 
@@ -402,7 +422,24 @@ class Model:
             self._clear_wfe_collections()
 
     def _calculate_corrections(self, wfe, field_idx, **kwargs):
-        """"""
+        """Compute corrections from input wavefront errors.
+
+        Parameters
+        ----------
+        wfe: `np.ndarray`
+            2D array with wavefront errors (in microns). Each element contains
+            the wavefront errors for a specific field index.
+        field_idx: `np.ndarray`
+            Field index for the input wavefront errors.
+        **kwargs: `dict`
+            User input keyword arguments. Optional standard kwargs:
+                gain: `float`
+                    User gain (default -1).
+                rot: `float`
+                    Camera rotation angle in degrees (default 0).
+                filter_name: `string`
+                    Name of the filter used for the observations.
+        """
         gain = kwargs.get("gain", -1.0)
         rot = kwargs.get("rot", 0.0)
         filter_name = kwargs.get("filter_name", "")
@@ -466,28 +503,43 @@ class Model:
 
         Parameters
         ----------
-        kwargs :
+        kwargs: `dict`
+            Input keyword arguments. The method does not expect any particular
+            input.
 
         Returns
         -------
         original_ofc_data_values : `dict`
+            Original values in `ofc_data`.
+
+        Notes
+        -----
+        For each input argument, check whether it is a valid entry in
+        `self.ofc.ofc_data`. If yes, save the original value to the
+        `original_ofc_data_values` dictionary and so on. If it fails to set a
+        particular value, undo all the other changes and raise the exception.
+
+        Uppon success, return the original values so users can restore it
+        later.
         """
 
         original_ofc_data_values = dict()
 
         try:
             for key in kwargs:
-                if hasattr(self.ofc.ofc_data, key):
+                if key == "name":
+                    self.log.debug(f"Configuring ofc_data for new instrument: {key}.")
+                    await self.ofc.ofc_data.configure_instrument(kwargs[key])
+                elif hasattr(self.ofc.ofc_data, key):
+                    self.log.debug(f"Overriding ofc_data parameter {key}.")
                     original_ofc_data_values[key] = getattr(self.ofc.ofc_data, key)
                     setattr(self.ofc.ofc_data, key, kwargs[key])
-        except Exception as e:
+        except Exception:
             self.log.error(
                 "Error setting value in ofc_data. Restoring original values."
             )
             for key in original_ofc_data_values:
                 setattr(self.ofc.ofc_data, key, original_ofc_data_values[key])
-            raise e
+            raise
         else:
             return original_ofc_data_values
-        finally:
-            await self.ofc.ofc_data._configure_task

@@ -32,7 +32,7 @@ STD_TIMEOUT = 60
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
-        return MTAOS.MtaosCsc(config_dir=config_dir, simulation_mode=simulation_mode)
+        return MTAOS.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
 
     def setUp(self):
 
