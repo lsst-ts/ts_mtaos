@@ -27,9 +27,9 @@ try:
 except ImportError:
     __version__ = "?"
 
-from .CollOfListOfWfErr import *
-from .Config import *
+from .wavefront_collection import *
+from .config import *
 from .config_schema import *
-from .Model import *
-from .Utility import *
-from .MtaosCsc import *
+from .model import *
+from .utility import *
+from .mtaos import *

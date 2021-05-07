@@ -28,7 +28,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v1
+title: MTAOS v2
 description: Schema for MTAOS configuration files
 type: object
 
@@ -45,20 +45,6 @@ properties:
     type: string
     enum: [lsst, comcam, sh, cmos]
     default: comcam
-
-  defaultIsrDir:
-    description: >
-      Default instrument signature removal (ISR) directory.
-      This setting will be override by the 'ISRDIRPATH' path variable.
-    type: string
-    default: /home/lsst/input
-
-  defaultSkyFilePath:
-    description: >
-      Default sky file path relative to the root of module.
-      This is for the test only.
-    type: string
-    default: tests/testData/phosimOutput/realComCam/skyComCamInfo.txt
 
 required:
   - camera

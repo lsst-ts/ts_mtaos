@@ -2,6 +2,21 @@
 Version History
 ===============
 
+v0.6.0
+------
+
+* In Jenkinsfile, run pytest in the entire package instead of only the `tests/` folder, to capture pep8 and black violations in the entire repo.
+* Refactor module names to the current telescope and site standards (lower_camel_case).
+* Refactor additional parts of the code to be compliant with the current style guide.
+* Implement new version of OFC.
+* In CSC:
+  * Refactor log-to-file interface.
+  * In `addAberration` command:
+    * Stop issuing corrections. Users need to send a `issueAberration` for the aberrations to be applied.
+    * Implement `config` feature, to allow users to customize ofc behavior.
+    * Add some unit tests for `addAberration` config feature.
+* Update tests/Sconscript to allow running scons with licensed version of OpenSplice.
+
 v0.5.6
 ------
 

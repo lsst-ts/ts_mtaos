@@ -28,7 +28,6 @@ __all__ = [
     "getLogDir",
     "getIsrDirPath",
     "getCamType",
-    "getInstName",
     "getCscName",
     "addRotFileHandler",
     "timeit",
@@ -45,7 +44,6 @@ from pathlib import Path
 from lsst.utils import getPackageDir
 
 from lsst.ts.wep.Utility import CamType
-from lsst.ts.ofc.Utility import InstName
 
 
 class WEPWarning(Enum):
@@ -147,37 +145,6 @@ def getCamType(camera):
         return CamType.ComCam
     else:
         raise ValueError("The camera (%s) is not supported." % camera)
-
-
-def getInstName(instName):
-    """Get the enum of instrument name.
-
-    Parameters
-    ----------
-    instName : str
-        Instrument name.
-
-    Returns
-    -------
-    enum 'InstName' in lsst.ts.ofc.Utility
-        Instrument name.
-
-    Raises
-    ------
-    ValueError
-        This instrument is not supported.
-    """
-
-    if instName == "lsst":
-        return InstName.LSST
-    elif instName == "comcam":
-        return InstName.COMCAM
-    elif instName == "sh":
-        return InstName.SH
-    elif instName == "cmos":
-        return InstName.CMOS
-    else:
-        raise ValueError("This instrument (%s) is not supported." % instName)
 
 
 def getCscName():

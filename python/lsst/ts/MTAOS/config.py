@@ -25,7 +25,7 @@ from collections import namedtuple
 import warnings
 import yaml
 
-from . import Utility
+from . import utility
 
 
 class Config(object):
@@ -49,22 +49,22 @@ class Config(object):
 
         Returns
         -------
-        enum 'CamType' in lsst.ts.wep.Utility
+        enum 'CamType' in lsst.ts.wep.utility
             Camera type.
         """
 
-        return Utility.getCamType(self.configObj.camera)
+        return utility.getCamType(self.configObj.camera)
 
     def getInstName(self):
         """Get the enum of instrument name in the configuration.
 
         Returns
         -------
-        enum 'InstName' in lsst.ts.ofc.Utility
+        enum 'InstName' in lsst.ts.ofc.utility
             Instrument name.
         """
 
-        return Utility.getInstName(self.configObj.instrument)
+        return self.configObj.instrument
 
     def getIsrDir(self):
         """Get the ISR directory.
@@ -79,7 +79,7 @@ class Config(object):
             ISR directory.
         """
 
-        isrDir = Utility.getIsrDirPath()
+        isrDir = utility.getIsrDirPath()
         if isrDir is None:
             isrDir = self.configObj.defaultIsrDir
             warnings.warn(
@@ -106,7 +106,7 @@ class Config(object):
             relativePath = self.configObj.defaultSkyFilePath
         except AttributeError:
             return None
-        return Utility.getModulePath().joinpath(relativePath)
+        return utility.getModulePath().joinpath(relativePath)
 
     def getState0DofFile(self):
         """Get the state 0 DoF filename.
@@ -122,4 +122,4 @@ class Config(object):
             relativePath = self.configObj.state0DofFilePath
         except AttributeError:
             return None
-        return Utility.getModulePath().joinpath(relativePath)
+        return utility.getModulePath().joinpath(relativePath)

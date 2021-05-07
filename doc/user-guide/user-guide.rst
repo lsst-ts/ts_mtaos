@@ -163,6 +163,12 @@ To use this command the user would do:
 
   await mtaosCsc.cmd_addAberration.set_start(wf=wf)
 
+  await mtaosCsc.cmd_issueCorrection.start()
+
+Note that the ``addAberration`` command itself does not send the corrections.
+It only computes and store them in the model.
+A user can send the corrections by sending a ``issueCorrection`` command, and ignore them with a ``resetCorrection``.
+
 .. ofc: Need to provide a link for the ofc in the future.
 
 .. note::

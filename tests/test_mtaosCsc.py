@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
+import yaml
 import unittest
 
 import numpy as np
@@ -31,13 +32,12 @@ from lsst.ts import MTAOS
 
 # standard command timeout (sec)
 STD_TIMEOUT = 60
+SHORT_TIMEOUT = 5
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
-        return MTAOS.MtaosCsc(
-            config_dir=config_dir, simulation_mode=simulation_mode, log_to_file=True
-        )
+        return MTAOS.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
 
     def setUp(self):
 
@@ -67,7 +67,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         return self.remote
 
     async def testBinScript(self):
-        cmdline_args = ["--logToFile", "--debugLevel", "20"]
+        cmdline_args = ["--log-to-file", "--log-level", "20"]
         await self.check_bin_script(
             "MTAOS", 0, "run_mtaos.py", cmdline_args=cmdline_args
         )
@@ -101,7 +101,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await remote.cmd_resetCorrection.set_start(timeout=STD_TIMEOUT)
 
             dof = await remote.evt_degreeOfFreedom.next(
-                flush=False, timeout=STD_TIMEOUT
+                flush=False, timeout=SHORT_TIMEOUT
             )
             dofAggr = dof.aggregatedDoF
             dofVisit = dof.visitDoF
@@ -154,14 +154,16 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
+
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
             remote = self._getRemote()
+
             with self.assertRaises(salobj.AckError):
                 await remote.cmd_issueCorrection.set_start(timeout=10.0)
 
             dof = await remote.evt_rejectedDegreeOfFreedom.next(
-                flush=False, timeout=STD_TIMEOUT
+                flush=False, timeout=SHORT_TIMEOUT
             )
             dofAggr = dof.aggregatedDoF
             dofVisit = dof.visitDoF
@@ -173,13 +175,94 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(
                 remote.evt_rejectedM2HexapodCorrection,
                 flush=False,
-                timeout=STD_TIMEOUT,
+                timeout=SHORT_TIMEOUT,
                 x=0,
                 y=0,
                 z=0,
                 u=0,
                 v=0,
                 w=0,
+            )
+
+    async def test_addAberration(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
+        ):
+
+            await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
+
+            remote = self._getRemote()
+
+            # Flush all events before command is sent
+            remote.evt_degreeOfFreedom.flush()
+            remote.evt_m2HexapodCorrection.flush()
+            remote.evt_cameraHexapodCorrection.flush()
+            remote.evt_m1m3Correction.flush()
+            remote.evt_m2Correction.flush()
+
+            await remote.cmd_addAberration.set_start(
+                wf=np.zeros(19), timeout=STD_TIMEOUT
+            )
+
+            await self.assert_next_sample(
+                remote.evt_degreeOfFreedom,
+                flush=False,
+                timeout=SHORT_TIMEOUT,
+            )
+
+            await self.assert_next_sample(
+                remote.evt_m2HexapodCorrection, flush=False, timeout=SHORT_TIMEOUT
+            )
+            await self.assert_next_sample(
+                remote.evt_cameraHexapodCorrection, flush=False, timeout=SHORT_TIMEOUT
+            )
+            await self.assert_next_sample(
+                remote.evt_m1m3Correction, flush=False, timeout=SHORT_TIMEOUT
+            )
+            await self.assert_next_sample(
+                remote.evt_m2Correction, flush=False, timeout=SHORT_TIMEOUT
+            )
+
+    async def test_addAberration_with_config(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
+        ):
+
+            await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
+
+            remote = self._getRemote()
+
+            # Flush all events before command is sent
+            remote.evt_degreeOfFreedom.flush()
+            remote.evt_m2HexapodCorrection.flush()
+            remote.evt_cameraHexapodCorrection.flush()
+            remote.evt_m1m3Correction.flush()
+            remote.evt_m2Correction.flush()
+
+            # set control algorithm
+            config = dict(xref="x0")
+
+            await remote.cmd_addAberration.set_start(
+                wf=np.zeros(19), config=yaml.safe_dump(config), timeout=STD_TIMEOUT
+            )
+
+            await self.assert_next_sample(
+                remote.evt_degreeOfFreedom,
+                flush=False,
+                timeout=SHORT_TIMEOUT,
+            )
+
+            await self.assert_next_sample(
+                remote.evt_m2HexapodCorrection, flush=False, timeout=SHORT_TIMEOUT
+            )
+            await self.assert_next_sample(
+                remote.evt_cameraHexapodCorrection, flush=False, timeout=SHORT_TIMEOUT
+            )
+            await self.assert_next_sample(
+                remote.evt_m1m3Correction, flush=False, timeout=SHORT_TIMEOUT
+            )
+            await self.assert_next_sample(
+                remote.evt_m2Correction, flush=False, timeout=SHORT_TIMEOUT
             )
 
     @unittest.skip("Skip until commands implementation.")
