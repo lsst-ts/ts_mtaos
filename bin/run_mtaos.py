@@ -23,6 +23,6 @@
 
 import asyncio
 
-from lsst.ts import MTAOS
+from lsst.ts.MTAOS import MTAOS
 
-asyncio.run(MTAOS.MtaosCsc.amain(0))
+asyncio.run(MTAOS.amain(0))

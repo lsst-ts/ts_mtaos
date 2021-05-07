@@ -14,6 +14,7 @@ pipeline {
 
     options {
       disableConcurrentBuilds()
+      skipDefaultCheckout()
     }
 
     triggers {
@@ -61,6 +62,9 @@ pipeline {
 
         stage ('Cloning Repos') {
             steps {
+                dir(env.WORKSPACE + '/ts_MTAOS') {
+                    checkout scm
+                }
                 dir(env.WORKSPACE + '/phosim_utils') {
                     git branch: 'master', url: 'https://github.com/lsst-dm/phosim_utils.git'
                 }
@@ -125,6 +129,7 @@ pipeline {
                 }
             }
         }
+
         stage ('Unit Tests and Coverage Analysis') {
             steps {
                 // Pytest needs to export the junit report.
@@ -141,9 +146,9 @@ pipeline {
                         cd ../ts_ofc/
                         setup -k -r .
 
-                        cd ../
+                        cd ../ts_MTAOS/
                         setup -k -r .
-                        pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT} tests/
+                        pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.WORKSPACE}/${env.XML_REPORT}
                     """
                 }
             }
@@ -164,11 +169,11 @@ pipeline {
                         cd ../ts_ofc/
                         setup -k -r .
 
-                        cd ../
+                        cd ../ts_MTAOS/
                         setup -k -r .
 
                         package-docs build
-                        ltd upload --product ${env.DOCUMENT_NAME} --git-ref ${GIT_BRANCH} --dir doc/_build/html
+                        ltd upload --product ${env.DOCUMENT_NAME} --git-ref ${BRANCH} --dir doc/_build/html
                     """
                 }
             }
@@ -196,7 +201,7 @@ pipeline {
                 allowMissing: false,
                 alwaysLinkToLastBuild: false,
                 keepAll: true,
-                reportDir: 'htmlcov',
+                reportDir: 'ts_MTAOS/htmlcov',
                 reportFiles: 'index.html',
                 reportName: "Coverage Report"
             ])

@@ -32,9 +32,7 @@ STD_TIMEOUT = 60
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
-        return MTAOS.MtaosCsc(
-            config_dir=config_dir, simulation_mode=simulation_mode, log_to_file=True
-        )
+        return MTAOS.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
 
     def setUp(self):
 
@@ -49,39 +47,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         self.m1m3_corrections = []
         self.m2_corrections = []
 
-        # Simulated CSC tasks
-        self.taskM2Hex = None
-        self.taskCamHex = None
-        self.taskM1M3 = None
-        self.taskM2 = None
-
     def tearDown(self):
 
         logFile = Path(MTAOS.getLogDir()).joinpath("MTAOS.log")
         if logFile.exists():
             logFile.unlink()
 
-    @unittest.skip("Skip until commands implementation.")
-    async def testIssueCorrection(self):
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
-        ):
-
-            await self._simulateCSCs()
-
-            await self._startCsc()
-
-            # Set the timeout > 20 seconds for the long calculation time
-            remote = self._getRemote()
-            await remote.cmd_runWEP.set_start()
-
-            await remote.cmd_runOFC.set_start()
-
-            await remote.cmd_issueCorrection.set_start(timeout=10.0, value=True)
-
-            await self._cancelCSCs()
-
-    async def test_addAberration(self):
+    async def test_addAberration_issueCorrection(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
@@ -92,7 +64,18 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # Set the timeout > 20 seconds for the long calculation time
             remote = self._getRemote()
 
-            await remote.cmd_addAberration.set_start(wf=np.zeros(19), timeout=10.0)
+            # User the addAberration to have something to issue
+            wfe = np.zeros(19)
+            await remote.cmd_addAberration.set_start(wf=wfe, timeout=STD_TIMEOUT)
+
+            # Add aberration does not send the corrections, we need to send
+            # run issueCorrections
+            self.assertEqual(len(self.m2_hex_corrections), 0)
+            self.assertEqual(len(self.cam_hex_corrections), 0)
+            self.assertEqual(len(self.m1m3_corrections), 0)
+            self.assertEqual(len(self.m2_corrections), 0)
+
+            await remote.cmd_issueCorrection.start(timeout=STD_TIMEOUT)
 
             # There must be 1 correction for each component
             self.assertEqual(len(self.m2_hex_corrections), 1)
@@ -126,8 +109,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             wf = np.random.rand(19) * 0.1
 
+            await remote.cmd_addAberration.set_start(wf=wf, timeout=10.0)
+
             with self.assertRaises(salobj.AckError):
-                await remote.cmd_addAberration.set_start(wf=wf, timeout=10.0)
+                await remote.cmd_issueCorrection.start(timeout=STD_TIMEOUT)
 
             # There must be 3 corrections for each component except for m1m3
             # which got rejected. The corrections are 1 from the previous test,
@@ -139,7 +124,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(self.m1m3_corrections), 1)
             self.assertEqual(len(self.m2_corrections), 3)
 
-            # Check values.
+            # Check values. The last 2 corrections should have same values with
+            # different sign.
             for axis in "xyzuvw":
                 self.assertEqual(
                     getattr(self.m2_hex_corrections[1], axis),
@@ -162,40 +148,40 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def _simulateCSCs(self):
 
-        # Mock controller that uses callback functions defined below
-        # to handle the expected commands
-        self.taskM2Hex = asyncio.create_task(self._simulateM2Hex())
-        self.taskCamHex = asyncio.create_task(self._simulateCamHex())
-        self.taskM1M3 = asyncio.create_task(self._simulateM1M3())
-        self.taskM2 = asyncio.create_task(self._simulateM2())
-
-    async def _simulateM2Hex(self):
-
         self.cscM2Hex = salobj.Controller(
-            "MTHexapod", index=MTAOS.Utility.MTHexapodIndex.M2.value
+            "MTHexapod", index=MTAOS.utility.MTHexapodIndex.M2.value
         )
-        self.cscM2Hex.cmd_move.callback = self.hexapod_move_callbck
-
-    def hexapod_move_callbck(self, data):
-
-        if data.MTHexapodID == MTAOS.Utility.MTHexapodIndex.M2.value:
-            self.m2_hex_corrections.append(data)
-        else:
-            self.cam_hex_corrections.append(data)
-
-    async def _simulateCamHex(self):
-
         self.cscCamHex = salobj.Controller(
-            "MTHexapod", index=MTAOS.Utility.MTHexapodIndex.Camera.value
+            "MTHexapod", index=MTAOS.utility.MTHexapodIndex.Camera.value
         )
-        self.cscCamHex.cmd_move.callback = self.hexapod_move_callbck
-
-    async def _simulateM1M3(self):
-
         self.cscM1M3 = salobj.Controller("MTM1M3")
+        self.cscM2 = salobj.Controller("MTM2")
+
+        await asyncio.gather(
+            *[
+                controller.start_task
+                for controller in {
+                    self.cscM2Hex,
+                    self.cscCamHex,
+                    self.cscM1M3,
+                    self.cscM2,
+                }
+            ]
+        )
+
+        self.cscM2Hex.cmd_move.callback = self.hexapod_move_callbck
+        self.cscCamHex.cmd_move.callback = self.hexapod_move_callbck
         self.cscM1M3.cmd_applyActiveOpticForces.callback = (
             self.m1m3_apply_forces_callbck
         )
+        self.cscM2.cmd_applyForces.callback = self.m2_apply_forces_callbck
+
+    def hexapod_move_callbck(self, data):
+
+        if data.MTHexapodID == MTAOS.utility.MTHexapodIndex.M2.value:
+            self.m2_hex_corrections.append(data)
+        else:
+            self.cam_hex_corrections.append(data)
 
     def m1m3_apply_forces_callbck(self, data):
 
@@ -204,11 +190,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def m1m3_apply_forces_fail_callbck(self, data):
 
         raise RuntimeError("This is a test.")
-
-    async def _simulateM2(self):
-
-        self.cscM2 = salobj.Controller("MTM2")
-        self.cscM2.cmd_applyForces.callback = self.m2_apply_forces_callbck
 
     def m2_apply_forces_callbck(self, data):
 
@@ -224,15 +205,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def _cancelCSCs(self):
 
-        await self.cscM2Hex.close()
-        await self.cscCamHex.close()
-        await self.cscM1M3.close()
-        await self.cscM2.close()
-
-        self.taskM2Hex.cancel()
-        self.taskCamHex.cancel()
-        self.taskM1M3.cancel()
-        self.taskM2.cancel()
+        await asyncio.gather(
+            self.cscM2Hex.close(),
+            self.cscCamHex.close(),
+            self.cscM1M3.close(),
+            self.cscM2.close(),
+        )
 
 
 if __name__ == "__main__":

@@ -26,9 +26,8 @@ import unittest
 import numpy as np
 import yaml
 
-from lsst.ts.ofc.ctrlIntf.OFCCalculationOfComCam import OFCCalculationOfComCam
-from lsst.ts.ofc.ctrlIntf.M1M3Correction import M1M3Correction
-from lsst.ts.ofc.ctrlIntf.M2Correction import M2Correction
+from lsst.ts.ofc import OFC, OFCData
+from lsst.ts.ofc.utils import CorrectionType
 
 from lsst.ts import MTAOS
 
@@ -48,14 +47,19 @@ class TestModel(unittest.TestCase):
         settingFilePath = MTAOS.getModulePath().joinpath(
             "tests", "testData", "default.yaml"
         )
+
+        ofc_data = OFCData("comcam")
+
         config = MTAOS.Config(str(settingFilePath))
-        state0Dof = yaml.safe_load(
+        dof_state0 = yaml.safe_load(
             MTAOS.getModulePath()
             .joinpath("tests", "testData", "state0inDof.yaml")
             .open()
             .read()
         )
-        cls.model = MTAOS.Model(config, state0Dof)
+        ofc_data.dof_state0 = dof_state0
+
+        cls.model = MTAOS.Model(config, ofc_data)
 
     def setUp(self):
         os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
@@ -67,8 +71,8 @@ class TestModel(unittest.TestCase):
 
     def tearDown(self):
 
-        self.model.resetFWHMSensorData()
-        self.model.resetWavefrontCorrection()
+        self.model.reset_fwhm_data()
+        self.model.reset_wfe_correction()
 
         shutil.rmtree(self.dataDir)
         try:
@@ -76,71 +80,88 @@ class TestModel(unittest.TestCase):
         except KeyError:
             pass
 
-    def testInitOfModelMTAOS(self):
+    def test_init(self):
 
-        ofc = self.model.ofc
-        self.assertTrue(isinstance(ofc, OFCCalculationOfComCam))
+        self.assertTrue(isinstance(self.model.ofc, OFC))
+        self.assertEqual(self.model.ofc.ofc_data.name, "comcam")
 
-    def testGetListOfWavefrontError(self):
+    def test_user_gain(self):
 
-        self.assertEqual(self.model.getListOfWavefrontError(), [])
+        self.assertTrue(self.model.user_gain is not None)
 
-    def testGetListOfWavefrontErrorRej(self):
+        self.model.user_gain = 0.0
+        self.assertEqual(self.model.user_gain, 0.0)
 
-        self.assertEqual(self.model.getListOfWavefrontErrorRej(), [])
+        self.model.user_gain = 0.5
+        self.assertEqual(self.model.user_gain, 0.5)
 
-    def testGetListOfFWHMSensorData(self):
+        self.model.user_gain = 1.0
+        self.assertEqual(self.model.user_gain, 1.0)
 
-        self.assertEqual(self.model.getListOfFWHMSensorData(), [])
+        with self.assertRaises(ValueError):
+            self.model.user_gain = -0.1
 
-    def testSetFWHMSensorData(self):
+        with self.assertRaises(ValueError):
+            self.model.user_gain = 1.1
 
-        self.model.setFWHMSensorData(1, np.zeros(2))
+    def test_get_wfe(self):
 
-        listOfFWHMSensorData = self.model.getListOfFWHMSensorData()
-        self.assertEqual(len(listOfFWHMSensorData), 1)
+        self.assertEqual(self.model.get_wfe(), [])
 
-        self.model.setFWHMSensorData(2, np.zeros(2))
-        self.assertEqual(len(listOfFWHMSensorData), 2)
+    def test_get_rejected_wfe(self):
 
-    def testSetFWHMSensorDataRepeatSensorId(self):
+        self.assertEqual(self.model.get_rejected_wfe(), [])
 
-        self.model.setFWHMSensorData(1, np.zeros(2))
+    def test_get_fwhm_sensors(self):
 
-        newFwhmValues = np.array([1, 2, 3])
-        self.model.setFWHMSensorData(1, newFwhmValues)
+        self.assertEqual(self.model.get_fwhm_sensors(), [])
 
-        listOfFWHMSensorData = self.model.getListOfFWHMSensorData()
-        self.assertEqual(len(listOfFWHMSensorData), 1)
+        self.model.set_fwhm_data(5, np.zeros(2))
+        self.assertEqual(len(self.model.get_fwhm_sensors()), 1)
+        self.assertEqual(self.model.get_fwhm_sensors()[0], 5)
 
-        fwhmValuesInList = listOfFWHMSensorData[0].getFwhmValues()
-        self.assertTrue((fwhmValuesInList == newFwhmValues).all())
+    def test_set_fwhm_data(self):
 
-    def testResetFWHMSensorData(self):
+        self.model.set_fwhm_data(1, np.zeros(2))
 
-        self.model.setFWHMSensorData(1, np.zeros(2))
-        self.model.resetFWHMSensorData()
+        fwhm_data = self.model.get_fwhm_data()
+        self.assertEqual(len(fwhm_data), 1)
 
-        listOfFWHMSensorData = self.model.getListOfFWHMSensorData()
-        self.assertEqual(listOfFWHMSensorData, [])
+        self.model.set_fwhm_data(2, np.zeros(3))
+        self.model.set_fwhm_data(3, np.zeros(4))
 
-    def testGetDofAggr(self):
+        fwhm_data = self.model.get_fwhm_data()
+        self.assertEqual(len(fwhm_data), 3)
 
-        dofAggr = self._getDofAggr()
-        self.assertEqual(len(dofAggr), 50)
+    def test_set_fwhm_data_repeat_sensor(self):
 
-    def _getDofAggr(self):
+        self.model.set_fwhm_data(1, np.zeros(2))
 
-        return self.model.getDofAggr()
+        new_fwhm_values = np.array([1, 2, 3])
+        self.model.set_fwhm_data(1, new_fwhm_values)
 
-    def testGetDofVisit(self):
+        fwhm_data = self.model.get_fwhm_data()
 
-        dofVisit = self._getDofVisit()
-        self.assertEqual(len(dofVisit), 50)
+        self.assertEqual(len(fwhm_data), 1)
 
-    def _getDofVisit(self):
+        fwhm_values_in_list = fwhm_data[0]
+        self.assertTrue(np.all(fwhm_values_in_list == new_fwhm_values))
 
-        return self.model.getDofVisit()
+    def test_reset_fwhm_data(self):
+
+        self.model.set_fwhm_data(1, np.zeros(2))
+        self.model.reset_fwhm_data()
+
+        fwhm_data = self.model.get_fwhm_data()
+        self.assertEqual(len(fwhm_data), 0)
+
+    def test_get_dof_aggr(self):
+
+        self.assertEqual(len(self.model.get_dof_aggr()), 50)
+
+    def test_get_dof(self):
+
+        self.assertEqual(len(self.model.get_dof_lv()), 50)
 
     def test_add_correction(self):
 
@@ -149,7 +170,7 @@ class TestModel(unittest.TestCase):
         # Passing in zeros for wavefront_errors should return 0 in correction
         self.model.add_correction(wavefront_erros)
 
-        x, y, z, u, v, w = self.model.getM2HexCorr()
+        x, y, z, u, v, w = self.model.m2_hexapod_correction()
 
         self.assertEqual(x, 0)
         self.assertEqual(y, 0)
@@ -158,7 +179,7 @@ class TestModel(unittest.TestCase):
         self.assertEqual(v, 0)
         self.assertEqual(w, 0)
 
-        x, y, z, u, v, w = self.model.getCamHexCorr()
+        x, y, z, u, v, w = self.model.cam_hexapod_correction()
         self.assertEqual(x, 0)
         self.assertEqual(y, 0)
         self.assertEqual(z, 0)
@@ -166,10 +187,10 @@ class TestModel(unittest.TestCase):
         self.assertEqual(v, 0)
         self.assertEqual(w, 0)
 
-        actCorr = self.model.getM1M3ActCorr()
+        actCorr = self.model.m1m3_correction()
         self.assertListEqual(actCorr.tolist(), np.zeros_like(actCorr).tolist())
 
-        actCorr = self.model.getM2ActCorr()
+        actCorr = self.model.m2_correction()
         self.assertListEqual(actCorr.tolist(), np.zeros_like(actCorr).tolist())
 
         # Give 0.1 um of focus correction. All values must be close to zero
@@ -178,7 +199,7 @@ class TestModel(unittest.TestCase):
         wavefront_erros[0] = 0.1
         self.model.add_correction(wavefront_erros)
 
-        x, y, z_m2hex, u, v, w = self.model.getM2HexCorr()
+        x, y, z_m2hex, u, v, w = self.model.m2_hexapod_correction()
 
         self.assertAlmostEqual(x, 0, 3)
         self.assertAlmostEqual(y, 0, 3)
@@ -186,7 +207,7 @@ class TestModel(unittest.TestCase):
         self.assertAlmostEqual(v, 0, 3)
         self.assertAlmostEqual(w, 0, 3)
 
-        x, y, z_camhex, u, v, w = self.model.getCamHexCorr()
+        x, y, z_camhex, u, v, w = self.model.cam_hexapod_correction()
 
         self.assertAlmostEqual(x, 0, 3)
         self.assertAlmostEqual(y, 0, 3)
@@ -197,21 +218,24 @@ class TestModel(unittest.TestCase):
         # Expected total hexapod offset
         self.assertAlmostEqual(z_m2hex + z_camhex, 4.16211, 3)
 
-        actCorr = self.model.getM1M3ActCorr()
+        actCorr = self.model.m1m3_correction()
         self.assertTrue(
             np.allclose(actCorr, np.zeros_like(actCorr), rtol=0.1, atol=0.1),
             f"{actCorr} not almost close to 0.",
         )
 
-        actCorr = self.model.getM2ActCorr()
+        actCorr = self.model.m2_correction()
         self.assertTrue(
             np.allclose(actCorr, np.zeros_like(actCorr), rtol=0.1, atol=0.1),
             f"{actCorr} not almost close to 0.",
         )
 
-    def testGetM2HexCorr(self):
+    def test_m2_hexapod_correction(self):
 
-        x, y, z, u, v, w = self.model.getM2HexCorr()
+        x, y, z, u, v, w = self.model.m2_hexapod_correction()
+        self.assertEqual(
+            self.model.m2_hexapod_correction.correction_type, CorrectionType.POSITION
+        )
         self.assertEqual(x, 0)
         self.assertEqual(y, 0)
         self.assertEqual(z, 0)
@@ -219,9 +243,12 @@ class TestModel(unittest.TestCase):
         self.assertEqual(v, 0)
         self.assertEqual(w, 0)
 
-    def testGetCamHexCorr(self):
+    def test_cam_hexapod_correction(self):
 
-        x, y, z, u, v, w = self.model.getCamHexCorr()
+        self.assertEqual(
+            self.model.cam_hexapod_correction.correction_type, CorrectionType.POSITION
+        )
+        x, y, z, u, v, w = self.model.cam_hexapod_correction()
         self.assertEqual(x, 0)
         self.assertEqual(y, 0)
         self.assertEqual(z, 0)
@@ -229,34 +256,32 @@ class TestModel(unittest.TestCase):
         self.assertEqual(v, 0)
         self.assertEqual(w, 0)
 
-    def testGetM1M3ActCorr(self):
+    def test_m1m3_correction(self):
 
-        actCorr = self.model.getM1M3ActCorr()
-        self.assertEqual(len(actCorr), M1M3Correction.NUM_OF_ACT)
+        self.assertEqual(
+            self.model.m1m3_correction.correction_type, CorrectionType.FORCE
+        )
+        self.assertEqual(len(self.model.m1m3_correction()), 156)
 
-    def testGetM2ActCorr(self):
+    def test_m2_correction(self):
 
-        actCorr = self.model.getM2ActCorr()
-        self.assertEqual(len(actCorr), M2Correction.NUM_OF_ACT)
+        self.assertEqual(self.model.m2_correction.correction_type, CorrectionType.FORCE)
+        self.assertEqual(len(self.model.m2_correction()), 72)
 
-    def testResetWavefrontCorrection(self):
+    def test_reset_wfe_correction(self):
 
         data = [1, 2, 3]
         self.model.wavefront_errors.append(data)
         self.model.rejected_wavefront_errors.append(data)
 
-        self.model.resetWavefrontCorrection()
+        self.model.reset_wfe_correction()
 
-        self._checkWfsErrAndWfsErrRejClear()
+        self.assertEqual(self.model.get_wfe(), [])
+        self.assertEqual(self.model.get_rejected_wfe(), [])
 
-    def _checkWfsErrAndWfsErrRejClear(self):
+    def test_reject_unreasonable_wfe(self):
 
-        self.assertEqual(self.model.getListOfWavefrontError(), [])
-        self.assertEqual(self.model.getListOfWavefrontErrorRej(), [])
-
-    def testRejWavefrontErrorUnreasonable(self):
-
-        self.assertEqual(self.model.rejWavefrontErrorUnreasonable([]), [])
+        self.assertEqual(self.model.reject_unreasonable_wfe([]), [])
 
 
 if __name__ == "__main__":
