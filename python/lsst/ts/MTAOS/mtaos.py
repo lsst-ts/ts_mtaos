@@ -558,7 +558,7 @@ class MTAOS(salobj.ConfigurableCsc):
                 # fails to undo the exception log the error and continue.
                 self.log.warning(f"Undoing {comp} correction.")
                 try:
-                    await getattr(self, f"issue_{comp}_correction")(undo=True)
+                    await getattr(self, f"issue_{comp}_correction")()
                 except Exception:
                     self.log.exception(
                         f"Failed to undo successful correction in {comp}."
