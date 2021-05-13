@@ -204,7 +204,18 @@ class MTAOS(salobj.ConfigurableCsc):
         await ofc_data.configure_instrument(config.instrument)
 
         self.log.debug("ofc data ready. Creating model")
-        self.model = Model(config_obj, ofc_data, log=self.log)
+
+        self.model = Model(
+            instrument=config.instrument,
+            data_path=config.data_path,
+            ofc_data=ofc_data,
+            log=self.log,
+            run_name=config.run_name,
+            collections=config.collections,
+            pipeline_instrument=config.pipeline_instrument,
+            pipeline_n_processes=config.pipeline_n_processes,
+            zernike_table_name=config.zernike_table_name,
+        )
 
         if dof_state0 is not None:
             self.model.ofc_data.dof_state0 = dof_state0
@@ -378,7 +389,7 @@ class MTAOS(salobj.ConfigurableCsc):
             await self.model.run_wep(
                 visit_id=data.visitId,
                 extra_id=data.extraId if data.extraId > 0 else None,
-                config=yaml.safe_load(data.config),
+                config=yaml.safe_dump(data.config),
                 log_time=self.execution_times,
             )
             while len(self.execution_times["RUN_WEP"]) > self.MAX_TIME_SAMPLE:

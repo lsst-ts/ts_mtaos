@@ -21,6 +21,7 @@
 
 import asyncio
 import unittest
+
 import numpy as np
 from pathlib import Path
 from lsst.ts import salobj

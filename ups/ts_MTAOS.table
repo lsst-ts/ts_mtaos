@@ -3,6 +3,7 @@
 # - Common third-party packages can be assumed to be recursively included by
 #   the "sconsUtils" package.
 setupRequired(sconsUtils)
+setupRequired(lsst_distrib)
 setupRequired(utils)
 setupRequired(ts_wep)
 setupRequired(ts_ofc)
