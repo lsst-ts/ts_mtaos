@@ -31,6 +31,10 @@ from lsst.ts.ofc.utils import CorrectionType
 
 from lsst.ts import MTAOS
 
+from lsst.daf import butler as dafButler
+
+from lsst.ts.wep.Utility import getModulePath, writeCleanUpRepoCmd, runProgram
+
 
 class TestModel(unittest.TestCase):
     """Test the Model class."""
@@ -44,13 +48,8 @@ class TestModel(unittest.TestCase):
         # Let the MTAOS to set WEP based on this path variable
         os.environ["ISRDIRPATH"] = cls.isrDir.as_posix()
 
-        settingFilePath = MTAOS.getModulePath().joinpath(
-            "tests", "testData", "default.yaml"
-        )
-
         ofc_data = OFCData("comcam")
 
-        config = MTAOS.Config(str(settingFilePath))
         dof_state0 = yaml.safe_load(
             MTAOS.getModulePath()
             .joinpath("tests", "testData", "state0inDof.yaml")
@@ -59,7 +58,9 @@ class TestModel(unittest.TestCase):
         )
         ofc_data.dof_state0 = dof_state0
 
-        cls.model = MTAOS.Model(config, ofc_data)
+        cls.model = MTAOS.Model(
+            instrument=ofc_data.name, data_path=None, ofc_data=ofc_data
+        )
 
     def setUp(self):
         os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
@@ -282,6 +283,126 @@ class TestModel(unittest.TestCase):
     def test_reject_unreasonable_wfe(self):
 
         self.assertEqual(self.model.reject_unreasonable_wfe([]), [])
+
+
+class TestAsyncModel(unittest.IsolatedAsyncioTestCase):
+    @classmethod
+    def setUpClass(cls):
+
+        cls.dataDir = MTAOS.getModulePath().joinpath("tests", "tmp")
+        cls.isrDir = cls.dataDir.joinpath("input")
+
+        # Let the MTAOS to set WEP based on this path variable
+        os.environ["ISRDIRPATH"] = cls.isrDir.as_posix()
+
+        ofc_data = OFCData("comcam")
+
+        dof_state0 = yaml.safe_load(
+            MTAOS.getModulePath()
+            .joinpath("tests", "testData", "state0inDof.yaml")
+            .open()
+            .read()
+        )
+        ofc_data.dof_state0 = dof_state0
+
+        data_path = os.path.join(getModulePath(), "tests", "testData", "gen3TestRepo")
+        run_name = "run1"
+
+        # Check that run doesn't already exist due to previous improper cleanup
+        butler = dafButler.Butler(data_path)
+        registry = butler.registry
+
+        if run_name in list(registry.queryCollections()):
+            cleanUpCmd = writeCleanUpRepoCmd(data_path, run_name)
+            runProgram(cleanUpCmd)
+
+        cls.model = MTAOS.Model(
+            instrument=ofc_data.name,
+            data_path=data_path,
+            ofc_data=ofc_data,
+            run_name=run_name,
+            collections="LSSTCam/raw/all",
+            pipeline_instrument=dict(comcam="lsst.obs.lsst.LsstCam"),
+            data_instrument_name=dict(comcam="LSSTCam"),
+            reference_detector=94,
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        # Check that run doesn't already exist due to previous improper cleanup
+        butler = dafButler.Butler(cls.model.data_path)
+
+        if cls.model.run_name in list(butler.registry.queryCollections()):
+            runProgram(writeCleanUpRepoCmd(cls.model.data_path, cls.model.run_name))
+
+    async def test_process_comcam(self):
+
+        await self.model.process_comcam(4021123106002, 4021123106001, {})
+
+        self.assertEqual(self.model.wavefront_errors.getNumOfData(), 1)
+
+        data = self.model.wavefront_errors.pop()
+
+        # There is one element for each sensor, 2 sensors have data.
+        self.assertEqual(len(data), 2)
+
+        zk_avg = self.model.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
+
+        # The sensors with data are 93 and 94
+        self.assertTrue(93 in zk_avg)
+        self.assertTrue(94 in zk_avg)
+
+        # These are the expected values:
+        zk_93 = np.array(
+            [
+                -6.62292327e-01,
+                8.64533634e-01,
+                8.21705492e-01,
+                1.68615454e-01,
+                -5.23335624e-02,
+                1.60666853e-01,
+                7.51935984e-04,
+                2.68486585e-02,
+                -8.47699426e-03,
+                -3.47245149e-02,
+                9.34883913e-02,
+                2.95668504e-02,
+                3.90354365e-03,
+                -2.45913219e-02,
+                -7.78672650e-03,
+                -4.02011453e-03,
+                8.41721618e-03,
+                2.57302754e-02,
+                -1.27949365e-02,
+            ]
+        )
+
+        zk_94 = np.array(
+            [
+                -0.6038172,
+                0.88843812,
+                0.8173907,
+                0.20109895,
+                -0.03687552,
+                0.05604168,
+                -0.02240365,
+                0.01645535,
+                -0.03471326,
+                -0.03231903,
+                0.07864597,
+                0.00981912,
+                0.00297442,
+                -0.03256414,
+                -0.00348982,
+                0.00878057,
+                0.00260512,
+                0.01449167,
+                -0.01265463,
+            ]
+        )
+
+        self.assertTrue(np.allclose(zk_avg[93], zk_93))
+        self.assertTrue(np.allclose(zk_avg[94], zk_94))
 
 
 if __name__ == "__main__":

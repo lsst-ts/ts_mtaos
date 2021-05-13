@@ -21,15 +21,24 @@
 
 __all__ = ["Model"]
 
+import yaml
+import asyncio
 import logging
+import tempfile
 
 import numpy as np
 
 from lsst.ts.ofc import OFC
-from lsst.ts.wep.bsc.CamFactory import CamFactory
+from lsst.ts.salobj import DefaultingValidator
+
+from .config_schema import WEP_PIPELINE_CONFIG
 
 from .wavefront_collection import WavefrontCollection
 from .utility import timeit
+
+from lsst.ts.wep.Utility import writePipetaskCmd
+
+from lsst.daf import butler as dafButler
 
 
 class Model:
@@ -37,7 +46,20 @@ class Model:
     # Maximum length of queue for wavefront error
     MAX_LEN_QUEUE = 10
 
-    def __init__(self, config, ofc_data, log=None):
+    def __init__(
+        self,
+        instrument,
+        data_path,
+        ofc_data,
+        log=None,
+        run_name="mtaos_wep",
+        collections="LSSTComCam/raw/all,LSSTComCam/calib",
+        pipeline_instrument=None,
+        pipeline_n_processes=9,
+        data_instrument_name=None,
+        reference_detector=0,
+        zernike_table_name="zernikeEstimateRaw",
+    ):
         """MTAOS model class.
 
         This class implements a model for the MTAOS operations. It encapsulates
@@ -45,16 +67,44 @@ class Model:
 
         Parameters
         ----------
-        config : `lsst.ts.MTAOS.Config`
-            Configuration.
+        instrument: `str`
+            Name of the instrument.
+        data_path: `str`
+            Path to the data butler.
         ofc_data : `OFCData`
             OFC data container class.
         log : `logging.Logger` or `None`, optional
             Optional logging class to be used for logging operations. If
             `None`, creates a new logger.
 
+        Other Parameters
+        ----------------
+        run_name: `str`, optional
+            Which name to use when running the pipeline task. This defines
+            the location where the data is written in the butler.
+            Default is "mtaos_wep".
+        collections: `str`, optional
+            String with the data collections to add to the pipeline task.
+            Default is "refcats,LSSTComCam/raw/all,LSSTComCam/calib".
+        pipeline_instrument: `dict` or `None`, optional
+            A dictionary that maps the name of the instrument to the name used
+            in the pipeline task. If None, use default dictionary mapping.
+        pipeline_n_processes: `int`, optional
+            Number of processes to use when running pipeline. Default is 9.
+        data_instrument_name: `dict` or `None`, optional
+            A dictionary that maps the name of the instrument to the name used
+            by the pipeline task to store the data products. If None, use
+            default dictionary mapping.
+        zernike_table_name: `str`, optional
+            Name of the table in the butler with zernike coeffients.
+            Default is "zernikeEstimate".
+
         Attributes
         ----------
+        donut_cat_config: `dict`
+            Donut catalog configuration.
+        donut_cat: `Struct`
+            Donut catalog table.
         log : `Logger`
             Log facility.
         config : `lsst.ts.MTAOS.Config`
@@ -87,10 +137,34 @@ class Model:
         else:
             self.log = log.getChild(type(self).__name__)
 
-        # Configuration
-        self.config = config
+        self.instrument = instrument
+        self.data_path = data_path
+        self.run_name = run_name
 
-        self.camera = CamFactory.createCam(self.config.getCamType())
+        self.collections = collections
+        self.pipeline_instrument = (
+            pipeline_instrument
+            if pipeline_instrument is not None
+            else dict(
+                comcam="lsst.obs.lsst.LsstComCam",
+                lsstCam="lsst.obs.lsst.LsstCam",
+                lsstFamCam="lsst.obs.lsst.LsstCam",
+            )
+        )
+        self.pipeline_n_processes = pipeline_n_processes
+        self.data_instrument_name = (
+            data_instrument_name
+            if data_instrument_name is not None
+            else dict(
+                comcam="LSSTComCam",
+                lsstCam="LSSTCam",
+                lsstFamCam="LSSTCam",
+            )
+        )
+        self.zernike_table_name = zernike_table_name
+        self.reference_detector = reference_detector
+
+        self.wep_configuration_validation = DefaultingValidator(WEP_PIPELINE_CONFIG)
 
         # Collection of calculated list of wavefront error
         self.wavefront_errors = WavefrontCollection(self.MAX_LEN_QUEUE)
@@ -359,14 +433,182 @@ class Model:
             self.log.debug(
                 f"Processing MainCamera corner wavefront sensor on image {visit_id}."
             )
+            raise NotImplementedError(
+                "LSSTCam Corner wavefront sensor processing not implemented yet."
+            )
         else:
-            # Will have to verify images are ComCam and raise an exception if
-            # they are main camera. Main camera intra/extra data will be
-            # processed exclusively using OCPS.
-            self.log.debug(f"Processing intra/extra pair: {visit_id}/{extra_id}.")
+            # If data is intra/extra it must be ComCam at this point. Main
+            # camera intra/extra data will be processed exclusively using OCPS.
+            self.log.debug(
+                f"Processing intra/extra pair: {visit_id}/{extra_id}. Expecting ComCam data."
+            )
 
-        # TODO: (DM-28710) Initial implementation of runWEP command in MTAOS
-        raise NotImplementedError("This function is not supported yet (DM-28710).")
+            await self.process_comcam(
+                intra_id=visit_id, extra_id=extra_id, config=config
+            )
+
+    async def process_comcam(self, intra_id, extra_id, config):
+        """Process ComCam intra/extra focual images.
+
+        Parameters
+        ----------
+        intra_id : `int`
+            Id of the intra-focal image.
+        extra_id : `int`
+            Id of the extra-focal image.
+        config : `dict`
+
+        """
+        self.log.debug(f"Processing ComCam intra/extra pair: {intra_id}/{extra_id}.")
+
+        wep_configuration = self.generate_wep_configuration(
+            instrument="comcam", reference_id=intra_id, config=config
+        )
+
+        comcam_config_file = tempfile.NamedTemporaryFile(suffix=".yaml")
+
+        comcam_config_file.write(yaml.safe_dump(wep_configuration).encode())
+
+        comcam_config_file.flush()
+
+        self.log.debug(f"Pipeline configuration in {comcam_config_file.name}.")
+
+        run_pipetask_cmd = writePipetaskCmd(
+            self.data_path,
+            self.run_name,
+            self.pipeline_instrument["comcam"],
+            "refcats," + self.collections,
+            pipelineYaml=comcam_config_file.name,
+        )
+
+        run_pipetask_cmd += f' -d "exposure IN ({intra_id}, {extra_id})"'
+        run_pipetask_cmd += f" -j {self.pipeline_n_processes}"
+
+        self.log.debug(f"Running: {run_pipetask_cmd}")
+
+        # Run pipeline task in a process asynchronously
+        wep_process = await asyncio.create_subprocess_shell(
+            run_pipetask_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        stdout, stderr = await wep_process.communicate()
+
+        self.log.debug(f"Process returned: {wep_process.returncode}")
+
+        self.log.debug(stdout)
+
+        self.log.error(stderr)
+
+        self.log.debug("Data processing completed. Gathering output.")
+
+        comcam_config_file.close()
+
+        butler = dafButler.Butler(self.data_path)
+
+        # We may need to run the following in an executor so we won't block the
+        # event loop.
+
+        datasetRefs = list(
+            butler.registry.queryDatasets(
+                datasetType="postISRCCD", collections=[self.run_name]
+            )
+        )
+        for ref in datasetRefs:
+            self.log.debug(ref.dataId)
+
+        # Get output
+        data_ids = butler.registry.queryDatasets(
+            self.zernike_table_name,
+            dataId=dict(
+                instrument=self.data_instrument_name["comcam"], exposure=extra_id
+            ),
+            collections=[self.run_name],
+        )
+
+        self.log.debug(f"Processing yielded: {data_ids}")
+
+        self.wavefront_errors.append(
+            [
+                (
+                    data_id.dataId["detector"],
+                    butler.get(
+                        self.zernike_table_name,
+                        dataId=data_id.dataId,
+                        collections=[self.run_name],
+                    ),
+                )
+                for data_id in data_ids
+            ]
+        )
+
+    def generate_wep_configuration(self, instrument, reference_id, config):
+        """Generate configuration dictionary for running the WEP pipeline based
+        on a reference image id and a configuration dictionary.
+
+        Parameters
+        ----------
+        instrument: `str`
+            Name of the instrument.
+        reference_id: `int`
+            Id of the reference image.
+        config: `dict`
+            Additional configuration overrides provided by the user.
+
+        Returns
+        -------
+        wep_configuration: `dict`
+            Configuration dictionary validated against the WEP schema.
+        """
+
+        # TODO: Implement configuration when user runs select_sources
+        # beforehand.
+
+        butler = dafButler.Butler(self.data_path)
+
+        visit_info = butler.get(
+            "raw.visitInfo",
+            dataId={
+                "instrument": self.data_instrument_name[instrument],
+                "exposure": reference_id,
+                "detector": self.reference_detector,
+            },
+            collections=self.collections,
+        )
+
+        wep_configuration = config.copy()
+
+        if "tasks" not in wep_configuration:
+            wep_configuration["tasks"] = {
+                "generateDonutCatalogOnlineTask": {"config": {}}
+            }
+        elif "generateDonutCatalogOnlineTask" not in wep_configuration["tasks"]:
+            wep_configuration["tasks"]["generateDonutCatalogOnlineTask"] = {
+                "config": {}
+            }
+        elif (
+            "config" not in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]
+        ):
+            wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"] = {}
+
+        (
+            wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
+                "boresightRa"
+            ],
+            wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
+                "boresightDec"
+            ],
+            wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
+                "boresightRotAng"
+            ],
+        ) = (
+            visit_info.getBoresightRaDec().getRa().asDegrees(),
+            visit_info.getBoresightRaDec().getDec().asDegrees(),
+            visit_info.getBoresightRotAngle().asDegrees(),
+        )
+
+        return self.wep_configuration_validation.validate(wep_configuration)
 
     def reject_unreasonable_wfe(self, listOfWfErr):
         """Reject the wavefront error that is unreasonable.
@@ -414,12 +656,10 @@ class Model:
                 self.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
             )
 
-            field_idx = np.array(
-                [wfe_data.getSensorId() for wfe_data in wfe_data_container]
-            )
+            field_idx = np.array([sensor_id for sensor_id in wfe_data_container])
 
             wfe = np.array(
-                [wfe_data.getAnnularZernikePoly() for wfe_data in wfe_data_container]
+                [wfe_data_container[sensor_id] for sensor_id in wfe_data_container]
             )
 
             self._calculate_corrections(wfe=wfe, field_idx=field_idx, **kwargs)
@@ -482,7 +722,7 @@ class Model:
             Default is `None`.
         """
 
-        self.log.debug(f"Currently configured with {self.config.getCamType()!r}")
+        self.log.debug(f"Currently configured with {self.instrument} instrument.")
 
         # Get the intrinsic zernike coeffients. Will consider white light for
         # now but may use last filter set in select sources in the future.
