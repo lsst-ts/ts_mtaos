@@ -253,7 +253,14 @@ class Model:
 
         self.ofc.ofc_controller.aggregate_state(-lv_dof, self.ofc.ofc_data.dof_idx)
 
-        self.ofc.init_lv_dof()
+        self.ofc.lv_dof = self.ofc.ofc_controller.dof_state.copy()
+
+        (
+            self.m2_hexapod_correction,
+            self.cam_hexapod_correction,
+            self.m1m3_correction,
+            self.m2_correction,
+        ) = self.ofc.get_all_corrections()
 
     def reset_wfe_correction(self):
         """Reset the current calculation contains the wavefront error and

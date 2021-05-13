@@ -64,9 +64,32 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # Set the timeout > 20 seconds for the long calculation time
             remote = self._getRemote()
 
-            # User the addAberration to have something to issue
+            # Use the addAberration to have something to issue.
             wfe = np.zeros(19)
+            # Add 0.1 mm of defocus
+            wfe[0] = 0.1
+
+            # Flush event before correction is issued
+            remote.evt_m2HexapodCorrection.flush()
+            remote.evt_cameraHexapodCorrection.flush()
+            remote.evt_m1m3Correction.flush()
+            remote.evt_m2Correction.flush()
+
             await remote.cmd_addAberration.set_start(wf=wfe, timeout=STD_TIMEOUT)
+
+            # Get the expected corrections.
+            m2_hex_corrections = await remote.evt_m2HexapodCorrection.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
+            cam_hex_corrections = await remote.evt_cameraHexapodCorrection.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
+            m1m3_corrections = await remote.evt_m1m3Correction.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
+            m2_corrections = await remote.evt_m2Correction.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
 
             # Add aberration does not send the corrections, we need to send
             # run issueCorrections
@@ -83,33 +106,41 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(self.m1m3_corrections), 1)
             self.assertEqual(len(self.m2_corrections), 1)
 
-            # Check values. They should all be zeros.
-
+            # Check values. They should match what was published by the events
             for axis in "xyzuvw":
-                self.assertEqual(getattr(self.m2_hex_corrections[0], axis), 0)
-                self.assertEqual(getattr(self.cam_hex_corrections[0], axis), 0)
+                self.assertEqual(
+                    getattr(self.m2_hex_corrections[0], axis),
+                    getattr(m2_hex_corrections, axis),
+                )
+                self.assertEqual(
+                    getattr(self.cam_hex_corrections[0], axis),
+                    getattr(cam_hex_corrections, axis),
+                )
 
             # Check sync flag
             self.assertTrue(self.m2_hex_corrections[0].sync)
             self.assertTrue(self.cam_hex_corrections[0].sync)
 
             self.assertTrue(
-                np.allclose(self.m1m3_corrections[0].zForces, 0.0),
-                f"Not all M1M3 forces are close to zero {self.m1m3_corrections[0].zForces}",
+                np.allclose(self.m1m3_corrections[0].zForces, m1m3_corrections.zForces),
+                f"Commanded M1M3 z-forces {self.m1m3_corrections[0].zForces} "
+                f"different than expected {m1m3_corrections.zForces}",
             )
             self.assertTrue(
-                np.allclose(self.m2_corrections[0].axial, 0.0),
-                f"Not all M2 forces are close to zero {self.m2_corrections[0].axial}",
+                np.allclose(self.m2_corrections[0].axial, m2_corrections.zForces),
+                f"Commanded M2 axial forces {self.m2_corrections[0].axial} "
+                f"different than expected {m2_corrections.zForces}",
             )
+
+            # add random values for aberrations
+            wf = np.random.rand(19) * 0.1
+
+            await remote.cmd_addAberration.set_start(wf=wf, timeout=10.0)
 
             # Test it works if one of the forces get rejected
             self.cscM1M3.cmd_applyActiveOpticForces.callback = (
                 self.m1m3_apply_forces_fail_callbck
             )
-
-            wf = np.random.rand(19) * 0.1
-
-            await remote.cmd_addAberration.set_start(wf=wf, timeout=10.0)
 
             with self.assertRaises(salobj.AckError):
                 await remote.cmd_issueCorrection.start(timeout=STD_TIMEOUT)
@@ -124,22 +155,23 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(self.m1m3_corrections), 1)
             self.assertEqual(len(self.m2_corrections), 3)
 
-            # Check values. The last 2 corrections should have same values with
-            # different sign.
+            # Check values. When the correction fails the system should apply
+            # the last successful correction. Therefore the last correction
+            # must be equal to the first.
             for axis in "xyzuvw":
-                self.assertEqual(
-                    getattr(self.m2_hex_corrections[1], axis),
-                    -getattr(self.m2_hex_corrections[2], axis),
+                self.assertAlmostEqual(
+                    getattr(self.m2_hex_corrections[0], axis),
+                    getattr(self.m2_hex_corrections[2], axis),
                 )
-                self.assertEqual(
-                    getattr(self.cam_hex_corrections[1], axis),
-                    -getattr(self.cam_hex_corrections[2], axis),
+                self.assertAlmostEqual(
+                    getattr(self.cam_hex_corrections[0], axis),
+                    getattr(self.cam_hex_corrections[2], axis),
                 )
 
             self.assertTrue(
-                np.all(
-                    np.array(self.m2_corrections[1].axial)
-                    == -np.array(self.m2_corrections[2].axial)
+                np.allclose(
+                    np.array(self.m2_corrections[0].axial),
+                    np.array(self.m2_corrections[2].axial),
                 )
             )
 
