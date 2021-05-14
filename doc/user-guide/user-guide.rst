@@ -175,6 +175,25 @@ A user can send the corrections by sending a ``issueCorrection`` command, and ig
 
 	The MTAOS uses Zernike Noll coefficients.
 
+Processing data with runWEP command
+-----------------------------------
+
+The MTAOS CSC can be instructed to process a set of data to generate wavefront errors to correct for optical aberrations.
+This is done using the command ``runWEP``.
+
+This single command can work for processing all the different types of data the MTAOS can handle this includes;
+
+- ComCam intra/extra focal images.
+- LSSTCam full array mode.
+- LSSTCam Corner wavefront sensors.
+
+To process an intra/extra pair of ComCam images the user would do;
+
+.. code:: python
+
+  await mtaosCsc.cmd_runWEP.set_start(visit_id=4021123106002, extra_id=4021123106001)
+
+
 Further reading
 ===============
 
