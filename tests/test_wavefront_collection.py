@@ -22,8 +22,6 @@
 import numpy as np
 import unittest
 
-# from lsst.ts.wep.ctrlIntf.SensorWavefrontData import SensorWavefrontData
-
 from lsst.ts.MTAOS import WavefrontCollection
 
 

@@ -85,7 +85,7 @@ class Model:
             Default is "mtaos_wep".
         collections: `str`, optional
             String with the data collections to add to the pipeline task.
-            Default is "refcats,LSSTComCam/raw/all,LSSTComCam/calib".
+            Default is "LSSTComCam/raw/all,LSSTComCam/calib".
         pipeline_instrument: `dict` or `None`, optional
             A dictionary that maps the name of the instrument to the name used
             in the pipeline task. If None, use default dictionary mapping.
@@ -95,20 +95,43 @@ class Model:
             A dictionary that maps the name of the instrument to the name used
             by the pipeline task to store the data products. If None, use
             default dictionary mapping.
+        reference_detector: `int`, optional
+            Which detector to use as a referece to construct the WCS.
         zernike_table_name: `str`, optional
             Name of the table in the butler with zernike coeffients.
-            Default is "zernikeEstimate".
+            Default is "zernikeEstimateRaw".
 
         Attributes
         ----------
-        donut_cat_config: `dict`
-            Donut catalog configuration.
-        donut_cat: `Struct`
-            Donut catalog table.
         log : `Logger`
             Log facility.
-        config : `lsst.ts.MTAOS.Config`
-            Configuration.
+        instrument: `str`
+            Name of the instrument.
+        data_path: `str`
+            Path to the data butler.
+        run_name: `str`, optional
+            Which name to use when running the pipeline task. This defines
+            the location where the data is written in the butler.
+            Default is "mtaos_wep".
+        collections: `str`, optional
+            String with the data collections to add to the pipeline task.
+            Default is "LSSTComCam/raw/all,LSSTComCam/calib".
+        pipeline_instrument: `dict` or `None`, optional
+            A dictionary that maps the name of the instrument to the name used
+            in the pipeline task. If None, use default dictionary mapping.
+        pipeline_n_processes: `int`, optional
+            Number of processes to use when running pipeline. Default is 9.
+        data_instrument_name: `dict` or `None`, optional
+            A dictionary that maps the name of the instrument to the name used
+            by the pipeline task to store the data products. If None, use
+            default dictionary mapping.
+        reference_detector: `int`, optional
+            Which detector to use as a referece to construct the WCS.
+        zernike_table_name: `str`, optional
+            Name of the table in the butler with zernike coeffients.
+            Default is "zernikeEstimateRaw".
+        wep_configuration_validation: `DefaultingValidator`
+            Provide schema validation for wavefront estimation pipeline task.
         wavefront_errors : `WavefrontCollection`
             Object to manage list of wavefront errors.
         rejected_wavefront_errors : `WavefrontCollection`
@@ -425,8 +448,8 @@ class Model:
         Raises
         ------
         NotImplementedError
-            This function is not supported yet (DM-28710).
-
+            If executed to process LSST corner wavefront sensors data, e.g.
+            `extra_id` is not provided.
         """
 
         if extra_id is None:
@@ -457,7 +480,6 @@ class Model:
         extra_id : `int`
             Id of the extra-focal image.
         config : `dict`
-
         """
         self.log.debug(f"Processing ComCam intra/extra pair: {intra_id}/{extra_id}.")
 
@@ -496,11 +518,8 @@ class Model:
         stdout, stderr = await wep_process.communicate()
 
         self.log.debug(f"Process returned: {wep_process.returncode}")
-
         self.log.debug(stdout)
-
         self.log.error(stderr)
-
         self.log.debug("Data processing completed. Gathering output.")
 
         comcam_config_file.close()
@@ -522,7 +541,7 @@ class Model:
         data_ids = butler.registry.queryDatasets(
             self.zernike_table_name,
             dataId=dict(
-                instrument=self.data_instrument_name["comcam"], exposure=extra_id
+                instrument=self.data_instrument_name["comcam"], exposure=intra_id
             ),
             collections=[self.run_name],
         )
@@ -549,16 +568,16 @@ class Model:
 
         Parameters
         ----------
-        instrument: `str`
+        instrument : `str`
             Name of the instrument.
-        reference_id: `int`
+        reference_id : `int`
             Id of the reference image.
-        config: `dict`
+        config : `dict`
             Additional configuration overrides provided by the user.
 
         Returns
         -------
-        wep_configuration: `dict`
+        wep_configuration : `dict`
             Configuration dictionary validated against the WEP schema.
         """
 

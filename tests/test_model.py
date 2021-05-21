@@ -33,7 +33,8 @@ from lsst.ts import MTAOS
 
 from lsst.daf import butler as dafButler
 
-from lsst.ts.wep.Utility import getModulePath, writeCleanUpRepoCmd, runProgram
+from lsst.ts.wep.Utility import writeCleanUpRepoCmd, runProgram
+from lsst.ts.wep.Utility import getModulePath as getModulePathWep
 
 
 class TestModel(unittest.TestCase):
@@ -305,7 +306,9 @@ class TestAsyncModel(unittest.IsolatedAsyncioTestCase):
         )
         ofc_data.dof_state0 = dof_state0
 
-        data_path = os.path.join(getModulePath(), "tests", "testData", "gen3TestRepo")
+        data_path = os.path.join(
+            getModulePathWep(), "tests", "testData", "gen3TestRepo"
+        )
         run_name = "run1"
 
         # Check that run doesn't already exist due to previous improper cleanup

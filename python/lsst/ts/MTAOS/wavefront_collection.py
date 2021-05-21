@@ -43,6 +43,7 @@ class WavefrontCollection(object):
         # error. The published data will be in this collection.
         # This is a list of tuples with (sensor_id, np.ndarray)
         self._collectionDataTaken = dict()
+        # Number of data taken from collectionData into collectionDataTaken
         self._numDataTaken = 0
 
     def getNumOfData(self):
@@ -116,7 +117,7 @@ class WavefrontCollection(object):
 
         Returns
         -------
-        wfe_avg: `dict`
+        wfe_avg : `dict`
             Dictionary with average wavefront errors for each sensor.
 
         Raises
@@ -140,6 +141,7 @@ class WavefrontCollection(object):
         )
 
         self._collectionDataTaken = dict()
+        self._numDataTaken = 0
 
         return wfe_avg
 

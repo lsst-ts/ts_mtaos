@@ -60,7 +60,7 @@ properties:
   collections:
     description: Name of the collections where the data is written in the butler.
     type: string
-    default: refcats,LSSTComCam/raw/all,LSSTComCam/calib
+    default: refcats, LSSTComCam/raw/all, LSSTComCam/calib
 
   pipeline_instrument:
     description: >-
@@ -85,9 +85,9 @@ properties:
     default: 9
 
   zernike_table_name:
-    description: Name of the table in the butler with zernike coeffients.
+    description: Name of the table in the butler with zernike coefficients.
     type: string
-    default: zernikeEstimate
+    default: zernikeEstimateRaw
 
   reference_detector:
     description: Which detector to use as a reference for determining the boresight information.
@@ -366,6 +366,5 @@ properties:
                           initialCutoutPadding:
                             type: integer
                             default: 40
-
 """
 )
