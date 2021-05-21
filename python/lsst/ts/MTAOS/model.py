@@ -799,7 +799,42 @@ class Model:
                 elif hasattr(self.ofc.ofc_data, key):
                     self.log.debug(f"Overriding ofc_data parameter {key}.")
                     original_ofc_data_values[key] = getattr(self.ofc.ofc_data, key)
-                    setattr(self.ofc.ofc_data, key, kwargs[key])
+
+                    # Check if there is a type annotation and try to cast the
+                    # values as such.
+                    if (key in self.ofc.ofc_data.__annotations__) and (
+                        self.ofc.ofc_data.__annotations__[key] != np.ndarray
+                    ):
+                        setattr(
+                            self.ofc.ofc_data,
+                            key,
+                            self.ofc.ofc_data.__annotations__[key](kwargs[key]),
+                        )
+
+                    elif (key in self.ofc.ofc_data.__annotations__) and (
+                        self.ofc.ofc_data.__annotations__[key] == np.ndarray
+                    ):
+
+                        setattr(
+                            self.ofc.ofc_data,
+                            key,
+                            np.array(kwargs[key]),
+                        )
+
+                    elif key == "comp_dof_idx":
+                        # Handle special case comp_dof_idx.
+                        if not isinstance(kwargs[key], dict):
+                            raise RuntimeError(
+                                f"comp_dof_idx must be a dictionary. Got {type(kwargs[key])}."
+                            )
+
+                        new_comp_dof_idx = kwargs[key].copy()
+
+                        for comp_dof_idx_key in new_comp_dof_idx:
+                            new_comp_dof_idx[comp_dof_idx_key] = np.array(
+                                new_comp_dof_idx[comp_dof_idx_key], dtype=bool
+                            )
+
         except Exception:
             self.log.error(
                 "Error setting value in ofc_data. Restoring original values."
