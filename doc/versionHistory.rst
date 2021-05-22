@@ -2,6 +2,18 @@
 Version History
 ===============
 
+v0.7.0
+------
+
+* Implement ``runWEP`` command.
+  The current implementation is designed to work for ComCam intra/extra data.
+  It is also limited in a way that we cannot provide the target ahead of time for the pipeline task to select the sources.
+* Add user-guide documentation on using ``runWEP``.
+* Update UML class diagram.
+* Enable pytest-black in unit tests.
+* Fix bugs reported by Bo when trying to set ofc values in addAberration.
+* Update model unit tests for fixed intra/extra definition.
+
 v0.6.0
 ------
 

@@ -18,7 +18,7 @@
 #
 # You should have received a copy of the GNU General Public License
 
-__all__ = ["CONFIG_SCHEMA", "TELESCOPE_DOF_SCHEMA"]
+__all__ = ["CONFIG_SCHEMA", "TELESCOPE_DOF_SCHEMA", "WEP_PIPELINE_CONFIG"]
 
 import yaml
 
@@ -43,12 +43,61 @@ properties:
   instrument:
     description: Type of instrument for optical feedback control (OFC) to use
     type: string
-    enum: [lsst, comcam, sh, cmos]
     default: comcam
+
+  data_path:
+    description: Path to the data butler.
+    type: string
+    default: /project/shared/
+
+  run_name:
+    description: >-
+      Which name to use when running the pipeline task. This defines
+      the location where the data is written in the butler.
+    type: string
+    default: mtaos_wep
+
+  collections:
+    description: Name of the collections where the data is written in the butler.
+    type: string
+    default: refcats, LSSTComCam/raw/all, LSSTComCam/calib
+
+  pipeline_instrument:
+    description: >-
+      A dictionary that maps the name of the instrument to the name used in
+      the pipeline task.
+    anyOf:
+      - type: object
+        properties:
+          comcam:
+            type: string
+          lsstCam:
+            type: string
+          lsstFamCam:
+            type: string
+        additionalProperties: false
+      - type: "null"
+    default: null
+
+  pipeline_n_processes:
+    description: Number of processes to use when running pipeline.
+    type: integer
+    default: 9
+
+  zernike_table_name:
+    description: Name of the table in the butler with zernike coefficients.
+    type: string
+    default: zernikeEstimateRaw
+
+  reference_detector:
+    description: Which detector to use as a reference for determining the boresight information.
+    type: integer
+    default: 0
 
 required:
   - camera
   - instrument
+  - data_path
 
 additionalProperties: false
 """
@@ -198,5 +247,124 @@ required:
   - M2Bending
 
 additionalProperties: false
+"""
+)
+
+WEP_PIPELINE_CONFIG = yaml.safe_load(
+    """
+$schema: http://json-schema.org/draft-07/schema#
+$id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
+# title must end with one or more spaces followed by the schema version, which
+# must begin with "v"
+title: Wavefront estimation pipeline configuration schema.
+type: object
+
+properties:
+
+  description:
+    type: string
+    description: Description of this pipeline configuration.
+    default: wep basic processing test pipeline
+
+  instrument:
+    type: string
+    description: >-
+      Specify the corresponding instrument for the data we will be using.
+    default: lsst.obs.lsst.LsstComCam
+
+  tasks:
+        type: object
+        default:
+          isr:
+            class: lsst.ip.isr.isrTask.IsrTask
+        properties:
+            isr:
+              type: object
+              properties:
+                class:
+                    type: string
+                    default: lsst.ip.isr.isrTask.IsrTask
+                config:
+                    type: object
+                    properties:
+                      connections.outputExposure:
+                        type: string
+                        default: postISRCCD
+                      doBias:
+                        type: boolean
+                        default: False
+                      doVariance:
+                        type: boolean
+                        default: False
+                      doLinearize:
+                        type: boolean
+                        default: False
+                      doCrosstalk:
+                        type: boolean
+                        default: False
+                      doDefect:
+                        type: boolean
+                        default: False
+                      doNanMasking:
+                        type: boolean
+                        default: False
+                      doInterpolate:
+                        type: boolean
+                        default: False
+                      doBrighterFatter:
+                        type: boolean
+                        default: False
+                      doDark:
+                        type: boolean
+                        default: False
+                      doFlat:
+                        type: boolean
+                        default: False
+                      doApplyGains:
+                        type: boolean
+                        default: True
+                      doFringe:
+                        type: boolean
+                        default: False
+                      doOverscan:
+                        type: boolean
+                        default: True
+            generateDonutCatalogOnlineTask:
+                type: object
+                properties:
+                    class:
+                        type: string
+                        default: >-
+                          lsst.ts.wep.task.GenerateDonutCatalogOnlineTask.GenerateDonutCatalogOnlineTask
+                    config:
+                        required:
+                            - boresightRa
+                            - boresightDec
+                            - boresightRotAng
+                        properties:
+                            boresightRa:
+                                type: number
+                            boresightDec:
+                                type: number
+                            boresightRotAng:
+                                type: number
+            estimateZernikesFamTask:
+                type: object
+                properties:
+                    class:
+                        type: string
+                        default: lsst.ts.wep.task.EstimateZernikesFamTask.EstimateZernikesFamTask
+                    config:
+                        type: object
+                        properties:
+                          donutTemplateSize:
+                            type: integer
+                            default: 160
+                          donutStampSize:
+                            type: integer
+                            default: 160
+                          initialCutoutPadding:
+                            type: integer
+                            default: 40
 """
 )
