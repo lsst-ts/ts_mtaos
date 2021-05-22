@@ -1,6 +1,5 @@
 @startuml
-Model *-- Config
-Model "1" *-- "2" CollOfListOfWfErr
-MtaosCsc *-- Model
-MtaosCsc ..> Config
+Model "1" *-- "2" WavefrontCollection
+MTAOS *-- Model
+MTAOS ..> Config
 @enduml

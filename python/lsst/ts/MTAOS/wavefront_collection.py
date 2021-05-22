@@ -31,24 +31,27 @@ class WavefrontCollection(object):
 
         Parameters
         ----------
-        maxLeng : int
+        maxLeng : `int`
             Maximum length of collection.
         """
 
         # Collection of list of wavefront error data
         self._collectionData = deque(maxlen=int(maxLeng))
 
-        # Collection of taken data of list of wavefront error data
+        # Collection of taken data of list of wavefront error data.
         # This is designed for the MtaosCsc to publish the event of wavefront
         # error. The published data will be in this collection.
-        self._collectionDataTaken = []
+        # This is a list of tuples with (sensor_id, np.ndarray)
+        self._collectionDataTaken = dict()
+        # Number of data taken from collectionData into collectionDataTaken
+        self._numDataTaken = 0
 
     def getNumOfData(self):
         """Get the number of data.
 
         Returns
         -------
-        int
+        `int`
             Number of data.
         """
 
@@ -59,19 +62,21 @@ class WavefrontCollection(object):
 
         Returns
         -------
-        int
+        `int`
             Number of taken data.
         """
 
-        return len(self._collectionDataTaken)
+        return self._numDataTaken
 
     def append(self, listOfWfErr):
         """Add the list of wavefront error data to collection.
 
         Parameters
         ----------
-        listOfWfErr : list[lsst.ts.wep.ctrlIntf.SensorWavefrontData]
-            List of wavefront error data.
+        listOfWfErr : `list` of `tuple` with [`int`, `np.ndarray`]
+            List of wavefront error data. Each element contains tuple which the
+            first elements specify the sensor id and the second is an array
+            with the zernike coeffients.
         """
 
         self._collectionData.append(listOfWfErr)
@@ -81,13 +86,20 @@ class WavefrontCollection(object):
 
         Returns
         -------
-        listOfWfErr : list[lsst.ts.wep.ctrlIntf.SensorWavefrontData]
+        listOfWfErr : `tuple` with [`int`, `np.ndarray`]
             List of wavefront error data.
         """
 
         try:
             data = self._collectionData.popleft()
-            self._collectionDataTaken.append(data)
+            for sensor_id, zk in data:
+                if sensor_id in self._collectionDataTaken:
+                    self._collectionDataTaken[sensor_id] = np.vstack(
+                        (self._collectionDataTaken[sensor_id], zk)
+                    )
+                else:
+                    self._collectionDataTaken[sensor_id] = np.array(zk, ndmin=2)
+            self._numDataTaken += 1
         except IndexError:
             data = []
 
@@ -97,15 +109,16 @@ class WavefrontCollection(object):
         """Clear the collection."""
 
         self._collectionData.clear()
-        self._collectionDataTaken = []
+        self._collectionDataTaken = dict()
+        self._numDataTaken = 0
 
     def getListOfWavefrontErrorAvgInTakenData(self):
         """Get the list of average wavefront error in taken data.
 
         Returns
         -------
-        list[lsst.ts.wep.ctrlIntf.SensorWavefrontData]
-            List of average wavefront error data.
+        wfe_avg : `dict`
+            Dictionary with average wavefront errors for each sensor.
 
         Raises
         ------
@@ -114,71 +127,23 @@ class WavefrontCollection(object):
         """
 
         # Check there is the wavefront error data in collection or not
-        numOfElements = len(self._collectionDataTaken)
-        if numOfElements == 0:
+        if len(self._collectionDataTaken) == 0:
             raise RuntimeError("No data in the collection of taken data.")
 
-        # Do the average of wavefont error
-        listOfWfErrAvg = self._collectionDataTaken.pop()
-
-        for wfErr in listOfWfErrAvg:
-            zk = wfErr.getAnnularZernikePoly()
-            wfErr.setAnnularZernikePoly(zk / numOfElements)
-
-        idxWfErrMiss = []
-        while self._collectionDataTaken:
-
-            listOfWfErrNext = self._collectionDataTaken.pop()
-            for idx, wfErr in enumerate(listOfWfErrAvg):
-                sensorId = wfErr.getSensorId()
-                wfErrNext = self._getSensorWavefrontDataInList(
-                    listOfWfErrNext, sensorId
+        wfe_avg = dict(
+            [
+                (
+                    sensor_id,
+                    np.mean(np.array(self._collectionDataTaken[sensor_id]), axis=0),
                 )
+                for sensor_id in self._collectionDataTaken
+            ]
+        )
 
-                if wfErrNext is not None:
-                    zk = wfErr.getAnnularZernikePoly()
-                    zkNext = wfErrNext.getAnnularZernikePoly()
-                    wfErr.setAnnularZernikePoly(zk + zkNext / numOfElements)
-                else:
-                    # Collect the index of wavefront error data if there is the
-                    # data missing
-                    idxWfErrMiss.append(idx)
+        self._collectionDataTaken = dict()
+        self._numDataTaken = 0
 
-        # Get the unique list of index of wavefront error data that has the
-        # missing data.
-        idxWfErrMissUnique = np.unique(np.array(idxWfErrMiss)).tolist()
-
-        # Only return the value that is not in the above list
-        return [
-            listOfWfErrAvg[idx]
-            for idx in range(len(listOfWfErrAvg))
-            if idx not in idxWfErrMissUnique
-        ]
-
-    def _getSensorWavefrontDataInList(self, listOfWfErr, sensorId):
-        """Get the sensor wavefront data in the list.
-
-        Parameters
-        ----------
-        listOfWfErr : list[lsst.ts.wep.ctrlIntf.SensorWavefrontData]
-            List of wavefront error data.
-        sensorId : int
-            Sensor Id.
-
-        Returns
-        -------
-        lsst.ts.wep.ctrlIntf.SensorWavefrontData
-            Sensor wavefront data. Return None if not find.
-        """
-
-        for wfErr in listOfWfErr:
-            if wfErr.getSensorId() == sensorId:
-                return wfErr
-            else:
-                continue
-
-        # Return None if not find
-        return None
+        return wfe_avg
 
 
 if __name__ == "__main__":

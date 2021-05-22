@@ -265,6 +265,64 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 remote.evt_m2Correction, flush=False, timeout=SHORT_TIMEOUT
             )
 
+            # Change alpha
+            config = dict(alpha=(self.csc.model.ofc.ofc_data.alpha / 2).tolist())
+
+            await remote.cmd_addAberration.set_start(
+                wf=np.zeros(19), config=yaml.safe_dump(config), timeout=STD_TIMEOUT
+            )
+
+            await self.assert_next_sample(
+                remote.evt_degreeOfFreedom,
+                flush=False,
+                timeout=SHORT_TIMEOUT,
+            )
+
+            await self.assert_next_sample(
+                remote.evt_m2HexapodCorrection, flush=False, timeout=SHORT_TIMEOUT
+            )
+            await self.assert_next_sample(
+                remote.evt_cameraHexapodCorrection, flush=False, timeout=SHORT_TIMEOUT
+            )
+            await self.assert_next_sample(
+                remote.evt_m1m3Correction, flush=False, timeout=SHORT_TIMEOUT
+            )
+            await self.assert_next_sample(
+                remote.evt_m2Correction, flush=False, timeout=SHORT_TIMEOUT
+            )
+
+            # Change alpha
+            new_comp_dof_idx = dict(
+                m2HexPos=np.zeros(5, dtype=bool).tolist(),
+                camHexPos=np.ones(5, dtype=bool).tolist(),
+                M1M3Bend=np.zeros(20, dtype=bool).tolist(),
+                M2Bend=np.zeros(20, dtype=bool).tolist(),
+            )
+            config = dict(comp_dof_idx=new_comp_dof_idx)
+
+            await remote.cmd_addAberration.set_start(
+                wf=np.zeros(19), config=yaml.safe_dump(config), timeout=STD_TIMEOUT
+            )
+
+            await self.assert_next_sample(
+                remote.evt_degreeOfFreedom,
+                flush=False,
+                timeout=SHORT_TIMEOUT,
+            )
+
+            await self.assert_next_sample(
+                remote.evt_m2HexapodCorrection, flush=False, timeout=SHORT_TIMEOUT
+            )
+            await self.assert_next_sample(
+                remote.evt_cameraHexapodCorrection, flush=False, timeout=SHORT_TIMEOUT
+            )
+            await self.assert_next_sample(
+                remote.evt_m1m3Correction, flush=False, timeout=SHORT_TIMEOUT
+            )
+            await self.assert_next_sample(
+                remote.evt_m2Correction, flush=False, timeout=SHORT_TIMEOUT
+            )
+
     @unittest.skip("Skip until commands implementation.")
     async def test_runWEP(self):
         async with self.make_csc(
