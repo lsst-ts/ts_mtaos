@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.7.1
+------
+
+* Fix unit tests for reversed intra/extra image selection.
+
 v0.7.0
 ------
 
