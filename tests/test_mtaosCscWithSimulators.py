@@ -19,6 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import yaml
 import asyncio
 import unittest
 
@@ -67,7 +68,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             # Use the addAberration to have something to issue.
             wfe = np.zeros(19)
-            # Add 0.1 mm of defocus
+            # Add 0.1 um of defocus
             wfe[0] = 0.1
 
             # Flush event before correction is issued
@@ -175,6 +176,55 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     np.array(self.m2_corrections[2].axial),
                 )
             )
+
+    async def test_addAberration_issueCorrection_xref_x0(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
+        ):
+            await self._simulateCSCs()
+
+            await self._startCsc()
+
+            # Set the timeout > 20 seconds for the long calculation time
+            remote = self._getRemote()
+
+            # Flush event before correction is issued
+            remote.evt_m2HexapodCorrection.flush()
+            remote.evt_cameraHexapodCorrection.flush()
+            remote.evt_m1m3Correction.flush()
+            remote.evt_m2Correction.flush()
+
+            # Use the addAberration to have something to issue.
+            wfe = np.zeros(19)
+
+            # Add 1um of z7
+            wfe[7 - 4] = 1
+
+            # set control algorithm
+            config = dict(xref="x0")
+
+            # Calculate the DOF and issue the correction for first time
+            await remote.cmd_addAberration.set_start(
+                wf=wfe, config=yaml.safe_dump(config), timeout=STD_TIMEOUT
+            )
+            await remote.cmd_issueCorrection.start(timeout=STD_TIMEOUT)
+
+            dof_first = await remote.evt_degreeOfFreedom.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
+
+            # Calculate the DOF and issue the correction for second time
+            await remote.cmd_addAberration.set_start(
+                wf=wfe, config=yaml.safe_dump(config), timeout=STD_TIMEOUT
+            )
+            await remote.cmd_issueCorrection.start(timeout=STD_TIMEOUT)
+
+            dof_second = await remote.evt_degreeOfFreedom.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
+
+            # The two times calculation of visit DOF should be eqaul under "x0"
+            np.testing.assert_array_equal(dof_first.visitDoF, dof_second.visitDoF)
 
     async def asyncTearDown(self):
         await self._cancelCSCs()
