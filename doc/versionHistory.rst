@@ -2,6 +2,12 @@
 Version History
 ===============
 
+v0.7.2
+------
+
+* Support the setting of **xref**.
+* Add LSSTCam/calib to collections path in test Gen3 pipelines and fix the syntax of butler ``get()``.
+
 v0.7.1
 ------
 
