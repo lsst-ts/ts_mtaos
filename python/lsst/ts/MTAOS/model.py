@@ -593,7 +593,7 @@ class Model:
                 "exposure": reference_id,
                 "detector": self.reference_detector,
             },
-            collections=self.collections,
+            collections=self.collections.split(","),
         )
 
         wep_configuration = config.copy()
@@ -834,6 +834,9 @@ class Model:
                             new_comp_dof_idx[comp_dof_idx_key] = np.array(
                                 new_comp_dof_idx[comp_dof_idx_key], dtype=bool
                             )
+
+                    elif key == "xref":
+                        self.ofc.ofc_data.xref = kwargs[key]
 
         except Exception:
             self.log.error(
