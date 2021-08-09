@@ -93,6 +93,11 @@ properties:
     description: Which detector to use as a reference for determining the boresight information.
     type: integer
     default: 0
+  
+  visit_id_offset:
+    description: Offset applied to the visit ID.
+    type: integer
+    default: 0
 
 required:
   - camera
