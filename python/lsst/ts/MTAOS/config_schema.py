@@ -93,11 +93,14 @@ properties:
     description: Which detector to use as a reference for determining the boresight information.
     type: integer
     default: 0
-  
+
   visit_id_offset:
-    description: Offset applied to the visit ID.
+    description: >-
+      Offset applied to the visit ID. TODO (DM-31365): Remove workaround to
+      visitId being of type long in MTAOS runWEP command.
     type: integer
     default: 0
+    minimum: 0
 
 required:
   - camera
