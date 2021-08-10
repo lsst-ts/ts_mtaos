@@ -83,6 +83,9 @@ class MTAOS(salobj.ConfigurableCsc):
             A logger.
         state0DofValidator : `salobj.DefaultingValidator`
             Validator for the telescopedof configuration file.
+        visit_id_offset: `int`
+            Offset applied to visit id. TODO (DM-31365): Remove workaround to 
+            visitId being of type long in MTAOS runWEP command.
         remotes : `dict`
             A dictionary with `salobj.Remote` for each component the MTAOS
             communicates with.
@@ -134,6 +137,15 @@ class MTAOS(salobj.ConfigurableCsc):
             schema=TELESCOPE_DOF_SCHEMA
         )
 
+        # TODO (DM-31365): Remove workaround to visitId being of type long in
+        # MTAOS runWEP command.
+        #
+        # Offset applied to the visit ids when getting images from butler. This
+        # is mainly to work around an issue with xml < 9.2 where the visit id
+        # is defined as a a long which allows values from -2147483648 to
+        # 2147483647
+        self.visit_id_offset = 0
+
         # Dictionary with remotes for M2 Hexapod, Camera Hexapod, M1M3 and M2
         # components. Note the use of include=[] in all remotes. This prevents
         # the remote from subscribing to events and telemetry from those
@@ -180,6 +192,10 @@ class MTAOS(salobj.ConfigurableCsc):
 
         self._logExecFunc()
         self.log.debug("MTAOS configuration started.")
+
+        # TODO (DM-31365): Remove workaround to visitId being of type long in
+        # MTAOS runWEP command.
+        self.visit_id_offset = config.visit_id_offset
 
         config_obj = Config(config)
         state0_dof_file = config_obj.getState0DofFile()
@@ -361,8 +377,11 @@ class MTAOS(salobj.ConfigurableCsc):
         if data.useOCPS:
             raise NotImplementedError("Use OCPS not implemented.")
         else:
+            # TODO (DM-31365): Remove workaround to visitId being of type long in
+            # MTAOS runWEP command.
             await self.model.pre_process(
-                visit_id=data.visitId, config=yaml.safe_load(data.config)
+                visit_id=self.visit_id_offset + data.visitId,
+                config=yaml.safe_load(data.config),
             )
 
     async def do_runWEP(self, data):
@@ -386,12 +405,20 @@ class MTAOS(salobj.ConfigurableCsc):
         if data.useOCPS:
             raise NotImplementedError("Use OCPS not implemented.")
         else:
+            # TODO (DM-31365): Remove workaround to visitId being of type long in
+            # MTAOS runWEP command.
             await self.model.run_wep(
-                visit_id=data.visitId,
-                extra_id=data.extraId if data.extraId > 0 else None,
-                config=yaml.safe_dump(data.config),
+                visit_id=self.visit_id_offset + data.visitId,
+                extra_id=self.visit_id_offset + data.extraId
+                if data.extraId > 0
+                else None,
+                config=yaml.safe_dump(data.config) if len(data.config) > 0 else {},
                 log_time=self.execution_times,
             )
+
+            self.pubEvent_wavefrontError()
+            self.pubEvent_rejectedWavefrontError()
+
             while len(self.execution_times["RUN_WEP"]) > self.MAX_TIME_SAMPLE:
                 self.execution_times["RUN_WEP"].pop(0)
 
