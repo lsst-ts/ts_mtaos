@@ -95,8 +95,8 @@ properties:
     default: 0
 
   visit_id_offset:
-    description: >- 
-      Offset applied to the visit ID. TODO (DM-31365): Remove workaround to 
+    description: >-
+      Offset applied to the visit ID. TODO (DM-31365): Remove workaround to
       visitId being of type long in MTAOS runWEP command.
     type: integer
     default: 0

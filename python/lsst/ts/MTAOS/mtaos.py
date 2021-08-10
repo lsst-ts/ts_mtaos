@@ -377,8 +377,8 @@ class MTAOS(salobj.ConfigurableCsc):
         if data.useOCPS:
             raise NotImplementedError("Use OCPS not implemented.")
         else:
-            # TODO (DM-31365): Remove workaround to visitId being of type long in
-            # MTAOS runWEP command.
+            # TODO (DM-31365): Remove workaround to visitId being of type long
+            # in MTAOS runWEP command.
             await self.model.pre_process(
                 visit_id=self.visit_id_offset + data.visitId,
                 config=yaml.safe_load(data.config),
@@ -405,8 +405,8 @@ class MTAOS(salobj.ConfigurableCsc):
         if data.useOCPS:
             raise NotImplementedError("Use OCPS not implemented.")
         else:
-            # TODO (DM-31365): Remove workaround to visitId being of type long in
-            # MTAOS runWEP command.
+            # TODO (DM-31365): Remove workaround to visitId being of type long
+            # in MTAOS runWEP command.
             await self.model.run_wep(
                 visit_id=self.visit_id_offset + data.visitId,
                 extra_id=self.visit_id_offset + data.extraId
