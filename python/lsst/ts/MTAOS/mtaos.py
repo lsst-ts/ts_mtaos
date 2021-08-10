@@ -84,7 +84,7 @@ class MTAOS(salobj.ConfigurableCsc):
         state0DofValidator : `salobj.DefaultingValidator`
             Validator for the telescopedof configuration file.
         visit_id_offset: `int`
-            Offset applied to visit id. TODO (DM-31365): Remove workaround to 
+            Offset applied to visit id. TODO (DM-31365): Remove workaround to
             visitId being of type long in MTAOS runWEP command.
         remotes : `dict`
             A dictionary with `salobj.Remote` for each component the MTAOS
