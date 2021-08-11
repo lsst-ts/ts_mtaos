@@ -213,17 +213,19 @@ class Model:
         # M2 actuator correction
         self.m2_correction = None
 
+        self._user_gain = None
+
         self.reset_wfe_correction()
 
     @property
     def user_gain(self):
         """Return the user gain."""
-        return self.ofc.ofc_controller.gain
+        return self._user_gain
 
     @user_gain.setter
     def user_gain(self, value):
         """Set user gain."""
-        self.ofc.ofc_controller.gain = value
+        self._user_gain = value if 0.0 <= value <= 1.0 else -1
 
     def get_fwhm_sensors(self):
         """Get list of fwhm sensor ids.
@@ -662,15 +664,6 @@ class Model:
             No FWHM sensor data to use.
         """
         try:
-            if self.user_gain == -1:
-                if len(self.fwhm_data) == 0:
-                    raise RuntimeError("No FWHM sensor data to use.")
-                else:
-                    self.ofc.setGainByPSSN()
-                    self.ofc.setFWHMSensorDataOfCam(self.fwhm_data)
-            else:
-                self.ofc.setGainByUser(self.user_gain)
-
             field_idx, wfe = self.get_wavefront_errors()
 
             self._calculate_corrections(wfe=wfe, field_idx=field_idx, **kwargs)
@@ -732,18 +725,9 @@ class Model:
                 filter_name: `string`
                     Name of the filter used for the observations.
         """
-        gain = kwargs.get("gain", -1.0)
+        gain = kwargs.get("gain", self.user_gain)
         rot = kwargs.get("rot", 0.0)
         filter_name = kwargs.get("filter_name", "")
-
-        if gain < 0.0:
-            try:
-                self.ofc.set_pssn_gain()
-            except RuntimeError:
-                self.log.debug(
-                    f"Error setting pssn gain. Using default: {self.ofc.default_gain}."
-                )
-                gain = self.ofc.default_gain
 
         (
             self.m2_hexapod_correction,
