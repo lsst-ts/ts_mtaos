@@ -671,21 +671,47 @@ class Model:
             else:
                 self.ofc.setGainByUser(self.user_gain)
 
-            wfe_data_container = (
-                self.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
-            )
-
-            field_idx = np.array([sensor_id for sensor_id in wfe_data_container])
-
-            wfe = np.array(
-                [wfe_data_container[sensor_id] for sensor_id in wfe_data_container]
-            )
+            field_idx, wfe = self.get_wavefront_errors()
 
             self._calculate_corrections(wfe=wfe, field_idx=field_idx, **kwargs)
 
         finally:
             # Clear the queue
             self._clear_wfe_collections()
+
+    def get_wavefront_errors(self):
+        """Get wavefront errors.
+
+        Returns
+        -------
+        field_idx: `np.ndarray [int]`
+            Array with field indexes.
+        wfe: `np.ndarray`
+            Array of arrays with the zernike coeficients for each field index.
+        """
+
+        wfe_data_container = (
+            self.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
+        )
+
+        return self.get_field_idx_wfe_from_data_container(wfe_data_container)
+
+    def get_rejected_wavefront_errors(self):
+        """Get rejected wavefront errors.
+
+        Returns
+        -------
+        field_idx: `np.ndarray [int]`
+            Array with field indexes.
+        wfe: `np.ndarray`
+            Array of arrays with the zernike coeficients for each field index.
+        """
+
+        wfe_data_container = (
+            self.rejected_wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
+        )
+
+        return self.get_field_idx_wfe_from_data_container(wfe_data_container)
 
     def _calculate_corrections(self, wfe, field_idx, **kwargs):
         """Compute corrections from input wavefront errors.
@@ -847,3 +873,28 @@ class Model:
             raise
         else:
             return original_ofc_data_values
+
+    @staticmethod
+    def get_field_idx_wfe_from_data_container(data_container):
+        """Parse data container generated from calling
+        `WavefrontCollection.getListOfWavefrontErrorAvgInTakenData` into an
+        array with field indices and an array of wavefront errors.
+
+        Parameters
+        ----------
+        data_container: `dict`
+            Dictionary returned by
+            `WavefrontCollection.getListOfWavefrontErrorAvgInTakenData()`.
+
+        Returns
+        -------
+        field_idx: `np.ndarray [int]`
+            Array with field indexes.
+        wfe: `np.ndarray`
+            Array of arrays with the zernike coeficients for each field index.
+        """
+        field_idx = np.array([sensor_id for sensor_id in data_container])
+
+        wfe = np.array([data_container[sensor_id] for sensor_id in data_container])
+
+        return field_idx, wfe
