@@ -213,7 +213,7 @@ class Model:
         # M2 actuator correction
         self.m2_correction = None
 
-        self._user_gain = -1
+        self._user_gain = self.ofc.default_gain
 
         self.reset_wfe_correction()
 
@@ -225,7 +225,7 @@ class Model:
     @user_gain.setter
     def user_gain(self, value):
         """Set user gain."""
-        self._user_gain = value if 0.0 <= value <= 1.0 else -1
+        self._user_gain = value if 0.0 <= value <= 1.0 else self.ofc.default_gain
 
     def get_fwhm_sensors(self):
         """Get list of fwhm sensor ids.
