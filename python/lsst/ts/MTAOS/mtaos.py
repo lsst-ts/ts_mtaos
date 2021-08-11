@@ -874,8 +874,8 @@ class MTAOS(salobj.ConfigurableCsc):
         zForces = self.model.m2_correction()
         self.evt_rejectedM2Correction.set_put(zForces=zForces, force_output=True)
 
-    def pubTel_wepDuration(self):
-        """Publish the duration of the WEP calculation as telemetry."""
+    def pubEvent_wepDuration(self):
+        """Publish the duration of the WEP calculation."""
 
         self._logExecFunc()
 
@@ -885,10 +885,10 @@ class MTAOS(salobj.ConfigurableCsc):
             and len(self.execution_times["RUN_WEP"]) > 0
             else 0.0
         )
-        self.tel_wepDuration.set_put(calcTime=duration)
+        self.evt_wepDuration.set_put(calcTime=duration)
 
-    def pubTel_ofcDuration(self):
-        """Publish the duration of the OFC calculation as telemetry."""
+    def pubEvent_ofcDuration(self):
+        """Publish the duration of the OFC calculation."""
 
         self._logExecFunc()
 
@@ -898,7 +898,7 @@ class MTAOS(salobj.ConfigurableCsc):
             and len(self.execution_times["CALCULATE_CORRECTIONS"]) > 0
             else 0.0
         )
-        self.tel_ofcDuration.set_put(calcTime=duration)
+        self.evt_ofcDuration.set_put(calcTime=duration)
 
     @classmethod
     def add_arguments(cls, parser):
