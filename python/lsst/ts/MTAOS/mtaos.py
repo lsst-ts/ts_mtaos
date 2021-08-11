@@ -418,6 +418,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
             self.pubEvent_wavefrontError()
             self.pubEvent_rejectedWavefrontError()
+            self.pubEvent_wepDuration()
 
             while len(self.execution_times["RUN_WEP"]) > self.MAX_TIME_SAMPLE:
                 self.execution_times["RUN_WEP"].pop(0)

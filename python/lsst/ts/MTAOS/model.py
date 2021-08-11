@@ -213,7 +213,7 @@ class Model:
         # M2 actuator correction
         self.m2_correction = None
 
-        self._user_gain = None
+        self._user_gain = -1
 
         self.reset_wfe_correction()
 
