@@ -224,8 +224,23 @@ class Model:
 
     @user_gain.setter
     def user_gain(self, value):
-        """Set user gain."""
-        self._user_gain = value if 0.0 <= value <= 1.0 else self.ofc.default_gain
+        """Set user gain.
+
+        Parameters
+        ----------
+        value: `float`
+            New value for user_gain. Must be between 0 and 1.
+
+        Raises
+        ------
+        ValueError:
+            If input `value` is outside the range (0.0, 1.0).
+        """
+
+        if 0.0 <= value <= 1.0:
+            self._user_gain = value
+        else:
+            raise ValueError("User gain must be between 0 and 1.")
 
     def get_fwhm_sensors(self):
         """Get list of fwhm sensor ids.
