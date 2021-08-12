@@ -329,6 +329,12 @@ class MTAOS(salobj.ConfigurableCsc):
         self.pubEvent_rejectedDegreeOfFreedom()
         self.model.reject_correction()
 
+        self.pubEvent_degreeOfFreedom()
+        self.pubEvent_m2HexapodCorrection()
+        self.pubEvent_cameraHexapodCorrection()
+        self.pubEvent_m1m3Correction()
+        self.pubEvent_m2Correction()
+
     async def do_selectSources(self, data):
         """Run source selection algorithm for a specific field and visit
         configuration.
