@@ -725,7 +725,7 @@ class Model:
                 filter_name: `string`
                     Name of the filter used for the observations.
         """
-        gain = kwargs.get("gain", self.user_gain)
+        gain = kwargs.get("user_gain", self.user_gain)
         rot = kwargs.get("rot", 0.0)
         filter_name = kwargs.get("filter_name", "")
 

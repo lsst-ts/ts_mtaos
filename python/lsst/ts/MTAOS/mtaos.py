@@ -25,6 +25,7 @@ import inspect
 import asyncio
 import logging
 import yaml
+import warnings
 
 from astropy import units as u
 
@@ -454,13 +455,19 @@ class MTAOS(salobj.ConfigurableCsc):
 
         async with self.issue_correction_lock:
 
-            # Need to set user gain before computing corrections.
-            self.model.user_gain = data.userGain
+            if data.userGain != 0.0:
+                warnings.warn(
+                    "Using userGain parameter is deprecated. Use the config yaml string instead.",
+                    DeprecationWarning,
+                )
+
+            config = yaml.safe_load(data.config) if len(data.config) > 0 else dict()
             # If this call fails (raise an exeception), command will be
             # rejected.
             # This is not a coroutine so it will block the event loop. Need
             # to think about how to fix it, maybe run in executor?
-            self.model.calculate_corrections(log_time=self.execution_times)
+            self.model.calculate_corrections(log_time=self.execution_times, **config)
+
             while (
                 len(self.execution_times["CALCULATE_CORRECTIONS"])
                 > self.MAX_TIME_SAMPLE
