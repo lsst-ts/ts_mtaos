@@ -2,6 +2,21 @@
 Version History
 ===============
 
+v0.7.3
+------
+
+* Add visit_id_offset to configuration schema.
+* Add visit_id_offset CSC configuration parameter to work around type of visitId being a long in runWEP and preProcess commands.
+* Add unit tests for CSC configuration.
+* Fix publishing wavefront errors.
+* Fix gain feature in model.
+* Fix pubTel_ofcDuration and pubTel_wepDuration methods in CSC. Rename to ``pubEvent_*`` and fix publishing of event topic instead of telemetry.
+* In `rejectCorrection` publish degrees of freedom and corrections after rejecting correction.
+* Fix setting user gain in model class.
+* Deprecate the use of userGain in runOFC. It will now use the yaml configuration payload.
+* In Model class use default ofc gain when initializing the class.
+* Publish wepDuration at the end of runWEP.
+
 v0.7.2
 ------
 
