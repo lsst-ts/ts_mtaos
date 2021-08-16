@@ -213,17 +213,34 @@ class Model:
         # M2 actuator correction
         self.m2_correction = None
 
+        self._user_gain = self.ofc.default_gain
+
         self.reset_wfe_correction()
 
     @property
     def user_gain(self):
         """Return the user gain."""
-        return self.ofc.ofc_controller.gain
+        return self._user_gain
 
     @user_gain.setter
     def user_gain(self, value):
-        """Set user gain."""
-        self.ofc.ofc_controller.gain = value
+        """Set user gain.
+
+        Parameters
+        ----------
+        value: `float`
+            New value for user_gain. Must be between 0 and 1.
+
+        Raises
+        ------
+        ValueError:
+            If input `value` is outside the range (0.0, 1.0).
+        """
+
+        if 0.0 <= value <= 1.0:
+            self._user_gain = value
+        else:
+            raise ValueError("User gain must be between 0 and 1.")
 
     def get_fwhm_sensors(self):
         """Get list of fwhm sensor ids.
@@ -662,30 +679,47 @@ class Model:
             No FWHM sensor data to use.
         """
         try:
-            if self.user_gain == -1:
-                if len(self.fwhm_data) == 0:
-                    raise RuntimeError("No FWHM sensor data to use.")
-                else:
-                    self.ofc.setGainByPSSN()
-                    self.ofc.setFWHMSensorDataOfCam(self.fwhm_data)
-            else:
-                self.ofc.setGainByUser(self.user_gain)
-
-            wfe_data_container = (
-                self.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
-            )
-
-            field_idx = np.array([sensor_id for sensor_id in wfe_data_container])
-
-            wfe = np.array(
-                [wfe_data_container[sensor_id] for sensor_id in wfe_data_container]
-            )
+            field_idx, wfe = self.get_wavefront_errors()
 
             self._calculate_corrections(wfe=wfe, field_idx=field_idx, **kwargs)
 
         finally:
             # Clear the queue
             self._clear_wfe_collections()
+
+    def get_wavefront_errors(self):
+        """Get wavefront errors.
+
+        Returns
+        -------
+        field_idx: `np.ndarray [int]`
+            Array with field indexes.
+        wfe: `np.ndarray`
+            Array of arrays with the zernike coeficients for each field index.
+        """
+
+        wfe_data_container = (
+            self.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
+        )
+
+        return self.get_field_idx_wfe_from_data_container(wfe_data_container)
+
+    def get_rejected_wavefront_errors(self):
+        """Get rejected wavefront errors.
+
+        Returns
+        -------
+        field_idx: `np.ndarray [int]`
+            Array with field indexes.
+        wfe: `np.ndarray`
+            Array of arrays with the zernike coeficients for each field index.
+        """
+
+        wfe_data_container = (
+            self.rejected_wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
+        )
+
+        return self.get_field_idx_wfe_from_data_container(wfe_data_container)
 
     def _calculate_corrections(self, wfe, field_idx, **kwargs):
         """Compute corrections from input wavefront errors.
@@ -706,18 +740,9 @@ class Model:
                 filter_name: `string`
                     Name of the filter used for the observations.
         """
-        gain = kwargs.get("gain", -1.0)
+        gain = kwargs.get("user_gain", self.user_gain)
         rot = kwargs.get("rot", 0.0)
         filter_name = kwargs.get("filter_name", "")
-
-        if gain < 0.0:
-            try:
-                self.ofc.set_pssn_gain()
-            except RuntimeError:
-                self.log.debug(
-                    f"Error setting pssn gain. Using default: {self.ofc.default_gain}."
-                )
-                gain = self.ofc.default_gain
 
         (
             self.m2_hexapod_correction,
@@ -847,3 +872,28 @@ class Model:
             raise
         else:
             return original_ofc_data_values
+
+    @staticmethod
+    def get_field_idx_wfe_from_data_container(data_container):
+        """Parse data container generated from calling
+        `WavefrontCollection.getListOfWavefrontErrorAvgInTakenData` into an
+        array with field indices and an array of wavefront errors.
+
+        Parameters
+        ----------
+        data_container: `dict`
+            Dictionary returned by
+            `WavefrontCollection.getListOfWavefrontErrorAvgInTakenData()`.
+
+        Returns
+        -------
+        field_idx: `np.ndarray [int]`
+            Array with field indexes.
+        wfe: `np.ndarray`
+            Array of arrays with the zernike coeficients for each field index.
+        """
+        field_idx = np.array([sensor_id for sensor_id in data_container])
+
+        wfe = np.array([data_container[sensor_id] for sensor_id in data_container])
+
+        return field_idx, wfe

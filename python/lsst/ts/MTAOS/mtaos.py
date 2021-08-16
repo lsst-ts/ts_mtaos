@@ -25,6 +25,7 @@ import inspect
 import asyncio
 import logging
 import yaml
+import warnings
 
 from astropy import units as u
 
@@ -83,6 +84,9 @@ class MTAOS(salobj.ConfigurableCsc):
             A logger.
         state0DofValidator : `salobj.DefaultingValidator`
             Validator for the telescopedof configuration file.
+        visit_id_offset: `int`
+            Offset applied to visit id. TODO (DM-31365): Remove workaround to
+            visitId being of type long in MTAOS runWEP command.
         remotes : `dict`
             A dictionary with `salobj.Remote` for each component the MTAOS
             communicates with.
@@ -134,6 +138,15 @@ class MTAOS(salobj.ConfigurableCsc):
             schema=TELESCOPE_DOF_SCHEMA
         )
 
+        # TODO (DM-31365): Remove workaround to visitId being of type long in
+        # MTAOS runWEP command.
+        #
+        # Offset applied to the visit ids when getting images from butler. This
+        # is mainly to work around an issue with xml < 9.2 where the visit id
+        # is defined as a a long which allows values from -2147483648 to
+        # 2147483647
+        self.visit_id_offset = 0
+
         # Dictionary with remotes for M2 Hexapod, Camera Hexapod, M1M3 and M2
         # components. Note the use of include=[] in all remotes. This prevents
         # the remote from subscribing to events and telemetry from those
@@ -180,6 +193,10 @@ class MTAOS(salobj.ConfigurableCsc):
 
         self._logExecFunc()
         self.log.debug("MTAOS configuration started.")
+
+        # TODO (DM-31365): Remove workaround to visitId being of type long in
+        # MTAOS runWEP command.
+        self.visit_id_offset = config.visit_id_offset
 
         config_obj = Config(config)
         state0_dof_file = config_obj.getState0DofFile()
@@ -312,6 +329,12 @@ class MTAOS(salobj.ConfigurableCsc):
         self.pubEvent_rejectedDegreeOfFreedom()
         self.model.reject_correction()
 
+        self.pubEvent_degreeOfFreedom()
+        self.pubEvent_m2HexapodCorrection()
+        self.pubEvent_cameraHexapodCorrection()
+        self.pubEvent_m1m3Correction()
+        self.pubEvent_m2Correction()
+
     async def do_selectSources(self, data):
         """Run source selection algorithm for a specific field and visit
         configuration.
@@ -361,8 +384,11 @@ class MTAOS(salobj.ConfigurableCsc):
         if data.useOCPS:
             raise NotImplementedError("Use OCPS not implemented.")
         else:
+            # TODO (DM-31365): Remove workaround to visitId being of type long
+            # in MTAOS runWEP command.
             await self.model.pre_process(
-                visit_id=data.visitId, config=yaml.safe_load(data.config)
+                visit_id=self.visit_id_offset + data.visitId,
+                config=yaml.safe_load(data.config),
             )
 
     async def do_runWEP(self, data):
@@ -386,12 +412,21 @@ class MTAOS(salobj.ConfigurableCsc):
         if data.useOCPS:
             raise NotImplementedError("Use OCPS not implemented.")
         else:
+            # TODO (DM-31365): Remove workaround to visitId being of type long
+            # in MTAOS runWEP command.
             await self.model.run_wep(
-                visit_id=data.visitId,
-                extra_id=data.extraId if data.extraId > 0 else None,
-                config=yaml.safe_dump(data.config),
+                visit_id=self.visit_id_offset + data.visitId,
+                extra_id=self.visit_id_offset + data.extraId
+                if data.extraId > 0
+                else None,
+                config=yaml.safe_dump(data.config) if len(data.config) > 0 else {},
                 log_time=self.execution_times,
             )
+
+            self.pubEvent_wavefrontError()
+            self.pubEvent_rejectedWavefrontError()
+            self.pubEvent_wepDuration()
+
             while len(self.execution_times["RUN_WEP"]) > self.MAX_TIME_SAMPLE:
                 self.execution_times["RUN_WEP"].pop(0)
 
@@ -426,13 +461,19 @@ class MTAOS(salobj.ConfigurableCsc):
 
         async with self.issue_correction_lock:
 
-            # Need to set user gain before computing corrections.
-            self.model.user_gain = data.userGain
+            if data.userGain != 0.0:
+                warnings.warn(
+                    "Using userGain parameter is deprecated. Use the config yaml string instead.",
+                    DeprecationWarning,
+                )
+
+            config = yaml.safe_load(data.config) if len(data.config) > 0 else dict()
             # If this call fails (raise an exeception), command will be
             # rejected.
             # This is not a coroutine so it will block the event loop. Need
             # to think about how to fix it, maybe run in executor?
-            self.model.calculate_corrections(log_time=self.execution_times)
+            self.model.calculate_corrections(log_time=self.execution_times, **config)
+
             while (
                 len(self.execution_times["CALCULATE_CORRECTIONS"])
                 > self.MAX_TIME_SAMPLE
@@ -699,36 +740,13 @@ class MTAOS(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        listOfWfErr = self.model.getListOfWavefrontError()
-        for wavefrontError in listOfWfErr:
-            sensorId, zk = self._getIdAndZkFromWavefrontErr(wavefrontError)
-            self.evt_wavefrontError.set_put(
-                sensorId=sensorId,
-                annularZernikeCoeff=zk,
-                force_output=True,
-            )
-
-    def _getIdAndZkFromWavefrontErr(self, wavefrontError):
-        """Get the sensor Id and annular Zernike polynomial from the wavefront
-        error data.
-
-        Parameters
-        ----------
-        wavefrontError : lsst.ts.wep.ctrlIntf.SensorWavefrontData
-            Wavefront error data.
-
-        Returns
-        -------
-        int
-            The Id of the sensor this wavefront error is for.
-        numpy.ndarray
-            The poly describing the wavefront error in um.
-        """
-
-        sensorId = wavefrontError.getSensorId()
-        annularZernikePoly = wavefrontError.getAnnularZernikePoly()
-
-        return sensorId, annularZernikePoly
+        for sensor_id, zernike_coefficients in self.model.get_wfe():
+            for zernike_coefficient in zernike_coefficients:
+                self.evt_wavefrontError.set_put(
+                    sensorId=sensor_id,
+                    annularZernikeCoeff=zernike_coefficient,
+                    force_output=True,
+                )
 
     def pubEvent_rejectedWavefrontError(self):
         """Publish the rejected calculated wavefront error calculated by WEP.
@@ -738,14 +756,16 @@ class MTAOS(salobj.ConfigurableCsc):
 
         self._logExecFunc()
 
-        listOfWfErrRej = self.model.getListOfWavefrontErrorRej()
-        for wavefrontError in listOfWfErrRej:
-            sensorId, zk = self._getIdAndZkFromWavefrontErr(wavefrontError)
-            self.evt_rejectedWavefrontError.set_put(
-                sensorId=sensorId,
-                annularZernikeCoeff=zk,
-                force_output=True,
-            )
+        for (
+            sensor_id,
+            zernike_coefficients,
+        ) in self.model.get_rejected_wfe():
+            for zernike_coefficient in zernike_coefficients:
+                self.evt_rejectedWavefrontError.set_put(
+                    sensorId=sensor_id,
+                    annularZernikeCoeff=zernike_coefficient,
+                    force_output=True,
+                )
 
     def pubEvent_degreeOfFreedom(self):
         """Publish the degree of freedom generated by the OFC calculation.
@@ -868,8 +888,8 @@ class MTAOS(salobj.ConfigurableCsc):
         zForces = self.model.m2_correction()
         self.evt_rejectedM2Correction.set_put(zForces=zForces, force_output=True)
 
-    def pubTel_wepDuration(self):
-        """Publish the duration of the WEP calculation as telemetry."""
+    def pubEvent_wepDuration(self):
+        """Publish the duration of the WEP calculation."""
 
         self._logExecFunc()
 
@@ -879,10 +899,10 @@ class MTAOS(salobj.ConfigurableCsc):
             and len(self.execution_times["RUN_WEP"]) > 0
             else 0.0
         )
-        self.tel_wepDuration.set_put(calcTime=duration)
+        self.evt_wepDuration.set_put(calcTime=duration)
 
-    def pubTel_ofcDuration(self):
-        """Publish the duration of the OFC calculation as telemetry."""
+    def pubEvent_ofcDuration(self):
+        """Publish the duration of the OFC calculation."""
 
         self._logExecFunc()
 
@@ -892,7 +912,7 @@ class MTAOS(salobj.ConfigurableCsc):
             and len(self.execution_times["CALCULATE_CORRECTIONS"]) > 0
             else 0.0
         )
-        self.tel_ofcDuration.set_put(calcTime=duration)
+        self.evt_ofcDuration.set_put(calcTime=duration)
 
     @classmethod
     def add_arguments(cls, parser):
