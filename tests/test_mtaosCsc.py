@@ -21,6 +21,7 @@
 
 import os
 import yaml
+import glob
 import unittest
 
 import numpy as np
@@ -33,6 +34,7 @@ from lsst.ts import MTAOS
 # standard command timeout (sec)
 STD_TIMEOUT = 60
 SHORT_TIMEOUT = 5
+TEST_CONFIG_DIR = Path(__file__).parents[1].joinpath("tests", "testData", "config")
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
@@ -90,6 +92,59 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 enabled_commands=enabled_commands,
                 timeout=STD_TIMEOUT,
             )
+
+    async def test_configuration(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+
+            self.assertEqual(self.csc.summary_state, salobj.State.STANDBY)
+            await self.assert_next_summary_state(salobj.State.STANDBY)
+
+            invalid_files = glob.glob(os.path.join(TEST_CONFIG_DIR, "invalid_*.yaml"))
+            bad_config_names = [os.path.basename(name) for name in invalid_files]
+            bad_config_names.append("no_such_file.yaml")
+
+            for bad_config_name in bad_config_names:
+                with self.subTest(bad_config_name=bad_config_name):
+                    with salobj.assertRaisesAckError():
+                        await self.remote.cmd_start.set_start(
+                            settingsToApply=bad_config_name, timeout=STD_TIMEOUT
+                        )
+
+            valid_files = glob.glob(os.path.join(TEST_CONFIG_DIR, "valid_*.yaml"))
+            good_config_names = [os.path.basename(name) for name in valid_files]
+
+            for good_config_name in good_config_names:
+                await salobj.set_summary_state(self.remote, salobj.State.STANDBY)
+
+                config_data = None
+                with open(TEST_CONFIG_DIR / good_config_name) as fp:
+                    config_data = yaml.safe_load(fp)
+
+                await self.remote.cmd_start.set_start(
+                    settingsToApply=good_config_name, timeout=STD_TIMEOUT
+                )
+
+                self.assertEqual(
+                    self.csc.visit_id_offset, config_data["visit_id_offset"]
+                )
+                self.assertEqual(self.csc.model.instrument, config_data["instrument"])
+                self.assertEqual(self.csc.model.run_name, config_data["run_name"])
+                self.assertEqual(self.csc.model.collections, config_data["collections"])
+                self.assertEqual(
+                    self.csc.model.pipeline_instrument,
+                    config_data["pipeline_instrument"],
+                )
+                self.assertEqual(
+                    self.csc.model.pipeline_n_processes,
+                    config_data["pipeline_n_processes"],
+                )
+                self.assertEqual(
+                    self.csc.model.zernike_table_name, config_data["zernike_table_name"]
+                )
 
     async def testResetCorrection(self):
         async with self.make_csc(
