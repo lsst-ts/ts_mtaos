@@ -206,7 +206,17 @@ pipeline {
                 reportName: "Coverage Report"
             ])
         }
+        regression {
+            script {
+                slackSend(color: "danger", message: "<@U72CH91L2> ${JOB_NAME} has suffered a regression ${BUILD_URL}", channel: "#jenkins-builds")
+            }
 
+        }
+        fixed {
+            script {
+                slackSend(color: "good", message: "<@U72CH91L2> ${JOB_NAME} has been fixed ${BUILD_URL}", channel: "#jenkins-builds")
+            }
+        }
         cleanup {
             // clean up the workspace
             deleteDir()
