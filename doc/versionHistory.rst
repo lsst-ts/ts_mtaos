@@ -2,6 +2,12 @@
 Version History
 ===============
 
+v0.7.4
+------
+
+* Update Jenkinsfile to notify gate keeper (tribeiro) on slack when build suffers a regression and when it is fixed.
+* In `test_model`, update `test_process_comcam` to check the shape of the return arrays and the index of the maximum zernike coefficient instead of the values themselves.
+
 v0.7.3
 ------
 
