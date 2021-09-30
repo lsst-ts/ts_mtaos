@@ -27,7 +27,7 @@ pipeline {
         // SAL setup file
         SAL_SETUP_FILE = "/home/saluser/.setup.sh"
         // PlantUML url
-        PLANTUML_URL = "https://managedway.dl.sourceforge.net/project/plantuml/plantuml.jar"
+        PLANTUML_URL = "http://sourceforge.net/projects/plantuml/files/plantuml.jar"
         // XML report path
         XML_REPORT = "jenkinsReport/report.xml"
         // Module name used in the pytest coverage analysis
