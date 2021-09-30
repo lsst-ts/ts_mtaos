@@ -29,6 +29,7 @@ from lsst.ts import salobj
 from lsst.ts import MTAOS
 
 # standard command timeout (sec)
+SHORT_TIMEOUT = 5
 STD_TIMEOUT = 60
 
 
@@ -137,15 +138,70 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # add random values for aberrations
             wf = np.random.rand(19) * 0.1
 
+            dof_before_add_aberration = await remote.evt_degreeOfFreedom.aget(
+                timeout=SHORT_TIMEOUT
+            )
+
+            remote.evt_degreeOfFreedom.flush()
+
             await remote.cmd_addAberration.set_start(wf=wf, timeout=10.0)
+
+            dof_after_add_aberration = await remote.evt_degreeOfFreedom.next(
+                flush=False, timeout=SHORT_TIMEOUT
+            )
+
+            # DoF after addAberration should NOT be similar to DoF before
+            # applying addAberration.
+
+            self.assertFalse(
+                np.allclose(
+                    dof_before_add_aberration.aggregatedDoF,
+                    dof_after_add_aberration.aggregatedDoF,
+                ),
+                f"Expected {dof_before_add_aberration.aggregatedDoF} vs "
+                f"Received {dof_after_add_aberration.aggregatedDoF}.",
+            )
+            self.assertFalse(
+                np.allclose(
+                    dof_before_add_aberration.visitDoF,
+                    dof_after_add_aberration.visitDoF,
+                ),
+                f"Expected {dof_before_add_aberration.visitDoF} vs "
+                f"Received {dof_after_add_aberration.visitDoF}.",
+            )
 
             # Test it works if one of the forces get rejected
             self.cscM1M3.cmd_applyActiveOpticForces.callback = (
                 self.m1m3_apply_forces_fail_callbck
             )
 
+            remote.evt_degreeOfFreedom.flush()
+
             with self.assertRaises(salobj.AckError):
                 await remote.cmd_issueCorrection.start(timeout=STD_TIMEOUT)
+
+            dof_after_issue_correction = await remote.evt_degreeOfFreedom.next(
+                flush=False, timeout=SHORT_TIMEOUT
+            )
+
+            # DoF after issueCorrection is rejected should be similar to DoF
+            # before applying addAberration.
+            self.assertTrue(
+                np.allclose(
+                    dof_before_add_aberration.aggregatedDoF,
+                    dof_after_issue_correction.aggregatedDoF,
+                ),
+                f"Expected {dof_before_add_aberration.aggregatedDoF} vs "
+                f"Received {dof_after_issue_correction.aggregatedDoF}.",
+            )
+            self.assertTrue(
+                np.allclose(
+                    dof_before_add_aberration.visitDoF,
+                    dof_after_issue_correction.visitDoF,
+                ),
+                f"Expected {dof_before_add_aberration.visitDoF} vs "
+                f"Received {dof_after_issue_correction.visitDoF}.",
+            )
 
             # There must be 3 corrections for each component except for m1m3
             # which got rejected. The corrections are 1 from the previous test,
