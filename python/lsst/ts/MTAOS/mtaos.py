@@ -572,6 +572,7 @@ class MTAOS(salobj.ConfigurableCsc):
         ):
             self.pubEvent_rejectedDegreeOfFreedom()
             self.model.reject_correction()
+            self.pubEvent_degreeOfFreedom()
 
             # Undo corrections that completed.
             error_repor = await self.handle_undo_corrections(issue_corrections_tasks)
