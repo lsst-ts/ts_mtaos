@@ -38,7 +38,7 @@ The data shall be reset e.g. after a long telescope slew.
 Although not often required, MTAOS publishes the calculated wavefront error in the ``wavefrontError`` event and DOF in the ``degreeOfFreedom`` event.
 The ``wepDuration`` and ``ofcDuration`` events can be used to analyze system performance.
 The ``wepDuration`` event is published for each CCD.
-The mapping between sensor names and their IDs can be found `here <https://github.com/lsst-ts/ts_wep/blob/master/policy/sensorNameToId.yaml>`_.
+The mapping between sensor names and their IDs can be found `here <https://github.com/lsst/obs_lsst/blob/master/policy/rafts.yaml>`_.
 
 If some subsystem(s) reject the correction command(s) from MTAOS, the ``rejectedDegreeOfFreedom`` event is published.
 To recover, subsystems whose accepted the correction command might need to be put into a previous state to be consistent with the MTAOS internal data.
