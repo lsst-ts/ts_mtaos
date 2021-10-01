@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.7.5
+------
+
+* Fix publishing Degrees of Freedom event when `issueCorrection` fails.
+
 v0.7.4
 ------
 
