@@ -356,23 +356,24 @@ properties:
                                 type: number
                             boresightRotAng:
                                 type: number
-            estimateZernikesFamTask:
+            estimateZernikesScienceSensorTask:
                 type: object
                 properties:
-                    class:
-                        type: string
-                        default: lsst.ts.wep.task.EstimateZernikesFamTask.EstimateZernikesFamTask
-                    config:
-                        type: object
-                        properties:
-                          donutTemplateSize:
-                            type: integer
-                            default: 160
-                          donutStampSize:
-                            type: integer
-                            default: 160
-                          initialCutoutPadding:
-                            type: integer
-                            default: 40
+                  class:
+                    type: string
+                    default: >-
+                      lsst.ts.wep.task.EstimateZernikesScienceSensorTask.EstimateZernikesScienceSensorTask
+                  config:
+                    type: object
+                    properties:
+                      donutTemplateSize:
+                        type: integer
+                        default: 160
+                      donutStampSize:
+                        type: integer
+                        default: 160
+                      initialCutoutPadding:
+                        type: integer
+                        default: 40
 """
 )
