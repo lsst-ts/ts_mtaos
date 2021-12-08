@@ -66,7 +66,7 @@ pipeline {
                     checkout scm
                 }
                 dir(env.WORKSPACE + '/phosim_utils') {
-                    git branch: 'master', url: 'https://github.com/lsst-dm/phosim_utils.git'
+                    git branch: 'main', url: 'https://github.com/lsst-dm/phosim_utils.git'
                 }
                 dir(env.WORKSPACE + '/ts_wep') {
                     git branch: "${BRANCH}", url: 'https://github.com/lsst-ts/ts_wep.git'
