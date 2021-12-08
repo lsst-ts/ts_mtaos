@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.7.7
+------
+
+* Update phosim_utils branch to main instead of master in CI job.
+
 v0.7.6
 ------
 * Update name of `ts_wep` task in `config_schema.py` from `EstimateZernikesFamTask` to `EstimateZernikesScienceSensorTask`.
