@@ -24,6 +24,7 @@ __all__ = ["MTAOS"]
 import inspect
 import asyncio
 import logging
+from numpy.ma.core import identity
 import yaml
 import warnings
 
@@ -415,8 +416,15 @@ class MTAOS(salobj.ConfigurableCsc):
         else:
             # TODO (DM-31365): Remove workaround to visitId being of type long
             # in MTAOS runWEP command.
-            snd_stamp_isot = astropy_time_from_tai_unix(data.private_sndStamp).isot
-            run_name_extention = f"{data.private_identity}_{snd_stamp_isot}"
+            snd_stamp_isot = (
+                astropy_time_from_tai_unix(data.private_sndStamp)
+                .isot.replace("-", "")
+                .replace(":", "")
+                .replace(".", "")
+            )
+            identity = data.private_identity.replace("@", "_").replace("-", "_")
+
+            run_name_extention = f"_{identity}_{snd_stamp_isot}"
             await self.model.run_wep(
                 visit_id=self.visit_id_offset + data.visitId,
                 extra_id=self.visit_id_offset + data.extraId
