@@ -34,6 +34,7 @@ import numpy as np
 from lsst.ts import salobj
 from lsst.ts.idl.enums.MTAOS import FilterType
 from lsst.ts.ofc import OFCData
+from lsst.ts.utils import astropy_time_from_tai_unix
 
 from . import CONFIG_SCHEMA, TELESCOPE_DOF_SCHEMA
 from . import Config
@@ -414,12 +415,22 @@ class MTAOS(salobj.ConfigurableCsc):
         else:
             # TODO (DM-31365): Remove workaround to visitId being of type long
             # in MTAOS runWEP command.
+            snd_stamp_isot = (
+                astropy_time_from_tai_unix(data.private_sndStamp)
+                .isot.replace("-", "")
+                .replace(":", "")
+                .replace(".", "")
+            )
+            private_identity = data.private_identity.replace("@", "_").replace("-", "_")
+
+            run_name_extention = f"_{private_identity}_{snd_stamp_isot}"
             await self.model.run_wep(
                 visit_id=self.visit_id_offset + data.visitId,
                 extra_id=self.visit_id_offset + data.extraId
                 if data.extraId > 0
                 else None,
                 config=yaml.safe_load(data.config) if len(data.config) > 0 else {},
+                run_name_extention=run_name_extention,
                 log_time=self.execution_times,
             )
 
