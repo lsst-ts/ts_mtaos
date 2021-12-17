@@ -555,7 +555,19 @@ class Model:
             stderr=asyncio.subprocess.PIPE,
         )
 
+        log_task = asyncio.create_task(self.log_stream(wep_process.stderr))
+
         stdout, stderr = await wep_process.communicate()
+
+        if not log_task.done():
+            log_task.cancel()
+
+        try:
+            await log_task
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            self.log.debug(f"Exception in log task: {e}. Ignoring.")
 
         self.log.debug(f"Process returned: {wep_process.returncode}")
 
@@ -903,6 +915,19 @@ class Model:
             raise
         else:
             return original_ofc_data_values
+
+    async def log_stream(self, stream: asyncio.subprocess.PIPE) -> None:
+        """Log messages from input stream asynchronously.
+
+        Parameters
+        ----------
+        stream : `asyncio.subprocess.PIPE`
+            Output stream pipe to process and log.
+        """
+
+        while True:
+            message = await stream.readline()
+            self.log.debug(message.decode())
 
     @staticmethod
     def get_field_idx_wfe_from_data_container(data_container):
