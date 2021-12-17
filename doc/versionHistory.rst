@@ -2,6 +2,16 @@
 Version History
 ===============
 
+v0.7.8
+------
+
+* In `Model`, asynchronously log output of pipeline task.
+* In `MTAOS.do_runWEP`, implement mechanism to differentiate wep runs using private identity (who sent the command?) and the send timestamp.
+* In `MTAOS.do_runWEP`, fix use of `safe_dump` to `safe_load`, to convert input configuration string into python object.
+* In `Model`, add interface to create different run names for each time MTAOS is processing data.
+* In `Model`, raise an exception if the pipeline process fails.
+  This causes the command to be rejected as failed, which is the behavior we want.
+
 v0.7.7
 ------
 
