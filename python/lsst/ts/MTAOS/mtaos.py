@@ -419,7 +419,7 @@ class MTAOS(salobj.ConfigurableCsc):
                 extra_id=self.visit_id_offset + data.extraId
                 if data.extraId > 0
                 else None,
-                config=yaml.safe_dump(data.config) if len(data.config) > 0 else {},
+                config=yaml.safe_load(data.config) if len(data.config) > 0 else {},
                 log_time=self.execution_times,
             )
 
