@@ -535,9 +535,17 @@ class Model:
         stdout, stderr = await wep_process.communicate()
 
         self.log.debug(f"Process returned: {wep_process.returncode}")
-        self.log.debug(stdout)
-        self.log.error(stderr)
-        self.log.debug("Data processing completed. Gathering output.")
+
+        if len(stdout) > 0:
+            self.log.debug(stdout.decode())
+
+        if len(stderr) > 0:
+            self.log.error(stderr.decode())
+
+        if wep_process.returncode != 0:
+            raise RuntimeError(f"Error running pipeline task: {stderr.decode()}")
+
+        self.log.debug("Data processing completed successfully. Gathering output.")
 
         comcam_config_file.close()
 
