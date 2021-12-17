@@ -446,7 +446,14 @@ class Model:
         raise NotImplementedError("This function is not supported yet (DM-28708).")
 
     @timeit
-    async def run_wep(self, visit_id, extra_id, config, **kwargs):
+    async def run_wep(
+        self,
+        visit_id,
+        extra_id,
+        config,
+        run_name_extention="",
+        **kwargs,
+    ):
         """Process image or images with wavefront estimation pipeline.
 
         Parameters
@@ -484,10 +491,19 @@ class Model:
             )
 
             await self.process_comcam(
-                intra_id=visit_id, extra_id=extra_id, config=config
+                intra_id=visit_id,
+                extra_id=extra_id,
+                config=config,
+                run_name_extention=run_name_extention,
             )
 
-    async def process_comcam(self, intra_id, extra_id, config):
+    async def process_comcam(
+        self,
+        intra_id,
+        extra_id,
+        config,
+        run_name_extention="",
+    ):
         """Process ComCam intra/extra focual images.
 
         Parameters
@@ -497,6 +513,9 @@ class Model:
         extra_id : `int`
             Id of the extra-focal image.
         config : `dict`
+            A dictionary with additional configuration for the pipeline task.
+        run_name_extention : `str`
+            A string to be appended to the run name.
         """
         self.log.debug(f"Processing ComCam intra/extra pair: {intra_id}/{extra_id}.")
 
@@ -510,11 +529,15 @@ class Model:
 
         comcam_config_file.flush()
 
-        self.log.debug(f"Pipeline configuration in {comcam_config_file.name}.")
+        run_name = f"{self.run_name}{run_name_extention}"
+
+        self.log.debug(
+            f"Run name: {run_name}. Pipeline configuration in {comcam_config_file.name}."
+        )
 
         run_pipetask_cmd = writePipetaskCmd(
             self.data_path,
-            self.run_name,
+            run_name,
             self.pipeline_instrument["comcam"],
             "refcats," + self.collections,
             pipelineYaml=comcam_config_file.name,
@@ -556,7 +579,7 @@ class Model:
 
         datasetRefs = list(
             butler.registry.queryDatasets(
-                datasetType="postISRCCD", collections=[self.run_name]
+                datasetType="postISRCCD", collections=[run_name]
             )
         )
         for ref in datasetRefs:
@@ -568,7 +591,7 @@ class Model:
             dataId=dict(
                 instrument=self.data_instrument_name["comcam"], exposure=intra_id
             ),
-            collections=[self.run_name],
+            collections=[run_name],
         )
 
         self.log.debug(f"Processing yielded: {data_ids}")
@@ -580,7 +603,7 @@ class Model:
                     butler.get(
                         self.zernike_table_name,
                         dataId=data_id.dataId,
-                        collections=[self.run_name],
+                        collections=[run_name],
                     ),
                 )
                 for data_id in data_ids
