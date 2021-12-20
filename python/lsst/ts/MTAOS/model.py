@@ -446,7 +446,14 @@ class Model:
         raise NotImplementedError("This function is not supported yet (DM-28708).")
 
     @timeit
-    async def run_wep(self, visit_id, extra_id, config, **kwargs):
+    async def run_wep(
+        self,
+        visit_id,
+        extra_id,
+        config,
+        run_name_extention="",
+        **kwargs,
+    ):
         """Process image or images with wavefront estimation pipeline.
 
         Parameters
@@ -484,10 +491,19 @@ class Model:
             )
 
             await self.process_comcam(
-                intra_id=visit_id, extra_id=extra_id, config=config
+                intra_id=visit_id,
+                extra_id=extra_id,
+                config=config,
+                run_name_extention=run_name_extention,
             )
 
-    async def process_comcam(self, intra_id, extra_id, config):
+    async def process_comcam(
+        self,
+        intra_id,
+        extra_id,
+        config,
+        run_name_extention="",
+    ):
         """Process ComCam intra/extra focual images.
 
         Parameters
@@ -497,6 +513,9 @@ class Model:
         extra_id : `int`
             Id of the extra-focal image.
         config : `dict`
+            A dictionary with additional configuration for the pipeline task.
+        run_name_extention : `str`, optional
+            A string to be appended to the run name.
         """
         self.log.debug(f"Processing ComCam intra/extra pair: {intra_id}/{extra_id}.")
 
@@ -510,11 +529,15 @@ class Model:
 
         comcam_config_file.flush()
 
-        self.log.debug(f"Pipeline configuration in {comcam_config_file.name}.")
+        run_name = f"{self.run_name}{run_name_extention}"
+
+        self.log.debug(
+            f"Run name: {run_name}. Pipeline configuration in {comcam_config_file.name}."
+        )
 
         run_pipetask_cmd = writePipetaskCmd(
             self.data_path,
-            self.run_name,
+            run_name,
             self.pipeline_instrument["comcam"],
             "refcats," + self.collections,
             pipelineYaml=comcam_config_file.name,
@@ -532,12 +555,39 @@ class Model:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        stdout, stderr = await wep_process.communicate()
+        log_task = asyncio.create_task(self.log_stream(wep_process.stderr))
+
+        await wep_process.wait()
+
+        if not log_task.done():
+            log_task.cancel()
+
+        try:
+            await log_task
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            self.log.debug(f"Exception in log task: {e}. Ignoring.")
 
         self.log.debug(f"Process returned: {wep_process.returncode}")
-        self.log.debug(stdout)
-        self.log.error(stderr)
-        self.log.debug("Data processing completed. Gathering output.")
+
+        # returncode contains the exit value of the process started with
+        # asyncio.create_subprocess_shell. A value of zero means the process
+        # finished successfully, anything else is considered an error. If we
+        # get return code different than zero, assume the pipeline task
+        # failed and raise an exception with the error report.
+        if wep_process.returncode != 0:
+            stdout, stderr = await wep_process.communicate()
+
+            if len(stdout) > 0:
+                self.log.debug(stdout.decode())
+
+            if len(stderr) > 0:
+                self.log.error(stderr.decode())
+
+            raise RuntimeError(f"Error running pipeline task: {stderr.decode()}")
+
+        self.log.debug("Data processing completed successfully. Gathering output.")
 
         comcam_config_file.close()
 
@@ -548,7 +598,7 @@ class Model:
 
         datasetRefs = list(
             butler.registry.queryDatasets(
-                datasetType="postISRCCD", collections=[self.run_name]
+                datasetType="postISRCCD", collections=[run_name]
             )
         )
         for ref in datasetRefs:
@@ -560,7 +610,7 @@ class Model:
             dataId=dict(
                 instrument=self.data_instrument_name["comcam"], exposure=intra_id
             ),
-            collections=[self.run_name],
+            collections=[run_name],
         )
 
         self.log.debug(f"Processing yielded: {data_ids}")
@@ -572,7 +622,7 @@ class Model:
                     butler.get(
                         self.zernike_table_name,
                         dataId=data_id.dataId,
-                        collections=[self.run_name],
+                        collections=[run_name],
                     ),
                 )
                 for data_id in data_ids
@@ -872,6 +922,19 @@ class Model:
             raise
         else:
             return original_ofc_data_values
+
+    async def log_stream(self, stream: asyncio.subprocess.PIPE) -> None:
+        """Log messages from input stream asynchronously.
+
+        Parameters
+        ----------
+        stream : `asyncio.subprocess.PIPE`
+            Output stream pipe to process and log.
+        """
+
+        while True:
+            message = await stream.readline()
+            self.log.debug(message.decode())
 
     @staticmethod
     def get_field_idx_wfe_from_data_container(data_container):
