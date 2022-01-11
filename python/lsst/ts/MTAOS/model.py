@@ -31,6 +31,8 @@ import numpy as np
 from lsst.ts.ofc import OFC
 from lsst.ts.salobj import DefaultingValidator
 
+from lsst.afw.image import VisitInfo
+
 from .config_schema import WEP_PIPELINE_CONFIG
 
 from .wavefront_collection import WavefrontCollection
@@ -651,7 +653,10 @@ class Model:
         # TODO: Implement configuration when user runs select_sources
         # beforehand.
 
-        butler = dafButler.Butler(self.data_path)
+        visit_info = self._get_visit_info(
+            instrument=instrument,
+            exposure=reference_id,
+        )
 
         visit_info = butler.get(
             "raw.visitInfo",
@@ -935,6 +940,32 @@ class Model:
         while True:
             message = await stream.readline()
             self.log.debug(message.decode())
+
+    def _get_visit_info(self, instrument: str, exposure: int) -> VisitInfo:
+        """Get visit info from the butler.
+
+        Parameters
+        ----------
+        instrument: str
+            Name of the instrument.
+        exposure: int
+            exposure id of data to retrieve information from.
+
+        Returns
+        -------
+        VisitInfo
+            Object with information about a single exposure of an imaging
+            camera.
+        """
+        return dafButler.Butler(self.data_path).get(
+            "raw.visitInfo",
+            dataId={
+                "instrument": self.data_instrument_name[instrument],
+                "exposure": exposure,
+                "detector": self.reference_detector,
+            },
+            collections=self.collections.split(","),
+        )
 
     @staticmethod
     def get_field_idx_wfe_from_data_container(data_container):
