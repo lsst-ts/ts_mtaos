@@ -320,6 +320,50 @@ class TestModel(unittest.TestCase):
 
         self.assertEqual(self.model.reject_unreasonable_wfe([]), [])
 
+    def test_expand_wep_configuration_empty_config(self):
+
+        config = dict()
+        visit_info = self._get_visit_info_mock("comcam", 12345)
+        expected_donut_catalog_online_config = dict(
+            boresightRa=0.0,
+            boresightDec=-80.0,
+            boresightRotAng=45,
+        )
+
+        wep_configuration = self.model.expand_wep_configuration(config, visit_info)
+
+        self.assert_generate_donut_catalog_online_task_config(
+            wep_configuration, expected_donut_catalog_online_config
+        )
+
+    def test_expand_wep_configuration_valid_config(self):
+
+        config = dict(
+            tasks=dict(
+                generateDonutCatalogOnlineTask=dict(
+                    config={
+                        "filterName": "phot_g_mean",
+                        "boresightRotAng": -45.0,
+                        "connections.refCatalogs": "cal_ref_cat",
+                    }
+                )
+            )
+        )
+        visit_info = self._get_visit_info_mock("comcam", 12345)
+        expected_donut_catalog_online_config = dict(
+            boresightRa=0.0,
+            boresightDec=-80.0,
+            boresightRotAng=-45,
+            filterName="phot_g_mean",
+        )
+        expected_donut_catalog_online_config["connections.refCatalogs"] = "cal_ref_cat"
+
+        wep_configuration = self.model.expand_wep_configuration(config, visit_info)
+
+        self.assert_generate_donut_catalog_online_task_config(
+            wep_configuration, expected_donut_catalog_online_config
+        )
+
     def test_generate_wep_configuration(self):
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
@@ -543,6 +587,19 @@ class TestModel(unittest.TestCase):
 
         assert "tasks" in wep_configuration
 
+        self.assert_generate_donut_catalog_online_task_config(
+            wep_configuration, expected_donut_catalog_online_task_config
+        )
+
+        self.assert_isr_config(wep_configuration, expected_isr_config)
+
+        self.assert_estimate_zernikes_science_sensor_task(
+            wep_configuration, expected_zernike_science_sensor_config
+        )
+
+    def assert_generate_donut_catalog_online_task_config(
+        self, wep_configuration, expected_donut_catalog_online_task_config
+    ):
         assert "generateDonutCatalogOnlineTask" in wep_configuration["tasks"]
         assert "config" in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]
         for config in set(("boresightRa", "boresightDec", "boresightRotAng")).union(
@@ -561,6 +618,8 @@ class TestModel(unittest.TestCase):
                 ]
                 == expected_donut_catalog_online_task_config[config]
             )
+
+    def assert_isr_config(self, wep_configuration, expected_isr_config):
 
         assert "isr" in wep_configuration["tasks"]
         assert "config" in wep_configuration["tasks"]["isr"]
@@ -589,6 +648,9 @@ class TestModel(unittest.TestCase):
                 == expected_isr_config[config]
             ), f"Expected {config}"
 
+    def assert_estimate_zernikes_science_sensor_task(
+        self, wep_configuration, expected_zernike_science_sensor_config
+    ):
         assert "estimateZernikesScienceSensorTask" in wep_configuration["tasks"]
         assert (
             "config" in wep_configuration["tasks"]["estimateZernikesScienceSensorTask"]

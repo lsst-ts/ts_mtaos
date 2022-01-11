@@ -658,15 +658,34 @@ class Model:
             exposure=reference_id,
         )
 
-        visit_info = butler.get(
-            "raw.visitInfo",
-            dataId={
-                "instrument": self.data_instrument_name[instrument],
-                "exposure": reference_id,
-                "detector": self.reference_detector,
-            },
-            collections=self.collections.split(","),
+        wep_configuration = self.expand_wep_configuration(
+            config=config,
+            visit_info=visit_info,
         )
+
+        self.log.debug(f"validating {wep_configuration}")
+        return self.wep_configuration_validation.validate(wep_configuration)
+
+    def expand_wep_configuration(self, config: dict, visit_info: VisitInfo) -> dict:
+        """Expand wep configuration.
+
+        This method makes sure the input configuration has the required fields
+        for the WEP task configuration.
+
+        Parameters
+        ----------
+        config: `dict`
+            Input dictionary to expand into a valid wep configuration.
+
+        visit_info: `VisitInfo`
+            Object with information about a single exposure of an imaging
+            camera.
+
+        Returns
+        -------
+        wep_configuration: `dict`
+            Dictionary with a valid wep configuration.
+        """
 
         wep_configuration = config.copy()
 
@@ -683,23 +702,37 @@ class Model:
         ):
             wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"] = {}
 
-        (
+        if (
+            "boresightRa"
+            not in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"][
+                "config"
+            ]
+        ):
             wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
                 "boresightRa"
-            ],
+            ] = (visit_info.getBoresightRaDec().getRa().asDegrees())
+
+        if (
+            "boresightDec"
+            not in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"][
+                "config"
+            ]
+        ):
             wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
                 "boresightDec"
-            ],
+            ] = (visit_info.getBoresightRaDec().getDec().asDegrees())
+
+        if (
+            "boresightRotAng"
+            not in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"][
+                "config"
+            ]
+        ):
             wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
                 "boresightRotAng"
-            ],
-        ) = (
-            visit_info.getBoresightRaDec().getRa().asDegrees(),
-            visit_info.getBoresightRaDec().getDec().asDegrees(),
-            visit_info.getBoresightRotAngle().asDegrees(),
-        )
+            ] = visit_info.getBoresightRotAngle().asDegrees()
 
-        return self.wep_configuration_validation.validate(wep_configuration)
+        return wep_configuration
 
     def reject_unreasonable_wfe(self, listOfWfErr):
         """Reject the wavefront error that is unreasonable.
