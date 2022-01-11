@@ -20,12 +20,12 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
-from pathlib import Path
 import shutil
 import unittest
 import numpy as np
 import yaml
 
+from pathlib import Path
 from unittest.mock import Mock
 from jsonschema.exceptions import ValidationError
 
