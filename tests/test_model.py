@@ -26,12 +26,17 @@ import unittest
 import numpy as np
 import yaml
 
+from unittest.mock import Mock
+from jsonschema.exceptions import ValidationError
+
 from lsst.ts.ofc import OFC, OFCData
 from lsst.ts.ofc.utils import CorrectionType
 
 from lsst.ts import MTAOS
 
 from lsst.daf import butler as dafButler
+from lsst.afw.image import VisitInfo
+from lsst.geom import SpherePoint, degrees
 
 from lsst.ts.wep.Utility import writeCleanUpRepoCmd, runProgram
 from lsst.ts.wep.Utility import getModulePath as getModulePathWep
@@ -63,6 +68,9 @@ class TestModel(unittest.TestCase):
             instrument=ofc_data.name, data_path=None, ofc_data=ofc_data
         )
 
+        # patch _get_visit_info for unit testing
+        cls.model._get_visit_info = Mock(side_effect=cls._get_visit_info_mock)
+
     def setUp(self):
         os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
         self._makeDir(self.isrDir)
@@ -81,6 +89,33 @@ class TestModel(unittest.TestCase):
             os.environ.pop("ISRDIRPATH")
         except KeyError:
             pass
+
+    @staticmethod
+    def _get_visit_info_mock(instrument: str, exposure: int) -> VisitInfo:
+        """Mock the _get_visit_info method from mtaos Model class.
+
+        Parameters
+        ----------
+        instrument : `str`
+            Name of the instrument.
+        exposure : `int`
+            exposure id of data to retrieve information from.
+
+        Returns
+        -------
+        `VisitInfo`
+            Object with information about a single exposure of an imaging
+            camera.
+        """
+        return VisitInfo(
+            exposureId=exposure,
+            instrumentLabel=instrument,
+            boresightRaDec=SpherePoint(
+                0.0 * degrees,
+                -80.0 * degrees,
+            ),
+            boresightRotAngle=45.0 * degrees,
+        )
 
     def test_init(self):
 
@@ -284,6 +319,296 @@ class TestModel(unittest.TestCase):
     def test_reject_unreasonable_wfe(self):
 
         self.assertEqual(self.model.reject_unreasonable_wfe([]), [])
+
+    def test_generate_wep_configuration(self):
+        wep_configuration = self.model.generate_wep_configuration(
+            instrument="comcam",
+            reference_id=12345,
+            config=dict(),
+        )
+
+        expected_donut_catalog_online_config = dict(
+            boresightRa=0.0,
+            boresightDec=-80.0,
+            boresightRotAng=45,
+        )
+        expected_isr_config = {
+            "connections.outputExposure": "postISRCCD",
+            "doBias": False,
+            "doVariance": False,
+            "doLinearize": False,
+            "doCrosstalk": False,
+            "doDefect": False,
+            "doNanMasking": False,
+            "doInterpolate": False,
+            "doBrighterFatter": False,
+            "doDark": False,
+            "doFlat": False,
+            "doApplyGains": True,
+            "doFringe": False,
+            "doOverscan": True,
+        }
+        expected_zernike_science_sensor_config = {
+            "donutTemplateSize": 160,
+            "donutStampSize": 160,
+            "initialCutoutPadding": 40,
+        }
+
+        self.assert_wep_configuration(
+            wep_configuration=wep_configuration,
+            expected_donut_catalog_online_task_config=expected_donut_catalog_online_config,
+            expected_isr_config=expected_isr_config,
+            expected_zernike_science_sensor_config=expected_zernike_science_sensor_config,
+        )
+
+    def test_generate_wep_configuration_custom_donut_catalog_online(self):
+        wep_configuration = self.model.generate_wep_configuration(
+            instrument="comcam",
+            reference_id=12345,
+            config=dict(
+                tasks=dict(
+                    generateDonutCatalogOnlineTask=dict(
+                        config={
+                            "filterName": "g",
+                            "boresightRotAng": -45,
+                            "connections.refCatalogs": "cal_ref_cat",
+                        }
+                    )
+                )
+            ),
+        )
+
+        expected_donut_catalog_online_config = dict(
+            boresightRa=0.0,
+            boresightDec=-80.0,
+            boresightRotAng=-45,
+            filterName="g",
+        )
+        expected_donut_catalog_online_config["connections.refCatalogs"] = "cal_ref_cat"
+
+        expected_isr_config = {
+            "connections.outputExposure": "postISRCCD",
+            "doBias": False,
+            "doVariance": False,
+            "doLinearize": False,
+            "doCrosstalk": False,
+            "doDefect": False,
+            "doNanMasking": False,
+            "doInterpolate": False,
+            "doBrighterFatter": False,
+            "doDark": False,
+            "doFlat": False,
+            "doApplyGains": True,
+            "doFringe": False,
+            "doOverscan": True,
+        }
+
+        expected_zernike_science_sensor_config = {
+            "donutTemplateSize": 160,
+            "donutStampSize": 160,
+            "initialCutoutPadding": 40,
+        }
+
+        self.assert_wep_configuration(
+            wep_configuration=wep_configuration,
+            expected_donut_catalog_online_task_config=expected_donut_catalog_online_config,
+            expected_isr_config=expected_isr_config,
+            expected_zernike_science_sensor_config=expected_zernike_science_sensor_config,
+        )
+
+    def test_generate_wep_configuration_custom_isr(self):
+        wep_configuration = self.model.generate_wep_configuration(
+            instrument="comcam",
+            reference_id=12345,
+            config=dict(
+                tasks=dict(
+                    isr=dict(
+                        config=dict(
+                            doBias=True,
+                            doDefect=True,
+                        )
+                    )
+                )
+            ),
+        )
+
+        expected_donut_catalog_online_config = dict(
+            boresightRa=0.0,
+            boresightDec=-80.0,
+            boresightRotAng=45,
+        )
+        expected_isr_config = {
+            "connections.outputExposure": "postISRCCD",
+            "doBias": True,
+            "doVariance": False,
+            "doLinearize": False,
+            "doCrosstalk": False,
+            "doDefect": True,
+            "doNanMasking": False,
+            "doInterpolate": False,
+            "doBrighterFatter": False,
+            "doDark": False,
+            "doFlat": False,
+            "doApplyGains": True,
+            "doFringe": False,
+            "doOverscan": True,
+        }
+        expected_zernike_science_sensor_config = {
+            "donutTemplateSize": 160,
+            "donutStampSize": 160,
+            "initialCutoutPadding": 40,
+        }
+
+        self.assert_wep_configuration(
+            wep_configuration=wep_configuration,
+            expected_donut_catalog_online_task_config=expected_donut_catalog_online_config,
+            expected_isr_config=expected_isr_config,
+            expected_zernike_science_sensor_config=expected_zernike_science_sensor_config,
+        )
+
+    def test_generate_wep_configuration_custom_zernike_science_sensor(self):
+        wep_configuration = self.model.generate_wep_configuration(
+            instrument="comcam",
+            reference_id=12345,
+            config=dict(
+                tasks=dict(
+                    estimateZernikesScienceSensorTask=dict(
+                        config=dict(
+                            initialCutoutPadding=80,
+                        )
+                    )
+                )
+            ),
+        )
+
+        expected_donut_catalog_online_config = dict(
+            boresightRa=0.0,
+            boresightDec=-80.0,
+            boresightRotAng=45,
+        )
+        expected_isr_config = {
+            "connections.outputExposure": "postISRCCD",
+            "doBias": False,
+            "doVariance": False,
+            "doLinearize": False,
+            "doCrosstalk": False,
+            "doDefect": False,
+            "doNanMasking": False,
+            "doInterpolate": False,
+            "doBrighterFatter": False,
+            "doDark": False,
+            "doFlat": False,
+            "doApplyGains": True,
+            "doFringe": False,
+            "doOverscan": True,
+        }
+        expected_zernike_science_sensor_config = {
+            "donutTemplateSize": 160,
+            "donutStampSize": 160,
+            "initialCutoutPadding": 80,
+        }
+
+        self.assert_wep_configuration(
+            wep_configuration=wep_configuration,
+            expected_donut_catalog_online_task_config=expected_donut_catalog_online_config,
+            expected_isr_config=expected_isr_config,
+            expected_zernike_science_sensor_config=expected_zernike_science_sensor_config,
+        )
+
+    def test_generate_wep_fail_validation(self):
+        with self.assertRaises(ValidationError):
+            self.model.generate_wep_configuration(
+                instrument="comcam",
+                reference_id=12345,
+                config=dict(
+                    tasks=dict(
+                        generateDonutCatalogOnlineTask=dict(
+                            config={
+                                "filterName": "g",
+                                "boresightRotAng": "-45:00:00.0",
+                                "connections.refCatalogs": "cal_ref_cat",
+                            }
+                        )
+                    )
+                ),
+            )
+
+    def assert_wep_configuration(
+        self,
+        wep_configuration,
+        expected_donut_catalog_online_task_config,
+        expected_isr_config,
+        expected_zernike_science_sensor_config,
+    ):
+
+        assert "tasks" in wep_configuration
+
+        assert "generateDonutCatalogOnlineTask" in wep_configuration["tasks"]
+        assert "config" in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]
+        for config in set(("boresightRa", "boresightDec", "boresightRotAng")).union(
+            expected_donut_catalog_online_task_config.keys()
+        ):
+            assert (
+                config
+                in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"][
+                    "config"
+                ]
+            )
+
+            assert (
+                wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
+                    config
+                ]
+                == expected_donut_catalog_online_task_config[config]
+            )
+
+        assert "isr" in wep_configuration["tasks"]
+        assert "config" in wep_configuration["tasks"]["isr"]
+        for config in set(
+            (
+                "connections.outputExposure",
+                "doBias",
+                "doVariance",
+                "doLinearize",
+                "doCrosstalk",
+                "doDefect",
+                "doNanMasking",
+                "doInterpolate",
+                "doBrighterFatter",
+                "doDark",
+                "doFlat",
+                "doApplyGains",
+                "doFringe",
+                "doOverscan",
+            )
+        ).union(expected_isr_config.keys()):
+            assert config in wep_configuration["tasks"]["isr"]["config"]
+
+            assert (
+                wep_configuration["tasks"]["isr"]["config"][config]
+                == expected_isr_config[config]
+            ), f"Expected {config}"
+
+        assert "estimateZernikesScienceSensorTask" in wep_configuration["tasks"]
+        assert (
+            "config" in wep_configuration["tasks"]["estimateZernikesScienceSensorTask"]
+        )
+        for config in set(
+            ("donutTemplateSize", "donutStampSize", "initialCutoutPadding")
+        ).union(expected_zernike_science_sensor_config):
+            assert (
+                config
+                in wep_configuration["tasks"]["estimateZernikesScienceSensorTask"][
+                    "config"
+                ]
+            )
+
+            assert (
+                wep_configuration["tasks"]["estimateZernikesScienceSensorTask"][
+                    "config"
+                ][config]
+                == expected_zernike_science_sensor_config[config]
+            )
 
 
 class TestAsyncModel(unittest.IsolatedAsyncioTestCase):
