@@ -31,6 +31,8 @@ import numpy as np
 from lsst.ts.ofc import OFC
 from lsst.ts.salobj import DefaultingValidator
 
+from lsst.afw.image import VisitInfo
+
 from .config_schema import WEP_PIPELINE_CONFIG
 
 from .wavefront_collection import WavefrontCollection
@@ -67,9 +69,9 @@ class Model:
 
         Parameters
         ----------
-        instrument: `str`
+        instrument : `str`
             Name of the instrument.
-        data_path: `str`
+        data_path : `str`
             Path to the data butler.
         ofc_data : `OFCData`
             OFC data container class.
@@ -79,25 +81,25 @@ class Model:
 
         Other Parameters
         ----------------
-        run_name: `str`, optional
+        run_name : `str`, optional
             Which name to use when running the pipeline task. This defines
             the location where the data is written in the butler.
             Default is "mtaos_wep".
-        collections: `str`, optional
+        collections : `str`, optional
             String with the data collections to add to the pipeline task.
             Default is "LSSTComCam/raw/all,LSSTComCam/calib".
-        pipeline_instrument: `dict` or `None`, optional
+        pipeline_instrument : `dict` or `None`, optional
             A dictionary that maps the name of the instrument to the name used
             in the pipeline task. If None, use default dictionary mapping.
-        pipeline_n_processes: `int`, optional
+        pipeline_n_processes : `int`, optional
             Number of processes to use when running pipeline. Default is 9.
-        data_instrument_name: `dict` or `None`, optional
+        data_instrument_name : `dict` or `None`, optional
             A dictionary that maps the name of the instrument to the name used
             by the pipeline task to store the data products. If None, use
             default dictionary mapping.
-        reference_detector: `int`, optional
+        reference_detector : `int`, optional
             Which detector to use as a referece to construct the WCS.
-        zernike_table_name: `str`, optional
+        zernike_table_name : `str`, optional
             Name of the table in the butler with zernike coeffients.
             Default is "zernikeEstimateRaw".
 
@@ -105,32 +107,32 @@ class Model:
         ----------
         log : `Logger`
             Log facility.
-        instrument: `str`
+        instrument : `str`
             Name of the instrument.
-        data_path: `str`
+        data_path : `str`
             Path to the data butler.
-        run_name: `str`, optional
+        run_name : `str`, optional
             Which name to use when running the pipeline task. This defines
             the location where the data is written in the butler.
             Default is "mtaos_wep".
-        collections: `str`, optional
+        collections : `str`, optional
             String with the data collections to add to the pipeline task.
             Default is "LSSTComCam/raw/all,LSSTComCam/calib".
-        pipeline_instrument: `dict` or `None`, optional
+        pipeline_instrument : `dict` or `None`, optional
             A dictionary that maps the name of the instrument to the name used
             in the pipeline task. If None, use default dictionary mapping.
-        pipeline_n_processes: `int`, optional
+        pipeline_n_processes : `int`, optional
             Number of processes to use when running pipeline. Default is 9.
-        data_instrument_name: `dict` or `None`, optional
+        data_instrument_name : `dict` or `None`, optional
             A dictionary that maps the name of the instrument to the name used
             by the pipeline task to store the data products. If None, use
             default dictionary mapping.
-        reference_detector: `int`, optional
+        reference_detector : `int`, optional
             Which detector to use as a referece to construct the WCS.
-        zernike_table_name: `str`, optional
+        zernike_table_name : `str`, optional
             Name of the table in the butler with zernike coeffients.
             Default is "zernikeEstimateRaw".
-        wep_configuration_validation: `DefaultingValidator`
+        wep_configuration_validation : `DefaultingValidator`
             Provide schema validation for wavefront estimation pipeline task.
         wavefront_errors : `WavefrontCollection`
             Object to manage list of wavefront errors.
@@ -228,12 +230,12 @@ class Model:
 
         Parameters
         ----------
-        value: `float`
+        value : `float`
             New value for user_gain. Must be between 0 and 1.
 
         Raises
         ------
-        ValueError:
+        ValueError
             If input `value` is outside the range (0.0, 1.0).
         """
 
@@ -393,7 +395,8 @@ class Model:
 
     def _clear_wfe_collections(self):
         """Clear the collections of wavefront error contain the rejected
-        one."""
+        one.
+        """
 
         self.wavefront_errors.clear()
         self.rejected_wavefront_errors.clear()
@@ -651,17 +654,39 @@ class Model:
         # TODO: Implement configuration when user runs select_sources
         # beforehand.
 
-        butler = dafButler.Butler(self.data_path)
-
-        visit_info = butler.get(
-            "raw.visitInfo",
-            dataId={
-                "instrument": self.data_instrument_name[instrument],
-                "exposure": reference_id,
-                "detector": self.reference_detector,
-            },
-            collections=self.collections.split(","),
+        visit_info = self._get_visit_info(
+            instrument=instrument,
+            exposure=reference_id,
         )
+
+        wep_configuration = self.expand_wep_configuration(
+            config=config,
+            visit_info=visit_info,
+        )
+
+        self.log.debug(f"validating {wep_configuration}")
+        return self.wep_configuration_validation.validate(wep_configuration)
+
+    def expand_wep_configuration(self, config: dict, visit_info: VisitInfo) -> dict:
+        """Expand wep configuration.
+
+        This method makes sure the input configuration has the required fields
+        for the WEP task configuration.
+
+        Parameters
+        ----------
+        config : `dict`
+            Input dictionary to expand into a valid wep configuration.
+
+        visit_info : `VisitInfo`
+            Object with information about a single exposure of an imaging
+            camera.
+
+        Returns
+        -------
+        wep_configuration : `dict`
+            Dictionary with a valid wep configuration.
+        """
 
         wep_configuration = config.copy()
 
@@ -678,23 +703,37 @@ class Model:
         ):
             wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"] = {}
 
-        (
+        if (
+            "boresightRa"
+            not in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"][
+                "config"
+            ]
+        ):
             wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
                 "boresightRa"
-            ],
+            ] = (visit_info.getBoresightRaDec().getRa().asDegrees())
+
+        if (
+            "boresightDec"
+            not in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"][
+                "config"
+            ]
+        ):
             wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
                 "boresightDec"
-            ],
+            ] = (visit_info.getBoresightRaDec().getDec().asDegrees())
+
+        if (
+            "boresightRotAng"
+            not in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"][
+                "config"
+            ]
+        ):
             wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
                 "boresightRotAng"
-            ],
-        ) = (
-            visit_info.getBoresightRaDec().getRa().asDegrees(),
-            visit_info.getBoresightRaDec().getDec().asDegrees(),
-            visit_info.getBoresightRotAngle().asDegrees(),
-        )
+            ] = visit_info.getBoresightRotAngle().asDegrees()
 
-        return self.wep_configuration_validation.validate(wep_configuration)
+        return wep_configuration
 
     def reject_unreasonable_wfe(self, listOfWfErr):
         """Reject the wavefront error that is unreasonable.
@@ -742,9 +781,9 @@ class Model:
 
         Returns
         -------
-        field_idx: `np.ndarray [int]`
+        field_idx : `np.ndarray [int]`
             Array with field indexes.
-        wfe: `np.ndarray`
+        wfe : `np.ndarray`
             Array of arrays with the zernike coeficients for each field index.
         """
 
@@ -759,9 +798,9 @@ class Model:
 
         Returns
         -------
-        field_idx: `np.ndarray [int]`
+        field_idx : `np.ndarray [int]`
             Array with field indexes.
-        wfe: `np.ndarray`
+        wfe : `np.ndarray`
             Array of arrays with the zernike coeficients for each field index.
         """
 
@@ -776,12 +815,12 @@ class Model:
 
         Parameters
         ----------
-        wfe: `np.ndarray`
+        wfe : `np.ndarray`
             2D array with wavefront errors (in microns). Each element contains
             the wavefront errors for a specific field index.
-        field_idx: `np.ndarray`
+        field_idx : `np.ndarray`
             Field index for the input wavefront errors.
-        **kwargs: `dict`
+        **kwargs : `dict`
             User input keyword arguments. Optional standard kwargs:
                 gain: `float`
                     User gain (default -1).
@@ -844,7 +883,7 @@ class Model:
 
         Parameters
         ----------
-        kwargs: `dict`
+        **kwargs : `dict`
             Input keyword arguments. The method does not expect any particular
             input.
 
@@ -936,6 +975,32 @@ class Model:
             message = await stream.readline()
             self.log.debug(message.decode())
 
+    def _get_visit_info(self, instrument: str, exposure: int) -> VisitInfo:
+        """Get visit info from the butler.
+
+        Parameters
+        ----------
+        instrument : `str`
+            Name of the instrument.
+        exposure : `int`
+            exposure id of data to retrieve information from.
+
+        Returns
+        -------
+        `VisitInfo`
+            Object with information about a single exposure of an imaging
+            camera.
+        """
+        return dafButler.Butler(self.data_path).get(
+            "raw.visitInfo",
+            dataId={
+                "instrument": self.data_instrument_name[instrument],
+                "exposure": exposure,
+                "detector": self.reference_detector,
+            },
+            collections=self.collections.split(","),
+        )
+
     @staticmethod
     def get_field_idx_wfe_from_data_container(data_container):
         """Parse data container generated from calling
@@ -944,15 +1009,15 @@ class Model:
 
         Parameters
         ----------
-        data_container: `dict`
+        data_container : `dict`
             Dictionary returned by
             `WavefrontCollection.getListOfWavefrontErrorAvgInTakenData()`.
 
         Returns
         -------
-        field_idx: `np.ndarray [int]`
+        field_idx : `np.ndarray [int]`
             Array with field indexes.
-        wfe: `np.ndarray`
+        wfe : `np.ndarray`
             Array of arrays with the zernike coeficients for each field index.
         """
         field_idx = np.array([sensor_id for sensor_id in data_container])

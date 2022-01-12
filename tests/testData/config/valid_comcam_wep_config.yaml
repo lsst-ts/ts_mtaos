@@ -1,0 +1,16 @@
+# Test comcam configuration. Values are changed from the default for testing
+# purposes.
+camera: comcam
+instrument: comcam
+data_path: /project/shared/comcam 
+run_name: mtaos_wep_comcam
+collections: refcats,LSSTComCam/raw/all,LSSTComCam/calib,LSSTComCam/unittest
+pipeline_instrument:
+  comcam: "lsst.obs.lsst.LsstComCamTest"
+  lsstCam: "lsst.obs.lsst.LsstCamTest"
+  lsstFamCam: "lsst.obs.lsst.LsstCamTest"
+pipeline_n_processes: 123
+zernike_table_name: zernikeEstimateRawTest
+reference_detector: 2
+visit_id_offset: 4000000000000
+wep_config: good_wep_config.yaml
