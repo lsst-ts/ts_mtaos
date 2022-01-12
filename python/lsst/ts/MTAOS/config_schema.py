@@ -102,6 +102,11 @@ properties:
     default: 0
     minimum: 0
 
+  wep_config:
+    description: >-
+      A yaml configuration file to use as default values for the wep.
+    type: string
+
 required:
   - camera
   - instrument

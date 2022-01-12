@@ -21,10 +21,11 @@
 
 __all__ = ["MTAOS"]
 
+import yaml
+import typing
 import inspect
 import asyncio
 import logging
-import yaml
 import warnings
 
 from astropy import units as u
@@ -35,6 +36,9 @@ from lsst.ts import salobj
 from lsst.ts.idl.enums.MTAOS import FilterType
 from lsst.ts.ofc import OFCData
 from lsst.ts.utils import astropy_time_from_tai_unix
+
+from lsst.afw.image import VisitInfo
+from lsst.geom import SpherePoint, degrees
 
 from . import CONFIG_SCHEMA, TELESCOPE_DOF_SCHEMA
 from . import Config
@@ -100,6 +104,9 @@ class MTAOS(salobj.ConfigurableCsc):
             configuration.
         issue_correction_lock : `asyncio.Lock`
             A lock used to synchronize sending corrections to the components.
+        wep_config : `dict`
+            Default configuration for the wep. This is used in `do_runWEP()`,
+            when the user does not provide an override configuration.
         execution_times : `dict`
             Dictionary to store cricital execution times.
         DEFAULT_TIMEOUT : `float`
@@ -188,9 +195,29 @@ class MTAOS(salobj.ConfigurableCsc):
         # same time.
         self.issue_correction_lock = asyncio.Lock()
 
+        self.wep_config = dict()
+
         self.log.info("MTAOS CSC is ready.")
 
-    async def configure(self, config):
+    async def configure(self, config: typing.Any) -> None:
+        """Configure the CSC.
+
+        Parameters
+        ----------
+        config : `object`
+            The configuration as described by the schema at ``schema_path``,
+            as a struct-like object.
+
+        Raises
+        ------
+        `salobj.ExpectedError`
+            If fails to parse/validate `wep_config`.
+
+        Notes
+        -----
+        Called when running the ``start`` command, just before changing
+        summary state from `State.STANDBY` to `State.DISABLED`.
+        """
 
         self._logExecFunc()
         self.log.debug("MTAOS configuration started.")
@@ -237,6 +264,33 @@ class MTAOS(salobj.ConfigurableCsc):
 
         if dof_state0 is not None:
             self.model.ofc_data.dof_state0 = dof_state0
+
+        if hasattr(config, "wep_config"):
+            with open(self.config_dir / config.wep_config) as fp:
+                self.wep_config = yaml.safe_load(fp)
+                try:
+                    tmp_visit_info = VisitInfo(
+                        boresightRaDec=SpherePoint(
+                            0.0 * degrees,
+                            0.0 * degrees,
+                        ),
+                        boresightRotAngle=0.0 * degrees,
+                    )
+                    wep_config_expanded = self.model.expand_wep_configuration(
+                        self.wep_config,
+                        tmp_visit_info,
+                    )
+                    self.model.wep_configuration_validation.validate(
+                        wep_config_expanded
+                    )
+                except Exception as e:
+                    self.log.exception("Failed to validate WEP configuration.")
+                    raise salobj.ExpectedError(
+                        f"Failed to validate WEP configuration with {e}. "
+                        "Check CSC logs for more information."
+                    )
+        else:
+            self.wep_config = dict()
 
         self.log.debug("MTAOS configuration completed.")
 
@@ -432,7 +486,9 @@ class MTAOS(salobj.ConfigurableCsc):
                 extra_id=self.visit_id_offset + data.extraId
                 if data.extraId > 0
                 else None,
-                config=yaml.safe_load(data.config) if len(data.config) > 0 else {},
+                config=yaml.safe_load(data.config)
+                if len(data.config) > 0
+                else self.wep_config,
                 run_name_extention=run_name_extention,
                 log_time=self.execution_times,
             )

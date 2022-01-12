@@ -2,6 +2,18 @@
 Version History
 ===============
 
+v0.8.0
+------
+
+* Add new (backward compatible) CSC configuration parameter `wep_config`, which allows users to specify a default configuration override for the CSC to use in the `runWep` command.
+* Reorganize import statements in test_model.py unit test.
+* Add unit tests for `Model.generate_wep_configuration`.
+* In `Model` class: 
+  * Add `expand_wep_configuration` method that will get a dictionary and a visit_info object and expand it such that it contains information for the `generateDonutCatalogOnlineTask` pipeline task.
+  * Add `_get_visit_info` method to encapsulate usage of butler to retrieve image information. 
+    This allows us wrap the method and provide better unit testing for the `Model.generate_wep_configuration` method.
+  * Reformat docstrings to fit pep8 standards.
+
 v0.7.8
 ------
 

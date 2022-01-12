@@ -1,0 +1,6 @@
+tasks:
+  generateDonutCatalogOnlineTask:
+    config:
+      boresightRotAng: 0.0
+      connections.refCatalogs: cal_ref_cat
+      filterName: phot_g_mean

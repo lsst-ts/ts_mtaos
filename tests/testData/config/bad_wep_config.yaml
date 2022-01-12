@@ -1,0 +1,5 @@
+# boresightRotAng should be a number.
+tasks:
+  generateDonutCatalogOnlineTask:
+    config:
+      boresightRotAng: "-45:00:00.0"
