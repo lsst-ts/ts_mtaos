@@ -37,9 +37,6 @@ from lsst.ts.idl.enums.MTAOS import FilterType
 from lsst.ts.ofc import OFCData
 from lsst.ts.utils import astropy_time_from_tai_unix
 
-from lsst.afw.image import VisitInfo
-from lsst.geom import SpherePoint, degrees
-
 from . import CONFIG_SCHEMA, TELESCOPE_DOF_SCHEMA
 from . import Config
 from . import Model
@@ -269,20 +266,7 @@ class MTAOS(salobj.ConfigurableCsc):
             with open(self.config_dir / config.wep_config) as fp:
                 self.wep_config = yaml.safe_load(fp)
                 try:
-                    tmp_visit_info = VisitInfo(
-                        boresightRaDec=SpherePoint(
-                            0.0 * degrees,
-                            0.0 * degrees,
-                        ),
-                        boresightRotAngle=0.0 * degrees,
-                    )
-                    wep_config_expanded = self.model.expand_wep_configuration(
-                        self.wep_config,
-                        tmp_visit_info,
-                    )
-                    self.model.wep_configuration_validation.validate(
-                        wep_config_expanded
-                    )
+                    self.model.wep_configuration_validation.validate(self.wep_config)
                 except Exception as e:
                     self.log.exception("Failed to validate WEP configuration.")
                     raise salobj.ExpectedError(
