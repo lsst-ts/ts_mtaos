@@ -295,6 +295,16 @@ class MTAOS(salobj.ConfigurableCsc):
 
         await super().start()
 
+    async def begin_disable(self, data):
+        """Begin do_disable; called before state changes.
+
+        Parameters
+        ----------
+        data : `DataType`
+            Command data
+        """
+        await self.model.interrupt_wep_process()
+
     async def do_resetCorrection(self, data):
         """Command to reset the current wavefront error calculations.
 
