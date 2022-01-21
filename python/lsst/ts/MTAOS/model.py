@@ -29,6 +29,7 @@ import tempfile
 import numpy as np
 
 from lsst.ts.ofc import OFC
+from lsst.ts.utils import make_done_future
 from lsst.ts.salobj import DefaultingValidator
 
 from lsst.afw.image import VisitInfo
@@ -155,6 +156,11 @@ class Model:
             M2 correction.
         camera : `lsst.ts.wep.bsc.CameraData.CameraData`
             Current camera instance.
+        wep_process : `Coroutine`, optional
+            Task for the wep process.
+        wep_process_started_task : `asyncio.Future`
+            A future that is reset before a wep process is started and is set
+            to done when it starts.
         """
 
         if log is None:
@@ -216,6 +222,9 @@ class Model:
         self.m2_correction = None
 
         self._user_gain = self.ofc.default_gain
+
+        self.wep_process = None
+        self.wep_process_started_task = make_done_future()
 
         self.reset_wfe_correction()
 
@@ -519,7 +528,24 @@ class Model:
             A dictionary with additional configuration for the pipeline task.
         run_name_extention : `str`, optional
             A string to be appended to the run name.
+
+        Raises
+        ------
+        RuntimeError
+            If there is an ongoing wep process.
+
+        See Also
+        --------
+        interrupt_wep_process : Interrupt an ongoing wep process.
         """
+        self.wep_process_started_task = asyncio.Future()
+
+        if self.wep_process is not None:
+            raise RuntimeError(
+                "There is an ongoing wep process. To run a different process, "
+                "interrupt the first one with 'interrupt_wep_process'."
+            )
+
         self.log.debug(f"Processing ComCam intra/extra pair: {intra_id}/{extra_id}.")
 
         wep_configuration = self.generate_wep_configuration(
@@ -552,15 +578,17 @@ class Model:
         self.log.debug(f"Running: {run_pipetask_cmd}")
 
         # Run pipeline task in a process asynchronously
-        wep_process = await asyncio.create_subprocess_shell(
+        self.wep_process = await asyncio.create_subprocess_shell(
             run_pipetask_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
 
-        log_task = asyncio.create_task(self.log_stream(wep_process.stderr))
+        self.wep_process_started_task.set_result(True)
 
-        await wep_process.wait()
+        log_task = asyncio.create_task(self.log_stream(self.wep_process.stderr))
+
+        await self.wep_process.wait()
 
         if not log_task.done():
             log_task.cancel()
@@ -572,15 +600,15 @@ class Model:
         except Exception as e:
             self.log.debug(f"Exception in log task: {e}. Ignoring.")
 
-        self.log.debug(f"Process returned: {wep_process.returncode}")
+        self.log.debug(f"Process returned: {self.wep_process.returncode}")
 
         # returncode contains the exit value of the process started with
         # asyncio.create_subprocess_shell. A value of zero means the process
         # finished successfully, anything else is considered an error. If we
         # get return code different than zero, assume the pipeline task
         # failed and raise an exception with the error report.
-        if wep_process.returncode != 0:
-            stdout, stderr = await wep_process.communicate()
+        if self.wep_process.returncode != 0:
+            stdout, stderr = await self.wep_process.communicate()
 
             if len(stdout) > 0:
                 self.log.debug(stdout.decode())
@@ -588,7 +616,11 @@ class Model:
             if len(stderr) > 0:
                 self.log.error(stderr.decode())
 
+            self.wep_process = None
+
             raise RuntimeError(f"Error running pipeline task: {stderr.decode()}")
+        else:
+            self.wep_process = None
 
         self.log.debug("Data processing completed successfully. Gathering output.")
 
@@ -631,6 +663,17 @@ class Model:
                 for data_id in data_ids
             ]
         )
+
+    async def interrupt_wep_process(self):
+        """Interrupt a currently executing processing."""
+
+        if self.wep_process is not None:
+            self.log.debug("Waiting for wep process to start.")
+            await self.wep_process_started_task
+            self.log.debug("Terminating wep process.")
+            self.wep_process.terminate()
+        else:
+            self.log.debug("No wep process running. Nothing to do.")
 
     def generate_wep_configuration(self, instrument, reference_id, config):
         """Generate configuration dictionary for running the WEP pipeline based
@@ -892,9 +935,22 @@ class Model:
             Output stream pipe to process and log.
         """
 
+        wait_time = 1.0
+
         while True:
-            message = await stream.readline()
-            self.log.debug(message.decode())
+            timer_task = asyncio.create_task(asyncio.sleep(wait_time))
+            message = ""
+            n_empty_lines = 0
+            while not timer_task.done():
+                new_line = await stream.readline()
+                if len(new_line) > 0:
+                    message += new_line.decode()
+                else:
+                    n_empty_lines += 1
+            if n_empty_lines > 0:
+                self.log.debug(f"Got {n_empty_lines} empty lines.")
+            self.log.debug(message)
+            await asyncio.sleep(wait_time)
 
     def _get_visit_info(self, instrument: str, exposure: int) -> VisitInfo:
         """Get visit info from the butler.

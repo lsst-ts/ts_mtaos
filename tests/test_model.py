@@ -21,6 +21,7 @@
 
 import os
 import shutil
+import asyncio
 import unittest
 import numpy as np
 import yaml
@@ -641,6 +642,8 @@ class TestAsyncModel(unittest.IsolatedAsyncioTestCase):
             reference_detector=94,
         )
 
+        cls.short_waittime = 1.0
+
     @classmethod
     def tearDownClass(cls):
         # Check that run doesn't already exist due to previous improper cleanup
@@ -697,6 +700,29 @@ class TestAsyncModel(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             np.argmax(np.abs(zk_avg[94])) in self.zernike_coefficient_maximum_expected
         )
+
+    async def test_interrupt_wep_process(self):
+
+        task = asyncio.create_task(
+            self.model.process_comcam(
+                4021123106001,
+                4021123106002,
+                {
+                    "tasks": {
+                        "generateDonutCatalogWcsTask": {
+                            "config": {"donutSelector.fluxField": "g_flux"}
+                        }
+                    }
+                },
+            )
+        )
+
+        await asyncio.sleep(self.short_waittime)
+
+        await self.model.interrupt_wep_process()
+
+        with self.assertRaises(RuntimeError):
+            await task
 
 
 if __name__ == "__main__":
