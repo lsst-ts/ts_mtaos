@@ -935,22 +935,10 @@ class Model:
             Output stream pipe to process and log.
         """
 
-        wait_time = 1.0
-
-        while True:
-            timer_task = asyncio.create_task(asyncio.sleep(wait_time))
-            message = ""
-            n_empty_lines = 0
-            while not timer_task.done():
-                new_line = await stream.readline()
-                if len(new_line) > 0:
-                    message += new_line.decode()
-                else:
-                    n_empty_lines += 1
-            if n_empty_lines > 0:
-                self.log.debug(f"Got {n_empty_lines} empty lines.")
-            self.log.debug(message)
-            await asyncio.sleep(wait_time)
+        while not stream.at_eof():
+            new_line = await stream.readline()
+            if len(new_line) > 0:
+                self.log.debug(new_line.decode().strip())
 
     def _get_visit_info(self, instrument: str, exposure: int) -> VisitInfo:
         """Get visit info from the butler.
