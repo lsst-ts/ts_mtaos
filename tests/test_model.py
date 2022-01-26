@@ -724,6 +724,28 @@ class TestAsyncModel(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             await task
 
+    async def test_wep_process_fail_bad_config(self):
+
+        task = asyncio.create_task(
+            self.model.process_comcam(
+                4021123106001,
+                4021123106002,
+                {
+                    "tasks": {
+                        "generateDonutCatalogWcsTask": {
+                            "config": {
+                                "donutSelector.fluxField": "g_flux",
+                                "bad_key": "bad_value",
+                            }
+                        }
+                    }
+                },
+            )
+        )
+
+        with self.assertRaises(RuntimeError):
+            await task
+
     async def test_log_stream(self):
 
         task = await asyncio.create_subprocess_shell(
