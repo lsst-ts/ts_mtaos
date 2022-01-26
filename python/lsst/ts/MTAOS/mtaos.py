@@ -37,9 +37,6 @@ from lsst.ts.idl.enums.MTAOS import FilterType
 from lsst.ts.ofc import OFCData
 from lsst.ts.utils import astropy_time_from_tai_unix
 
-from lsst.afw.image import VisitInfo
-from lsst.geom import SpherePoint, degrees
-
 from . import CONFIG_SCHEMA, TELESCOPE_DOF_SCHEMA
 from . import Config
 from . import Model
@@ -122,6 +119,10 @@ class MTAOS(salobj.ConfigurableCsc):
         """
 
         cscName = utility.getCscName()
+
+        # TODO: Remove when xml 11 is available (DM-33401).
+        if utility.support_interrupt_wep_cmd():
+            setattr(self, "do_interruptWEP", self._handle_interrupt_wep)
 
         super().__init__(
             cscName,
@@ -269,20 +270,7 @@ class MTAOS(salobj.ConfigurableCsc):
             with open(self.config_dir / config.wep_config) as fp:
                 self.wep_config = yaml.safe_load(fp)
                 try:
-                    tmp_visit_info = VisitInfo(
-                        boresightRaDec=SpherePoint(
-                            0.0 * degrees,
-                            0.0 * degrees,
-                        ),
-                        boresightRotAngle=0.0 * degrees,
-                    )
-                    wep_config_expanded = self.model.expand_wep_configuration(
-                        self.wep_config,
-                        tmp_visit_info,
-                    )
-                    self.model.wep_configuration_validation.validate(
-                        wep_config_expanded
-                    )
+                    self.model.wep_configuration_validation.validate(self.wep_config)
                 except Exception as e:
                     self.log.exception("Failed to validate WEP configuration.")
                     raise salobj.ExpectedError(
@@ -310,6 +298,16 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         await super().start()
+
+    async def begin_disable(self, data):
+        """Begin do_disable; called before state changes.
+
+        Parameters
+        ----------
+        data : `DataType`
+            Command data
+        """
+        await self.model.interrupt_wep_process()
 
     async def do_resetCorrection(self, data):
         """Command to reset the current wavefront error calculations.
@@ -606,6 +604,23 @@ class MTAOS(salobj.ConfigurableCsc):
             self.pubEvent_cameraHexapodCorrection()
             self.pubEvent_m1m3Correction()
             self.pubEvent_m2Correction()
+
+    async def _handle_interrupt_wep(
+        self, data: salobj.type_hints.BaseDdsDataType
+    ) -> None:
+        """Interrupt a running wep process.
+
+        This method will be converted to do_interruptWEP when xml 11 is
+        released (DM-33401).
+
+        Parameters
+        ----------
+        data : ``cmd_interrupWEP.DataType``
+        """
+        # TODO: Rename to do_interruptWEP when xml 11 is available (DM-33401).
+        self.assert_enabled()
+
+        await self.model.interrupt_wep_process()
 
     async def handle_corrections(self):
         """Handle applying the corrections to all components.

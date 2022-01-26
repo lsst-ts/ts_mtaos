@@ -31,6 +31,7 @@ __all__ = [
     "getCscName",
     "addRotFileHandler",
     "timeit",
+    "support_interrupt_wep_cmd",
 ]
 
 import asyncio
@@ -41,8 +42,11 @@ import time
 from logging.handlers import RotatingFileHandler
 from enum import Enum, auto
 from pathlib import Path
+
 from lsst.utils import getPackageDir
 
+from lsst.ts.salobj import parse_idl
+from lsst.ts.idl import get_idl_dir
 from lsst.ts.wep.Utility import CamType
 
 
@@ -286,6 +290,26 @@ def timeit(func):
             return result
 
         return timed
+
+
+# TODO: Remove when xml 11 is available (DM-33401).
+def support_interrupt_wep_cmd() -> bool:
+    """Check if interruptWEP command is defined in MTAOS idl file.
+
+    This is a workaround to provide backward compatibility with xml 10.2
+    and will be removed in the future (DM-33401).
+
+    Returns
+    -------
+    `bool`
+        True if CSC interfaces defines the command "interruptWEP", False
+        otherwise.
+    """
+    csc_name = getCscName()
+
+    idl_metadata = parse_idl(csc_name, get_idl_dir() / f"sal_revCoded_{csc_name}.idl")
+
+    return "command_interruptWEP" in idl_metadata.topic_info
 
 
 if __name__ == "__main__":

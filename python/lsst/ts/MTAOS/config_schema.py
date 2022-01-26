@@ -271,7 +271,7 @@ $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema
 # must begin with "v"
 title: Wavefront estimation pipeline configuration schema.
 type: object
-
+additionalProperties: false
 properties:
 
   description:
@@ -293,11 +293,13 @@ properties:
         properties:
             isr:
               type: object
+              additionalProperties: false
               properties:
                 class:
                     type: string
                     default: lsst.ip.isr.isrTask.IsrTask
                 config:
+                    additionalProperties: false
                     type: object
                     properties:
                       connections.outputExposure:
@@ -342,27 +344,21 @@ properties:
                       doOverscan:
                         type: boolean
                         default: True
-            generateDonutCatalogOnlineTask:
+            generateDonutCatalogWcsTask:
                 type: object
+                additionalProperties: false
                 properties:
                     class:
                         type: string
                         default: >-
-                          lsst.ts.wep.task.GenerateDonutCatalogOnlineTask.GenerateDonutCatalogOnlineTask
+                          lsst.ts.wep.task.GenerateDonutCatalogWcsTask.GenerateDonutCatalogWcsTask
                     config:
-                        required:
-                            - boresightRa
-                            - boresightDec
-                            - boresightRotAng
                         properties:
-                            boresightRa:
-                                type: number
-                            boresightDec:
-                                type: number
-                            boresightRotAng:
-                                type: number
+                            filterName:
+                                type: string
             estimateZernikesScienceSensorTask:
                 type: object
+                additionalProperties: false
                 properties:
                   class:
                     type: string
@@ -370,6 +366,7 @@ properties:
                       lsst.ts.wep.task.EstimateZernikesScienceSensorTask.EstimateZernikesScienceSensorTask
                   config:
                     type: object
+                    additionalProperties: false
                     properties:
                       donutTemplateSize:
                         type: integer

@@ -21,13 +21,13 @@
 
 import os
 import shutil
+import asyncio
 import unittest
 import numpy as np
 import yaml
 
 from pathlib import Path
 from unittest.mock import Mock
-from jsonschema.exceptions import ValidationError
 
 from lsst.ts.ofc import OFC, OFCData
 from lsst.ts.ofc.utils import CorrectionType
@@ -320,50 +320,6 @@ class TestModel(unittest.TestCase):
 
         self.assertEqual(self.model.reject_unreasonable_wfe([]), [])
 
-    def test_expand_wep_configuration_empty_config(self):
-
-        config = dict()
-        visit_info = self._get_visit_info_mock("comcam", 12345)
-        expected_donut_catalog_online_config = dict(
-            boresightRa=0.0,
-            boresightDec=-80.0,
-            boresightRotAng=45,
-        )
-
-        wep_configuration = self.model.expand_wep_configuration(config, visit_info)
-
-        self.assert_generate_donut_catalog_online_task_config(
-            wep_configuration, expected_donut_catalog_online_config
-        )
-
-    def test_expand_wep_configuration_valid_config(self):
-
-        config = dict(
-            tasks=dict(
-                generateDonutCatalogOnlineTask=dict(
-                    config={
-                        "filterName": "phot_g_mean",
-                        "boresightRotAng": -45.0,
-                        "connections.refCatalogs": "cal_ref_cat",
-                    }
-                )
-            )
-        )
-        visit_info = self._get_visit_info_mock("comcam", 12345)
-        expected_donut_catalog_online_config = dict(
-            boresightRa=0.0,
-            boresightDec=-80.0,
-            boresightRotAng=-45,
-            filterName="phot_g_mean",
-        )
-        expected_donut_catalog_online_config["connections.refCatalogs"] = "cal_ref_cat"
-
-        wep_configuration = self.model.expand_wep_configuration(config, visit_info)
-
-        self.assert_generate_donut_catalog_online_task_config(
-            wep_configuration, expected_donut_catalog_online_config
-        )
-
     def test_generate_wep_configuration(self):
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
@@ -371,11 +327,8 @@ class TestModel(unittest.TestCase):
             config=dict(),
         )
 
-        expected_donut_catalog_online_config = dict(
-            boresightRa=0.0,
-            boresightDec=-80.0,
-            boresightRotAng=45,
-        )
+        expected_donut_catalog_wcs_config = dict()
+
         expected_isr_config = {
             "connections.outputExposure": "postISRCCD",
             "doBias": False,
@@ -400,7 +353,7 @@ class TestModel(unittest.TestCase):
 
         self.assert_wep_configuration(
             wep_configuration=wep_configuration,
-            expected_donut_catalog_online_task_config=expected_donut_catalog_online_config,
+            expected_donut_catalog_wcs_task_config=expected_donut_catalog_wcs_config,
             expected_isr_config=expected_isr_config,
             expected_zernike_science_sensor_config=expected_zernike_science_sensor_config,
         )
@@ -411,10 +364,9 @@ class TestModel(unittest.TestCase):
             reference_id=12345,
             config=dict(
                 tasks=dict(
-                    generateDonutCatalogOnlineTask=dict(
+                    generateDonutCatalogWcsTask=dict(
                         config={
                             "filterName": "g",
-                            "boresightRotAng": -45,
                             "connections.refCatalogs": "cal_ref_cat",
                         }
                     )
@@ -422,13 +374,10 @@ class TestModel(unittest.TestCase):
             ),
         )
 
-        expected_donut_catalog_online_config = dict(
-            boresightRa=0.0,
-            boresightDec=-80.0,
-            boresightRotAng=-45,
+        expected_donut_catalog_cwfs_config = dict(
             filterName="g",
         )
-        expected_donut_catalog_online_config["connections.refCatalogs"] = "cal_ref_cat"
+        expected_donut_catalog_cwfs_config["connections.refCatalogs"] = "cal_ref_cat"
 
         expected_isr_config = {
             "connections.outputExposure": "postISRCCD",
@@ -455,7 +404,7 @@ class TestModel(unittest.TestCase):
 
         self.assert_wep_configuration(
             wep_configuration=wep_configuration,
-            expected_donut_catalog_online_task_config=expected_donut_catalog_online_config,
+            expected_donut_catalog_wcs_task_config=expected_donut_catalog_cwfs_config,
             expected_isr_config=expected_isr_config,
             expected_zernike_science_sensor_config=expected_zernike_science_sensor_config,
         )
@@ -476,11 +425,7 @@ class TestModel(unittest.TestCase):
             ),
         )
 
-        expected_donut_catalog_online_config = dict(
-            boresightRa=0.0,
-            boresightDec=-80.0,
-            boresightRotAng=45,
-        )
+        expected_donut_catalog_cwfs_config = dict()
         expected_isr_config = {
             "connections.outputExposure": "postISRCCD",
             "doBias": True,
@@ -505,7 +450,7 @@ class TestModel(unittest.TestCase):
 
         self.assert_wep_configuration(
             wep_configuration=wep_configuration,
-            expected_donut_catalog_online_task_config=expected_donut_catalog_online_config,
+            expected_donut_catalog_wcs_task_config=expected_donut_catalog_cwfs_config,
             expected_isr_config=expected_isr_config,
             expected_zernike_science_sensor_config=expected_zernike_science_sensor_config,
         )
@@ -525,11 +470,7 @@ class TestModel(unittest.TestCase):
             ),
         )
 
-        expected_donut_catalog_online_config = dict(
-            boresightRa=0.0,
-            boresightDec=-80.0,
-            boresightRotAng=45,
-        )
+        expected_donut_catalog_cwfs_config = dict()
         expected_isr_config = {
             "connections.outputExposure": "postISRCCD",
             "doBias": False,
@@ -554,41 +495,23 @@ class TestModel(unittest.TestCase):
 
         self.assert_wep_configuration(
             wep_configuration=wep_configuration,
-            expected_donut_catalog_online_task_config=expected_donut_catalog_online_config,
+            expected_donut_catalog_wcs_task_config=expected_donut_catalog_cwfs_config,
             expected_isr_config=expected_isr_config,
             expected_zernike_science_sensor_config=expected_zernike_science_sensor_config,
         )
 
-    def test_generate_wep_fail_validation(self):
-        with self.assertRaises(ValidationError):
-            self.model.generate_wep_configuration(
-                instrument="comcam",
-                reference_id=12345,
-                config=dict(
-                    tasks=dict(
-                        generateDonutCatalogOnlineTask=dict(
-                            config={
-                                "filterName": "g",
-                                "boresightRotAng": "-45:00:00.0",
-                                "connections.refCatalogs": "cal_ref_cat",
-                            }
-                        )
-                    )
-                ),
-            )
-
     def assert_wep_configuration(
         self,
         wep_configuration,
-        expected_donut_catalog_online_task_config,
+        expected_donut_catalog_wcs_task_config,
         expected_isr_config,
         expected_zernike_science_sensor_config,
     ):
 
         assert "tasks" in wep_configuration
 
-        self.assert_generate_donut_catalog_online_task_config(
-            wep_configuration, expected_donut_catalog_online_task_config
+        self.assert_generate_donut_catalog_wcs_task_config(
+            wep_configuration, expected_donut_catalog_wcs_task_config
         )
 
         self.assert_isr_config(wep_configuration, expected_isr_config)
@@ -597,27 +520,26 @@ class TestModel(unittest.TestCase):
             wep_configuration, expected_zernike_science_sensor_config
         )
 
-    def assert_generate_donut_catalog_online_task_config(
-        self, wep_configuration, expected_donut_catalog_online_task_config
+    def assert_generate_donut_catalog_wcs_task_config(
+        self, wep_configuration, expected_donut_catalog_wcs_task_config
     ):
-        assert "generateDonutCatalogOnlineTask" in wep_configuration["tasks"]
-        assert "config" in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]
-        for config in set(("boresightRa", "boresightDec", "boresightRotAng")).union(
-            expected_donut_catalog_online_task_config.keys()
-        ):
-            assert (
-                config
-                in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"][
-                    "config"
-                ]
-            )
-
-            assert (
-                wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
+        assert "generateDonutCatalogWcsTask" in wep_configuration["tasks"]
+        if len(expected_donut_catalog_wcs_task_config) > 0:
+            assert "config" in wep_configuration["tasks"]["generateDonutCatalogWcsTask"]
+            for config in expected_donut_catalog_wcs_task_config:
+                assert (
                     config
-                ]
-                == expected_donut_catalog_online_task_config[config]
-            )
+                    in wep_configuration["tasks"]["generateDonutCatalogWcsTask"][
+                        "config"
+                    ]
+                )
+
+                assert (
+                    wep_configuration["tasks"]["generateDonutCatalogWcsTask"]["config"][
+                        config
+                    ]
+                    == expected_donut_catalog_wcs_task_config[config]
+                )
 
     def assert_isr_config(self, wep_configuration, expected_isr_config):
 
@@ -714,11 +636,13 @@ class TestAsyncModel(unittest.IsolatedAsyncioTestCase):
             data_path=data_path,
             ofc_data=ofc_data,
             run_name=run_name,
-            collections="LSSTCam/calib,LSSTCam/raw/all",
+            collections="LSSTCam/calib/unbounded,LSSTCam/raw/all",
             pipeline_instrument=dict(comcam="lsst.obs.lsst.LsstCam"),
             data_instrument_name=dict(comcam="LSSTCam"),
             reference_detector=94,
         )
+
+        cls.short_waittime = 1.0
 
     @classmethod
     def tearDownClass(cls):
@@ -730,7 +654,17 @@ class TestAsyncModel(unittest.IsolatedAsyncioTestCase):
 
     async def test_process_comcam(self):
 
-        await self.model.process_comcam(4021123106001, 4021123106002, {})
+        await self.model.process_comcam(
+            4021123106001,
+            4021123106002,
+            {
+                "tasks": {
+                    "generateDonutCatalogWcsTask": {
+                        "config": {"donutSelector.fluxField": "g_flux"}
+                    }
+                }
+            },
+        )
 
         self.assertEqual(self.model.wavefront_errors.getNumOfData(), 1)
 
@@ -766,6 +700,75 @@ class TestAsyncModel(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             np.argmax(np.abs(zk_avg[94])) in self.zernike_coefficient_maximum_expected
         )
+
+    async def test_interrupt_wep_process(self):
+
+        task = asyncio.create_task(
+            self.model.process_comcam(
+                4021123106001,
+                4021123106002,
+                {
+                    "tasks": {
+                        "generateDonutCatalogWcsTask": {
+                            "config": {"donutSelector.fluxField": "g_flux"}
+                        }
+                    }
+                },
+            )
+        )
+
+        await asyncio.sleep(self.short_waittime)
+
+        await self.model.interrupt_wep_process()
+
+        with self.assertRaises(RuntimeError):
+            await task
+
+    async def test_wep_process_fail_bad_config(self):
+
+        task = asyncio.create_task(
+            self.model.process_comcam(
+                4021123106001,
+                4021123106002,
+                {
+                    "tasks": {
+                        "generateDonutCatalogWcsTask": {
+                            "config": {
+                                "donutSelector.fluxField": "g_flux",
+                                "bad_key": "bad_value",
+                            }
+                        }
+                    }
+                },
+            )
+        )
+
+        with self.assertRaises(RuntimeError):
+            await task
+
+    async def test_log_stream(self):
+
+        task = await asyncio.create_subprocess_shell(
+            f"echo THIS IS A TEST; sleep {self.short_waittime};echo THIS IS A TEST",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        with self.assertLogs("Model", level="DEBUG") as model_log:
+            log_task = asyncio.create_task(self.model.log_stream(task.stdout))
+
+            await asyncio.wait_for(
+                log_task,
+                timeout=self.short_waittime * 2.0,
+            )
+
+            self.assertEqual(
+                model_log.output,
+                [
+                    "DEBUG:Model:THIS IS A TEST",
+                    "DEBUG:Model:THIS IS A TEST",
+                ],
+            )
 
 
 if __name__ == "__main__":
