@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
+from black import asyncio
 import yaml
 import glob
 import unittest
@@ -31,6 +32,13 @@ from pathlib import Path
 from lsst.ts import salobj
 from lsst.ts import MTAOS
 
+from lsst.ts.ofc import OFCData
+
+from lsst.ts.wep.Utility import writeCleanUpRepoCmd, runProgram
+from lsst.ts.wep.Utility import getModulePath as getModulePathWep
+
+from lsst.daf import butler as dafButler
+
 # standard command timeout (sec)
 STD_TIMEOUT = 60
 SHORT_TIMEOUT = 5
@@ -40,6 +48,31 @@ TEST_CONFIG_DIR = Path(__file__).parents[1].joinpath("tests", "testData", "confi
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
         return MTAOS.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
+
+    @classmethod
+    def setUpClass(cls):
+
+        cls.dataDir = MTAOS.getModulePath().joinpath("tests", "tmp")
+        cls.isrDir = cls.dataDir.joinpath("input")
+
+        # Let the MTAOS to set WEP based on this path variable
+        os.environ["ISRDIRPATH"] = cls.isrDir.as_posix()
+
+        cls.data_path = os.path.join(
+            getModulePathWep(), "tests", "testData", "gen3TestRepo"
+        )
+        cls.run_name = "run1"
+
+        # Check that run doesn't already exist due to previous improper cleanup
+        butler = dafButler.Butler(cls.data_path)
+        registry = butler.registry
+
+        # This is the expected index of the maximum zernike coefficient.
+        cls.zernike_coefficient_maximum_expected = {1, 2}
+
+        if cls.run_name in list(registry.queryCollections()):
+            cleanUpCmd = writeCleanUpRepoCmd(cls.data_path, cls.run_name)
+            runProgram(cleanUpCmd)
 
     def setUp(self):
 
@@ -60,6 +93,14 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         if logFile.exists():
             logFile.unlink()
 
+    @classmethod
+    def tearDownClass(cls):
+        # Check that run doesn't already exist due to previous improper cleanup
+        butler = dafButler.Butler(cls.data_path)
+
+        if cls.run_name in list(butler.registry.queryCollections()):
+            runProgram(writeCleanUpRepoCmd(cls.data_path, cls.run_name))
+
     def _getCsc(self):
         # This is instantiated after calling self.make_csc().
         return self.csc
@@ -78,7 +119,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
-            enabled_commands = (
+            enabled_commands = {
                 "resetCorrection",
                 "issueCorrection",
                 "rejectCorrection",
@@ -87,7 +128,17 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 "runWEP",
                 "runOFC",
                 "addAberration",
-            )
+            }
+
+            # TODO: Remove when xml 11 is available and add interruptWEP to the
+            # list of enabled_commands above (DM-33401).
+            if MTAOS.utility.support_interrupt_wep_cmd():
+                enabled_commands.update(
+                    {
+                        "interruptWEP",
+                    }
+                )
+
             await self.check_standard_state_transitions(
                 enabled_commands=enabled_commands,
                 timeout=STD_TIMEOUT,
@@ -378,61 +429,122 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 remote.evt_m2Correction, flush=False, timeout=SHORT_TIMEOUT
             )
 
-    @unittest.skip("Skip until commands implementation.")
     async def test_runWEP(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
+
+            ofc_data = OFCData("comcam")
+
+            dof_state0 = yaml.safe_load(
+                MTAOS.getModulePath()
+                .joinpath("tests", "testData", "state0inDof.yaml")
+                .open()
+                .read()
+            )
+            ofc_data.dof_state0 = dof_state0
+
+            self.csc.model = MTAOS.Model(
+                instrument=ofc_data.name,
+                data_path=self.data_path,
+                ofc_data=ofc_data,
+                run_name=self.run_name,
+                collections="LSSTCam/calib/unbounded,LSSTCam/raw/all",
+                pipeline_instrument=dict(comcam="lsst.obs.lsst.LsstCam"),
+                data_instrument_name=dict(comcam="LSSTCam"),
+                reference_detector=94,
+            )
+
+            remote = self._getRemote()
+            self.remote.evt_wavefrontError.flush()
+            self.remote.evt_wepDuration.flush()
+
+            await remote.cmd_runWEP.set_start(
+                visitId=4021123106001,
+                extraId=4021123106002,
+                config=yaml.safe_dump(
+                    {
+                        "tasks": {
+                            "generateDonutCatalogWcsTask": {
+                                "config": {"donutSelector.fluxField": "g_flux"}
+                            }
+                        }
+                    }
+                ),
+            )
+
+            await self.assert_next_sample(
+                self.remote.evt_wavefrontError,
+                flush=False,
+                timeout=SHORT_TIMEOUT,
+            )
+            await self.assert_next_sample(
+                self.remote.evt_wepDuration,
+                flush=False,
+                timeout=SHORT_TIMEOUT,
+            )
+
+    # TODO: Remove skipIf when xml 11 is available (DM-33401).
+    @unittest.skipIf(
+        not MTAOS.utility.support_interrupt_wep_cmd(),
+        "interruptWEP command not defined. See DM-33401.",
+    )
+    async def test_interruptWEP(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
-            # Set the timeout > 20 seconds for the long calculation time
+            ofc_data = OFCData("comcam")
+
+            dof_state0 = yaml.safe_load(
+                MTAOS.getModulePath()
+                .joinpath("tests", "testData", "state0inDof.yaml")
+                .open()
+                .read()
+            )
+            ofc_data.dof_state0 = dof_state0
+
+            self.csc.model = MTAOS.Model(
+                instrument=ofc_data.name,
+                data_path=self.data_path,
+                ofc_data=ofc_data,
+                run_name=self.run_name,
+                collections="LSSTCam/calib/unbounded,LSSTCam/raw/all",
+                pipeline_instrument=dict(comcam="lsst.obs.lsst.LsstCam"),
+                data_instrument_name=dict(comcam="LSSTCam"),
+                reference_detector=94,
+            )
+
             remote = self._getRemote()
-            await remote.cmd_runWEP.set_start(
-                timeout=2 * STD_TIMEOUT,
-                visitId=0,
-                extraId=1,
+            self.remote.evt_wavefrontError.flush()
+            self.remote.evt_wepDuration.flush()
+
+            run_wep_task = asyncio.create_task(
+                remote.cmd_runWEP.set_start(
+                    visitId=4021123106001,
+                    extraId=4021123106002,
+                    config=yaml.safe_dump(
+                        {
+                            "tasks": {
+                                "generateDonutCatalogWcsTask": {
+                                    "config": {"donutSelector.fluxField": "g_flux"}
+                                }
+                            }
+                        }
+                    ),
+                )
             )
 
-            csc = self._getCsc()
-            await self._checkWepTopicsFromProcImg(remote, csc)
+            await asyncio.sleep(SHORT_TIMEOUT)
 
-    async def _checkWepTopicsFromProcImg(self, remote, csc):
+            await remote.cmd_interruptWEP.start(timeout=SHORT_TIMEOUT)
 
-        await self.assert_next_sample(
-            remote.evt_wepWarning, flush=False, timeout=STD_TIMEOUT, warning=0
-        )
-
-        # The value here should be 0 because the wavefront error is published
-        # already
-        numOfWfErr = len(csc.getModel().getListOfWavefrontError())
-        self.assertEqual(numOfWfErr, 0)
-
-        # Check the published wavefront error
-        for counter in range(9):
-            wfErr = await remote.evt_wavefrontError.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
-            self.assertNotEqual(wfErr.sensorId, 0)
-
-            zk = wfErr.annularZernikePoly
-            self.assertEqual(len(zk), 19)
-            self.assertNotEqual(np.sum(np.abs(zk)), 0)
-
-        numOfWfErrRej = len(csc.getModel().getListOfWavefrontErrorRej())
-        for counter in range(numOfWfErrRej):
-            wfErr = await remote.evt_rejectedWavefrontError.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
-            self.assertNotEqual(wfErr.sensorId, 0)
-
-            zk = wfErr.annularZernikePoly
-            self.assertEqual(len(zk), 19)
-            self.assertNotEqual(np.sum(np.abs(zk)), 0)
-
-        durationWep = await remote.tel_wepDuration.next(
-            flush=False, timeout=STD_TIMEOUT
-        )
-        self.assertGreater(durationWep.calcTime, 14)
+            with self.assertRaises(salobj.AckError):
+                await run_wep_task
 
 
 if __name__ == "__main__":
