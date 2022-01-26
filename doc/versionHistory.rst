@@ -2,6 +2,19 @@
 Version History
 ===============
 
+v0.9.0
+------
+
+* Add unit tests for `interruptWEP` command.
+* Add xml 10/11 backward compatible command `interruptWEP`.
+  The command won't be available for xml 10, but CSC will continue to work and automatically support when it is released.
+* Add unit test for `Model.process_comcam` when pipeline task fails to execute.
+* Add unit test for `Model.log_stream`.
+* Add `support_interrupt_wep_cmd` utility method to support backward compatibility between xml 10 and xml 11.
+* In `Model` refactor `log_stream` to handle `eof` condition.
+* Add mechanism no interrupt an execution of the wep process.
+* Update MTAOS to work with latest version of wep.
+
 v0.8.0
 ------
 
