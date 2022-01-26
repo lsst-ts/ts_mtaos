@@ -724,6 +724,30 @@ class TestAsyncModel(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             await task
 
+    async def test_log_stream(self):
+
+        task = await asyncio.create_subprocess_shell(
+            f"echo THIS IS A TEST; sleep {self.short_waittime};echo THIS IS A TEST",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        with self.assertLogs("Model", level="DEBUG") as model_log:
+            log_task = asyncio.create_task(self.model.log_stream(task.stdout))
+
+            await asyncio.wait_for(
+                log_task,
+                timeout=self.short_waittime * 2.0,
+            )
+
+            self.assertEqual(
+                model_log.output,
+                [
+                    "DEBUG:Model:THIS IS A TEST",
+                    "DEBUG:Model:THIS IS A TEST",
+                ],
+            )
+
 
 if __name__ == "__main__":
 
