@@ -1,5 +1,5 @@
-# boresightRotAng should be a number.
-tasks:
-  generateDonutCatalogOnlineTask:
+# Typo in task -> tasks
+task:
+  generateDonutCatalogWcsTask:
     config:
-      boresightRotAng: "-45:00:00.0"
+      filterName: "phot_g_mean"

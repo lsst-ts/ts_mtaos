@@ -29,6 +29,7 @@ import tempfile
 import numpy as np
 
 from lsst.ts.ofc import OFC
+from lsst.ts.utils import make_done_future
 from lsst.ts.salobj import DefaultingValidator
 
 from lsst.afw.image import VisitInfo
@@ -155,6 +156,11 @@ class Model:
             M2 correction.
         camera : `lsst.ts.wep.bsc.CameraData.CameraData`
             Current camera instance.
+        wep_process : `Coroutine`, optional
+            Task for the wep process.
+        wep_process_started_task : `asyncio.Future`
+            A future that is reset before a wep process is started and is set
+            to done when it starts.
         """
 
         if log is None:
@@ -216,6 +222,9 @@ class Model:
         self.m2_correction = None
 
         self._user_gain = self.ofc.default_gain
+
+        self.wep_process = None
+        self.wep_process_started_task = make_done_future()
 
         self.reset_wfe_correction()
 
@@ -519,7 +528,24 @@ class Model:
             A dictionary with additional configuration for the pipeline task.
         run_name_extention : `str`, optional
             A string to be appended to the run name.
+
+        Raises
+        ------
+        RuntimeError
+            If there is an ongoing wep process.
+
+        See Also
+        --------
+        interrupt_wep_process : Interrupt an ongoing wep process.
         """
+        self.wep_process_started_task = asyncio.Future()
+
+        if self.wep_process is not None:
+            raise RuntimeError(
+                "There is an ongoing wep process. To run a different process, "
+                "interrupt the first one with 'interrupt_wep_process'."
+            )
+
         self.log.debug(f"Processing ComCam intra/extra pair: {intra_id}/{extra_id}.")
 
         wep_configuration = self.generate_wep_configuration(
@@ -552,15 +578,17 @@ class Model:
         self.log.debug(f"Running: {run_pipetask_cmd}")
 
         # Run pipeline task in a process asynchronously
-        wep_process = await asyncio.create_subprocess_shell(
+        self.wep_process = await asyncio.create_subprocess_shell(
             run_pipetask_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
 
-        log_task = asyncio.create_task(self.log_stream(wep_process.stderr))
+        self.wep_process_started_task.set_result(True)
 
-        await wep_process.wait()
+        log_task = asyncio.create_task(self.log_stream(self.wep_process.stderr))
+
+        await self.wep_process.wait()
 
         if not log_task.done():
             log_task.cancel()
@@ -572,15 +600,15 @@ class Model:
         except Exception as e:
             self.log.debug(f"Exception in log task: {e}. Ignoring.")
 
-        self.log.debug(f"Process returned: {wep_process.returncode}")
+        self.log.debug(f"Process returned: {self.wep_process.returncode}")
 
         # returncode contains the exit value of the process started with
         # asyncio.create_subprocess_shell. A value of zero means the process
         # finished successfully, anything else is considered an error. If we
         # get return code different than zero, assume the pipeline task
         # failed and raise an exception with the error report.
-        if wep_process.returncode != 0:
-            stdout, stderr = await wep_process.communicate()
+        if self.wep_process.returncode != 0:
+            stdout, stderr = await self.wep_process.communicate()
 
             if len(stdout) > 0:
                 self.log.debug(stdout.decode())
@@ -588,7 +616,11 @@ class Model:
             if len(stderr) > 0:
                 self.log.error(stderr.decode())
 
+            self.wep_process = None
+
             raise RuntimeError(f"Error running pipeline task: {stderr.decode()}")
+        else:
+            self.wep_process = None
 
         self.log.debug("Data processing completed successfully. Gathering output.")
 
@@ -632,6 +664,17 @@ class Model:
             ]
         )
 
+    async def interrupt_wep_process(self):
+        """Interrupt a currently executing processing."""
+
+        if self.wep_process is not None:
+            self.log.debug("Waiting for wep process to start.")
+            await self.wep_process_started_task
+            self.log.debug("Terminating wep process.")
+            self.wep_process.terminate()
+        else:
+            self.log.debug("No wep process running. Nothing to do.")
+
     def generate_wep_configuration(self, instrument, reference_id, config):
         """Generate configuration dictionary for running the WEP pipeline based
         on a reference image id and a configuration dictionary.
@@ -654,86 +697,7 @@ class Model:
         # TODO: Implement configuration when user runs select_sources
         # beforehand.
 
-        visit_info = self._get_visit_info(
-            instrument=instrument,
-            exposure=reference_id,
-        )
-
-        wep_configuration = self.expand_wep_configuration(
-            config=config,
-            visit_info=visit_info,
-        )
-
-        self.log.debug(f"validating {wep_configuration}")
-        return self.wep_configuration_validation.validate(wep_configuration)
-
-    def expand_wep_configuration(self, config: dict, visit_info: VisitInfo) -> dict:
-        """Expand wep configuration.
-
-        This method makes sure the input configuration has the required fields
-        for the WEP task configuration.
-
-        Parameters
-        ----------
-        config : `dict`
-            Input dictionary to expand into a valid wep configuration.
-
-        visit_info : `VisitInfo`
-            Object with information about a single exposure of an imaging
-            camera.
-
-        Returns
-        -------
-        wep_configuration : `dict`
-            Dictionary with a valid wep configuration.
-        """
-
-        wep_configuration = config.copy()
-
-        if "tasks" not in wep_configuration:
-            wep_configuration["tasks"] = {
-                "generateDonutCatalogOnlineTask": {"config": {}}
-            }
-        elif "generateDonutCatalogOnlineTask" not in wep_configuration["tasks"]:
-            wep_configuration["tasks"]["generateDonutCatalogOnlineTask"] = {
-                "config": {}
-            }
-        elif (
-            "config" not in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]
-        ):
-            wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"] = {}
-
-        if (
-            "boresightRa"
-            not in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"][
-                "config"
-            ]
-        ):
-            wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
-                "boresightRa"
-            ] = (visit_info.getBoresightRaDec().getRa().asDegrees())
-
-        if (
-            "boresightDec"
-            not in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"][
-                "config"
-            ]
-        ):
-            wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
-                "boresightDec"
-            ] = (visit_info.getBoresightRaDec().getDec().asDegrees())
-
-        if (
-            "boresightRotAng"
-            not in wep_configuration["tasks"]["generateDonutCatalogOnlineTask"][
-                "config"
-            ]
-        ):
-            wep_configuration["tasks"]["generateDonutCatalogOnlineTask"]["config"][
-                "boresightRotAng"
-            ] = visit_info.getBoresightRotAngle().asDegrees()
-
-        return wep_configuration
+        return self.wep_configuration_validation.validate(config)
 
     def reject_unreasonable_wfe(self, listOfWfErr):
         """Reject the wavefront error that is unreasonable.
@@ -971,9 +935,10 @@ class Model:
             Output stream pipe to process and log.
         """
 
-        while True:
-            message = await stream.readline()
-            self.log.debug(message.decode())
+        while not stream.at_eof():
+            new_line = await stream.readline()
+            if len(new_line) > 0:
+                self.log.debug(new_line.decode().strip())
 
     def _get_visit_info(self, instrument: str, exposure: int) -> VisitInfo:
         """Get visit info from the butler.
