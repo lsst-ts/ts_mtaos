@@ -120,6 +120,10 @@ class MTAOS(salobj.ConfigurableCsc):
 
         cscName = utility.getCscName()
 
+        # TODO: Remove when xml 11 is available (DM-33401).
+        if utility.support_interrupt_wep_cmd():
+            setattr(self, "do_interruptWEP", self._handle_interrupt_wep)
+
         super().__init__(
             cscName,
             index=0,
@@ -600,6 +604,23 @@ class MTAOS(salobj.ConfigurableCsc):
             self.pubEvent_cameraHexapodCorrection()
             self.pubEvent_m1m3Correction()
             self.pubEvent_m2Correction()
+
+    async def _handle_interrupt_wep(
+        self, data: salobj.type_hints.BaseDdsDataType
+    ) -> None:
+        """Interrupt a running wep process.
+
+        This method will be converted to do_interruptWEP when xml 11 is
+        released (DM-33401).
+
+        Parameters
+        ----------
+        data : ``cmd_interrupWEP.DataType``
+        """
+        # TODO: Rename to do_interruptWEP when xml 11 is available (DM-33401).
+        self.assert_enabled()
+
+        await self.model.interrupt_wep_process()
 
     async def handle_corrections(self):
         """Handle applying the corrections to all components.
