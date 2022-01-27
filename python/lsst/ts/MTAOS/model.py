@@ -25,8 +25,11 @@ import yaml
 import asyncio
 import logging
 import tempfile
+import contextlib
 
 import numpy as np
+
+from typing import Optional
 
 from lsst.ts.ofc import OFC
 from lsst.ts.utils import make_done_future
@@ -133,8 +136,9 @@ class Model:
         zernike_table_name : `str`, optional
             Name of the table in the butler with zernike coeffients.
             Default is "zernikeEstimateRaw".
-        wep_configuration_validation : `DefaultingValidator`
-            Provide schema validation for wavefront estimation pipeline task.
+        wep_configuration_validation : `dict`
+            Dictionary to store schema validations for wavefront estimation
+            pipeline tasks.
         wavefront_errors : `WavefrontCollection`
             Object to manage list of wavefront errors.
         rejected_wavefront_errors : `WavefrontCollection`
@@ -195,7 +199,9 @@ class Model:
         self.zernike_table_name = zernike_table_name
         self.reference_detector = reference_detector
 
-        self.wep_configuration_validation = DefaultingValidator(WEP_PIPELINE_CONFIG)
+        self.wep_configuration_validation = dict(
+            comcam=DefaultingValidator(WEP_PIPELINE_CONFIG)
+        )
 
         # Collection of calculated list of wavefront error
         self.wavefront_errors = WavefrontCollection(self.MAX_LEN_QUEUE)
@@ -225,6 +231,16 @@ class Model:
 
         self.wep_process = None
         self.wep_process_started_task = make_done_future()
+
+        # This asyncio.Lock is used to synchronize the initialization of a new
+        # wep pipeline task process. The idea is that we want to limit the
+        # number of executing processes to 1. If more than one call to
+        # `run_wep` are made, we lock the resources before starting the
+        # background process and unlock once the process has started. Any
+        # additional cal to `run_wep` will then raise an exception while the
+        # first one executes. This way we guarantee that only 1 process is
+        # running at any time.
+        self._wep_process_start_lock = asyncio.Lock()
 
         self.reset_wfe_correction()
 
@@ -516,7 +532,7 @@ class Model:
         config,
         run_name_extention="",
     ):
-        """Process ComCam intra/extra focual images.
+        """Process ComCam intra/extra focal images.
 
         Parameters
         ----------
@@ -538,76 +554,186 @@ class Model:
         --------
         interrupt_wep_process : Interrupt an ongoing wep process.
         """
-        self.wep_process_started_task = asyncio.Future()
-
-        if self.wep_process is not None:
-            raise RuntimeError(
-                "There is an ongoing wep process. To run a different process, "
-                "interrupt the first one with 'interrupt_wep_process'."
-            )
 
         self.log.debug(f"Processing ComCam intra/extra pair: {intra_id}/{extra_id}.")
 
-        wep_configuration = self.generate_wep_configuration(
-            instrument="comcam", reference_id=intra_id, config=config
-        )
-
-        comcam_config_file = tempfile.NamedTemporaryFile(suffix=".yaml")
-
-        comcam_config_file.write(yaml.safe_dump(wep_configuration).encode())
-
-        comcam_config_file.flush()
-
         run_name = f"{self.run_name}{run_name_extention}"
 
-        self.log.debug(
-            f"Run name: {run_name}. Pipeline configuration in {comcam_config_file.name}."
+        async with self.handle_wep_process(
+            instrument="comcam",
+            exposures_str=f"exposure IN ({intra_id}, {extra_id})",
+            run_name=run_name,
+            config=config,
+        ):
+            await self.wep_process.wait()
+
+        self.wavefront_errors.append(
+            self._gather_outputs(
+                run_name=run_name,
+                visit_id=intra_id,
+            )
         )
 
-        run_pipetask_cmd = writePipetaskCmd(
-            self.data_path,
-            run_name,
-            self.pipeline_instrument["comcam"],
-            "refcats," + self.collections,
-            pipelineYaml=comcam_config_file.name,
-        )
+    @contextlib.asynccontextmanager
+    async def handle_wep_process(
+        self,
+        instrument: str,
+        exposures_str: str,
+        run_name: str = "",
+        config: Optional[dict] = None,
+    ):
+        """A context manager to start and cleanup the WEP pipeline task
+        process.
 
-        run_pipetask_cmd += f' -d "exposure IN ({intra_id}, {extra_id})"'
-        run_pipetask_cmd += f" -j {self.pipeline_n_processes}"
+        This async context manager takes care of initializing a the wep
+        pipeline task in the background and then cleaning up when it is
+        done.
 
-        self.log.debug(f"Running: {run_pipetask_cmd}")
+        When using this async context manager, one must wait until the
+        `wep_process` finishes before allowing the context to finish, otherwise
+        the process will be cleaned up before it is done.
 
-        # Run pipeline task in a process asynchronously
-        self.wep_process = await asyncio.create_subprocess_shell(
-            run_pipetask_cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        Parameters
+        ----------
+        instrument : `str`
+            Name of the instrument to generate wep process for.
+        exposures_str : `str`
+            A string that can be used by the pipeline task to query the data
+            to be processed.
+        run_name : `str`
+            Optional extention to the run name.
+        config : `dict`, optional
+            User-provided configuration overrides.
+        """
+
+        try:
+            log_task, config_file = await self._start_wep_process(
+                instrument=instrument,
+                exposures_str=exposures_str,
+                run_name=run_name,
+                config=config,
+            )
+
+            yield
+
+            await self._close_pending_task(log_task)
+            config_file.close()
+
+        finally:
+            await self._finish_wep_process()
+
+    async def _start_wep_process(
+        self,
+        instrument: str,
+        exposures_str: str,
+        run_name: str = "",
+        config: Optional[dict] = None,
+    ) -> asyncio.Task:
+        """Start a wep process.
+
+        Parameters
+        ----------
+        instrument : `str`
+            Name of the instrument to generate wep process for.
+        exposures_str : `str`
+            A string that can be used by the pipeline task to query the data
+            to be processed.
+        run_name : `str`, optional
+            Optional extention to the run name. Default is "".
+        config : `dict`, optional
+            User-provided configuration overrides. Default is `None`.
+
+        Returns
+        -------
+        `asyncio.Task`
+            Task with the process background logger generated by `log_stream`.
+
+        See Also
+        --------
+        log_stream : Log messages from input stream asynchronously.
+        _finish_wep_process : Finalize a wep process.
+        """
+
+        async with self._wep_process_start_lock:
+
+            if (self.wep_process is not None) and (self.wep_process.returncode is None):
+                raise RuntimeError(
+                    "There is an ongoing wep process. To run a different process, "
+                    "interrupt the first one with 'interrupt_wep_process'."
+                )
+
+            self.wep_process_started_task = asyncio.Future()
+
+            config_file = self._save_wep_configuration(
+                instrument=instrument,
+                config=config,
+            )
+
+            self.log.debug(
+                f"Run name: {run_name}. Pipeline configuration in {config_file}."
+            )
+
+            run_pipetask_cmd = self._generate_pipetask_command(
+                run_name=run_name,
+                instrument=instrument,
+                config_filename=config_file.name,
+                exposures_str=exposures_str,
+            )
+
+            self.log.debug(f"Running: {run_pipetask_cmd}")
+
+            # Run pipeline task in a process asynchronously
+            self.wep_process = await asyncio.create_subprocess_shell(
+                run_pipetask_cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
 
         self.wep_process_started_task.set_result(True)
 
-        log_task = asyncio.create_task(self.log_stream(self.wep_process.stderr))
+        return (
+            asyncio.create_task(self.log_stream(self.wep_process.stderr)),
+            config_file,
+        )
 
-        await self.wep_process.wait()
+    async def interrupt_wep_process(self):
+        """Interrupt a currently executing processing."""
 
-        if not log_task.done():
-            log_task.cancel()
+        if self.wep_process is not None:
+            self.log.debug("Waiting for wep process to start.")
+            await self.wep_process_started_task
+            self.log.debug("Terminating wep process.")
+            self.wep_process.terminate()
+        else:
+            self.log.debug("No wep process running. Nothing to do.")
 
-        try:
-            await log_task
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            self.log.debug(f"Exception in log task: {e}. Ignoring.")
+    async def _finish_wep_process(self) -> None:
+        """Finalize wep process.
 
-        self.log.debug(f"Process returned: {self.wep_process.returncode}")
+        Raises
+        ------
+        RuntimeError
+            If wep process failed, is still executing or is not set.
 
-        # returncode contains the exit value of the process started with
-        # asyncio.create_subprocess_shell. A value of zero means the process
-        # finished successfully, anything else is considered an error. If we
-        # get return code different than zero, assume the pipeline task
-        # failed and raise an exception with the error report.
-        if self.wep_process.returncode != 0:
+        Notes
+        -----
+        `self.wep_process.returncode` contains the exit value of the process
+        started with asyncio.create_subprocess_shell. A value of zero means the
+        process finished successfully, anything else is considered an error. If
+        we get return code different than zero, assume the pipeline task
+        failed and raise an exception with the error report.
+
+        See Also
+        --------
+        _start_wep_process : Start a wep process.
+        """
+        if self.wep_process is None:
+            raise RuntimeError("wep_process not set.")
+        elif self.wep_process.returncode is None:
+            raise RuntimeError("wep_process still executing.")
+        elif self.wep_process.returncode != 0:
+            self.log.debug(f"Process returned: {self.wep_process.returncode}")
+
             stdout, stderr = await self.wep_process.communicate()
 
             if len(stdout) > 0:
@@ -622,9 +748,127 @@ class Model:
         else:
             self.wep_process = None
 
-        self.log.debug("Data processing completed successfully. Gathering output.")
+    def generate_wep_configuration(
+        self,
+        instrument: str,
+        config: dict,
+    ) -> dict:
+        """Generate configuration dictionary for running the WEP pipeline based
+        on a reference image id and a configuration dictionary.
 
-        comcam_config_file.close()
+        Parameters
+        ----------
+        instrument : `str`
+            Name of the instrument.
+        config : `dict`
+            Additional configuration overrides provided by the user.
+
+        Returns
+        -------
+        `dict`
+            Configuration dictionary validated against the WEP schema.
+        """
+        wep_configuration = config.copy()
+        wep_configuration["instrument"] = self.pipeline_instrument[instrument]
+
+        return self.wep_configuration_validation.validate(wep_configuration)
+
+    def _save_wep_configuration(
+        self,
+        instrument,
+        config,
+    ) -> tempfile._TemporaryFileWrapper:
+        """Save wep configuration to a temporary yaml file for running the WEP
+        pipeline, based on a reference image id and a configuration dictionary.
+
+        Parameters
+        ----------
+        instrument : `str`
+            Name of the instrument.
+        config : `dict`
+            Configuration for the WEP pipeline task.
+
+        Returns
+        -------
+        config_file : `tempfile._TemporaryFileWrapper[str]`
+            Handler for the generated configuration file.
+        """
+
+        # TODO: Implement configuration when user runs select_sources
+        # beforehand.
+
+        wep_configuration = self.generate_wep_configuration(
+            instrument=instrument, config=config
+        )
+
+        config_file = tempfile.NamedTemporaryFile(suffix=".yaml")
+
+        config_file.write(yaml.safe_dump(wep_configuration).encode())
+
+        config_file.flush()
+
+        return config_file
+
+    def _generate_pipetask_command(
+        self,
+        run_name,
+        instrument,
+        config_filename,
+        exposures_str,
+    ) -> str:
+        """Generate pipetask command to execute as a process.
+
+        Parameters
+        ----------
+        run_name : `str`
+            Name of the run.
+        instrument : `str`
+            Name of the instrument.
+        config_filename : `str`
+            Name of the configuration file.
+        exposures_str : `str`
+            String expressing a query for the images to be processed.
+
+        Returns
+        -------
+        run_pipetask_cmd : `str`
+            A formatted string with the command line execution for the
+            pipeline task.
+        """
+
+        run_pipetask_cmd = writePipetaskCmd(
+            self.data_path,
+            run_name,
+            self.pipeline_instrument[instrument],
+            "refcats," + self.collections,
+            pipelineYaml=config_filename,
+        )
+
+        run_pipetask_cmd += f' -d "{exposures_str}"'
+        run_pipetask_cmd += f" -j {self.pipeline_n_processes}"
+
+        return run_pipetask_cmd
+
+    def _gather_outputs(
+        self,
+        run_name: str,
+        visit_id: int,
+    ) -> list:
+        """Gather outputs from the given run for a given visit id.
+
+        Parameters
+        ----------
+        run_name : `str`
+            Name of the run.
+        visit_id : `int`
+            Id of the visit.
+
+        Returns
+        -------
+        `list`
+            List of wavefront errors from the butler.
+        """
+        self.log.debug("Data processing completed successfully. Gathering output.")
 
         butler = dafButler.Butler(self.data_path)
 
@@ -643,61 +887,26 @@ class Model:
         data_ids = butler.registry.queryDatasets(
             self.zernike_table_name,
             dataId=dict(
-                instrument=self.data_instrument_name["comcam"], exposure=intra_id
+                instrument=self.data_instrument_name["comcam"], exposure=visit_id
             ),
             collections=[run_name],
         )
 
-        self.log.debug(f"Processing yielded: {data_ids}")
-
-        self.wavefront_errors.append(
-            [
-                (
-                    data_id.dataId["detector"],
-                    butler.get(
-                        self.zernike_table_name,
-                        dataId=data_id.dataId,
-                        collections=[run_name],
-                    ),
-                )
-                for data_id in data_ids
-            ]
+        self.log.debug(
+            f"run_name: {run_name}, visit_id: {visit_id} yielded: {data_ids}"
         )
 
-    async def interrupt_wep_process(self):
-        """Interrupt a currently executing processing."""
-
-        if self.wep_process is not None:
-            self.log.debug("Waiting for wep process to start.")
-            await self.wep_process_started_task
-            self.log.debug("Terminating wep process.")
-            self.wep_process.terminate()
-        else:
-            self.log.debug("No wep process running. Nothing to do.")
-
-    def generate_wep_configuration(self, instrument, reference_id, config):
-        """Generate configuration dictionary for running the WEP pipeline based
-        on a reference image id and a configuration dictionary.
-
-        Parameters
-        ----------
-        instrument : `str`
-            Name of the instrument.
-        reference_id : `int`
-            Id of the reference image.
-        config : `dict`
-            Additional configuration overrides provided by the user.
-
-        Returns
-        -------
-        wep_configuration : `dict`
-            Configuration dictionary validated against the WEP schema.
-        """
-
-        # TODO: Implement configuration when user runs select_sources
-        # beforehand.
-
-        return self.wep_configuration_validation.validate(config)
+        return [
+            (
+                data_id.dataId["detector"],
+                butler.get(
+                    self.zernike_table_name,
+                    dataId=data_id.dataId,
+                    collections=[run_name],
+                ),
+            )
+            for data_id in data_ids
+        ]
 
     def reject_unreasonable_wfe(self, listOfWfErr):
         """Reject the wavefront error that is unreasonable.
@@ -990,3 +1199,22 @@ class Model:
         wfe = np.array([data_container[sensor_id] for sensor_id in data_container])
 
         return field_idx, wfe
+
+    async def _close_pending_task(self, task: asyncio.Task) -> None:
+        """Close a pending task and log any exception.
+
+        Parameters
+        ----------
+        task : `asyncio.Task`
+            Task to close.
+        """
+
+        if not task.done():
+            task.cancel()
+
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            self.log.debug(f"Ignoring exception in task: {e}.")
