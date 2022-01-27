@@ -20,9 +20,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
-from black import asyncio
 import yaml
 import glob
+import pytest
+import asyncio
 import unittest
 
 import numpy as np
@@ -429,6 +430,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 remote.evt_m2Correction, flush=False, timeout=SHORT_TIMEOUT
             )
 
+    @pytest.mark.csc_integtest
     async def test_runWEP(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
@@ -492,6 +494,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         not MTAOS.utility.support_interrupt_wep_cmd(),
         "interruptWEP command not defined. See DM-33401.",
     )
+    @pytest.mark.csc_integtest
     async def test_interruptWEP(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
