@@ -25,6 +25,7 @@ __all__ = [
     "ISR_CONFIG",
     "GENERATE_DONUT_CATALOG_CONFIG",
     "SCIENCE_SENSOR_PIPELINE_CONFIG",
+    "CWFS_PIPELINE_CONFIG",
 ]
 
 import yaml
@@ -394,5 +395,30 @@ SCIENCE_SENSOR_PIPELINE_CONFIG = yaml.safe_load(
         initialCutoutPadding:
           type: integer
           default: 40
+"""
+)
+
+CWFS_PIPELINE_CONFIG = yaml.safe_load(
+    """estimateZernikesCWFSTask:
+    type: object
+    additionalProperties: false
+    properties:
+      class:
+        type: string
+        default: >-
+          lsst.ts.wep.task.EstimateZernikesCwfsTask.EstimateZernikesCwfsTask
+      config:
+        type: object
+        additionalProperties: false
+        properties:
+          donutTemplateSize:
+            type: integer
+            default: 160
+          donutStampSize:
+            type: integer
+            default: 160
+          initialCutoutPadding:
+            type: integer
+            default: 40
 """
 )
