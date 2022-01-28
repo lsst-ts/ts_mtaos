@@ -41,6 +41,7 @@ from lsst.ts.salobj import DefaultingValidator
 from lsst.afw.image import VisitInfo
 
 from .config_schema import (
+    CWFS_PIPELINE_CONFIG,
     WEP_HEADER_CONFIG,
     ISR_CONFIG,
     GENERATE_DONUT_CATALOG_CONFIG,
@@ -219,8 +220,20 @@ class Model:
             SCIENCE_SENSOR_PIPELINE_CONFIG
         )
 
+        cwfs_config_schema = copy.deepcopy(WEP_HEADER_CONFIG)
+        cwfs_config_schema["properties"]["tasks"]["properties"] = dict()
+        cwfs_config_schema["properties"]["tasks"]["properties"].update(ISR_CONFIG)
+        cwfs_config_schema["properties"]["tasks"]["properties"].update(
+            GENERATE_DONUT_CATALOG_CONFIG
+        )
+        cwfs_config_schema["properties"]["tasks"]["properties"].update(
+            CWFS_PIPELINE_CONFIG
+        )
+
         self.wep_configuration_validation = dict(
             comcam=DefaultingValidator(science_sensor_config_schema),
+            lsstCam=DefaultingValidator(cwfs_config_schema),
+            lsstFamCam=DefaultingValidator(science_sensor_config_schema),
         )
 
         # Collection of calculated list of wavefront error
@@ -516,12 +529,6 @@ class Model:
             Configuration for the wavefront estimation pipeline.
         kwargs :
             Additional keyword arguments, required by the timer decorator.
-
-        Raises
-        ------
-        NotImplementedError
-            If executed to process LSST corner wavefront sensors data, e.g.
-            `extra_id` is not provided.
         """
 
         if extra_id is None:
@@ -544,6 +551,54 @@ class Model:
                 config=config,
                 run_name_extention=run_name_extention,
             )
+
+    async def process_lsstcam_corner_wfs(
+        self,
+        visit_id,
+        config,
+        run_name_extention="",
+    ):
+        """Process LSSTCam Corner Wavefront Sensor data.
+
+        Parameters
+        ----------
+        visit_id : `int`
+            Id of the image to process corner wavefront sensor.
+        config : `dict`
+            A dictionary with additional configuration for the pipeline task.
+        run_name_extention : `str`, optional
+            A string to be appended to the run name. Default is "".
+
+        Raises
+        ------
+        RuntimeError
+            If there is an ongoing wep process.
+            If pipeline process fails.
+
+        See Also
+        --------
+        interrupt_wep_process : Interrupt an ongoing wep process.
+        """
+
+        self.log.debug(f"Processing LSSTCam corner wavefront sensor: {visit_id}.")
+
+        run_name = f"{self.run_name}{run_name_extention}"
+
+        async with self.handle_wep_process(
+            instrument="lsstCam",
+            exposures_str=f"exposure IN ({visit_id})",
+            run_name=run_name,
+            config=config,
+        ):
+            await self.wep_process.wait()
+
+        self.wavefront_errors.append(
+            self._gather_outputs(
+                run_name=run_name,
+                visit_id=visit_id,
+                instrument="lsstCam",
+            )
+        )
 
     async def process_comcam(
         self,
