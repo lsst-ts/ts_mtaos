@@ -535,8 +535,10 @@ class Model:
             self.log.debug(
                 f"Processing MainCamera corner wavefront sensor on image {visit_id}."
             )
-            raise NotImplementedError(
-                "LSSTCam Corner wavefront sensor processing not implemented yet."
+            await self.process_lsstcam_corner_wfs(
+                visit_id=visit_id,
+                config=config,
+                run_name_extention=run_name_extention,
             )
         else:
             # If data is intra/extra it must be ComCam at this point. Main
