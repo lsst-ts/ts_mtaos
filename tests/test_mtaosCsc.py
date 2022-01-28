@@ -489,6 +489,62 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 timeout=SHORT_TIMEOUT,
             )
 
+    @pytest.mark.csc_integtest
+    async def test_run_wep_lsst_cwfs(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
+
+            ofc_data = OFCData("lsst")
+
+            dof_state0 = yaml.safe_load(
+                MTAOS.getModulePath()
+                .joinpath("tests", "testData", "state0inDof.yaml")
+                .open()
+                .read()
+            )
+            ofc_data.dof_state0 = dof_state0
+
+            self.csc.model = MTAOS.Model(
+                instrument=ofc_data.name,
+                data_path=self.data_path,
+                ofc_data=ofc_data,
+                run_name=self.run_name,
+                collections="LSSTCam/calib/unbounded,LSSTCam/raw/all",
+                reference_detector=94,
+            )
+
+            remote = self._getRemote()
+            self.remote.evt_wavefrontError.flush()
+            self.remote.evt_wepDuration.flush()
+
+            await remote.cmd_runWEP.set_start(
+                visitId=4021123106000,
+                config=yaml.safe_dump(
+                    {
+                        "tasks": {
+                            "generateDonutCatalogWcsTask": {
+                                "config": {"donutSelector.fluxField": "g_flux"}
+                            }
+                        }
+                    }
+                ),
+            )
+
+            await self.assert_next_sample(
+                self.remote.evt_wavefrontError,
+                flush=False,
+                timeout=SHORT_TIMEOUT,
+            )
+            await self.assert_next_sample(
+                self.remote.evt_wepDuration,
+                flush=False,
+                timeout=SHORT_TIMEOUT,
+            )
+
     # TODO: Remove skipIf when xml 11 is available (DM-33401).
     @unittest.skipIf(
         not MTAOS.utility.support_interrupt_wep_cmd(),
