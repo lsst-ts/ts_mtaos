@@ -591,6 +591,7 @@ class Model:
             self._gather_outputs(
                 run_name=run_name,
                 visit_id=intra_id,
+                instrument="comcam",
             )
         )
 
@@ -878,6 +879,7 @@ class Model:
         self,
         run_name: str,
         visit_id: int,
+        instrument: str,
     ) -> list:
         """Gather outputs from the given run for a given visit id.
 
@@ -887,6 +889,8 @@ class Model:
             Name of the run.
         visit_id : `int`
             Id of the visit.
+        instrument : `str`
+            Camera used to take the data.
 
         Returns
         -------
@@ -912,7 +916,7 @@ class Model:
         data_ids = butler.registry.queryDatasets(
             self.zernike_table_name,
             dataId=dict(
-                instrument=self.data_instrument_name["comcam"], exposure=visit_id
+                instrument=self.data_instrument_name[instrument], exposure=visit_id
             ),
             collections=[run_name],
         )
