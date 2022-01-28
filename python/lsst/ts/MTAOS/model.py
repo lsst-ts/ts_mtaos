@@ -21,8 +21,10 @@
 
 __all__ = ["Model"]
 
+import os
 import copy
 import yaml
+import shutil
 import asyncio
 import logging
 import tempfile
@@ -635,6 +637,13 @@ class Model:
             yield
 
             await self._close_pending_task(log_task)
+
+            if self.wep_process is not None and self.wep_process.returncode != 0:
+                copied_config_file_name = os.path.basename(config_file.name)
+                self.log.debug(
+                    f"WEP process failed, copying configuration file to {copied_config_file_name}."
+                )
+                shutil.copyfile(config_file.name, copied_config_file_name)
             config_file.close()
 
         finally:
@@ -759,8 +768,6 @@ class Model:
 
             if len(stderr) > 0:
                 self.log.error(stderr.decode())
-
-            self.wep_process = None
 
             raise RuntimeError(f"Error running pipeline task: {stderr.decode()}")
         else:
