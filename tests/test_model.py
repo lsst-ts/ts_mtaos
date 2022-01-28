@@ -322,7 +322,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
     def test_generate_wep_configuration(self):
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
-            reference_id=12345,
             config=dict(),
         )
 
@@ -360,7 +359,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
     def test_generate_wep_configuration_custom_donut_catalog_online(self):
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
-            reference_id=12345,
             config=dict(
                 tasks=dict(
                     generateDonutCatalogWcsTask=dict(
@@ -411,7 +409,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
     def test_generate_wep_configuration_custom_isr(self):
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
-            reference_id=12345,
             config=dict(
                 tasks=dict(
                     isr=dict(
@@ -457,7 +454,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
     def test_generate_wep_configuration_custom_zernike_science_sensor(self):
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
-            reference_id=12345,
             config=dict(
                 tasks=dict(
                     estimateZernikesScienceSensorTask=dict(
