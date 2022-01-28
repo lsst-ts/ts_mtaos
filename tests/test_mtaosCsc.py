@@ -431,7 +431,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     @pytest.mark.csc_integtest
-    async def test_runWEP(self):
+    async def test_run_wep_comcam(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
