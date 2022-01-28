@@ -270,7 +270,9 @@ class MTAOS(salobj.ConfigurableCsc):
             with open(self.config_dir / config.wep_config) as fp:
                 self.wep_config = yaml.safe_load(fp)
                 try:
-                    self.model.wep_configuration_validation.validate(self.wep_config)
+                    self.model.wep_configuration_validation[config.instrument].validate(
+                        self.wep_config
+                    )
                 except Exception as e:
                     self.log.exception("Failed to validate WEP configuration.")
                     raise salobj.ExpectedError(

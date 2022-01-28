@@ -21,6 +21,7 @@
 
 __all__ = ["Model"]
 
+import copy
 import yaml
 import asyncio
 import logging
@@ -37,7 +38,12 @@ from lsst.ts.salobj import DefaultingValidator
 
 from lsst.afw.image import VisitInfo
 
-from .config_schema import WEP_PIPELINE_CONFIG
+from .config_schema import (
+    WEP_HEADER_CONFIG,
+    ISR_CONFIG,
+    GENERATE_DONUT_CATALOG_CONFIG,
+    SCIENCE_SENSOR_PIPELINE_CONFIG,
+)
 
 from .wavefront_collection import WavefrontCollection
 from .utility import timeit
@@ -199,8 +205,20 @@ class Model:
         self.zernike_table_name = zernike_table_name
         self.reference_detector = reference_detector
 
+        science_sensor_config_schema = copy.deepcopy(WEP_HEADER_CONFIG)
+        science_sensor_config_schema["properties"]["tasks"]["properties"] = dict()
+        science_sensor_config_schema["properties"]["tasks"]["properties"].update(
+            ISR_CONFIG
+        )
+        science_sensor_config_schema["properties"]["tasks"]["properties"].update(
+            GENERATE_DONUT_CATALOG_CONFIG
+        )
+        science_sensor_config_schema["properties"]["tasks"]["properties"].update(
+            SCIENCE_SENSOR_PIPELINE_CONFIG
+        )
+
         self.wep_configuration_validation = dict(
-            comcam=DefaultingValidator(WEP_PIPELINE_CONFIG)
+            comcam=DefaultingValidator(science_sensor_config_schema),
         )
 
         # Collection of calculated list of wavefront error
@@ -771,7 +789,7 @@ class Model:
         wep_configuration = config.copy()
         wep_configuration["instrument"] = self.pipeline_instrument[instrument]
 
-        return self.wep_configuration_validation.validate(wep_configuration)
+        return self.wep_configuration_validation[instrument].validate(wep_configuration)
 
     def _save_wep_configuration(
         self,

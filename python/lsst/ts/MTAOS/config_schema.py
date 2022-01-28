@@ -18,7 +18,14 @@
 #
 # You should have received a copy of the GNU General Public License
 
-__all__ = ["CONFIG_SCHEMA", "TELESCOPE_DOF_SCHEMA", "WEP_PIPELINE_CONFIG"]
+__all__ = [
+    "CONFIG_SCHEMA",
+    "TELESCOPE_DOF_SCHEMA",
+    "WEP_HEADER_CONFIG",
+    "ISR_CONFIG",
+    "GENERATE_DONUT_CATALOG_CONFIG",
+    "SCIENCE_SENSOR_PIPELINE_CONFIG",
+]
 
 import yaml
 
@@ -263,13 +270,12 @@ additionalProperties: false
 """
 )
 
-WEP_PIPELINE_CONFIG = yaml.safe_load(
+WEP_HEADER_CONFIG = yaml.safe_load(
     """
 $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: Wavefront estimation pipeline configuration schema.
 type: object
 additionalProperties: false
 properties:
@@ -286,96 +292,107 @@ properties:
     default: lsst.obs.lsst.LsstComCam
 
   tasks:
-        type: object
-        default:
-          isr:
-            class: lsst.ip.isr.isrTask.IsrTask
-        properties:
-            isr:
-              type: object
-              additionalProperties: false
-              properties:
-                class:
-                    type: string
-                    default: lsst.ip.isr.isrTask.IsrTask
-                config:
-                    additionalProperties: false
-                    type: object
-                    properties:
-                      connections.outputExposure:
-                        type: string
-                        default: postISRCCD
-                      doBias:
-                        type: boolean
-                        default: False
-                      doVariance:
-                        type: boolean
-                        default: False
-                      doLinearize:
-                        type: boolean
-                        default: False
-                      doCrosstalk:
-                        type: boolean
-                        default: False
-                      doDefect:
-                        type: boolean
-                        default: False
-                      doNanMasking:
-                        type: boolean
-                        default: False
-                      doInterpolate:
-                        type: boolean
-                        default: False
-                      doBrighterFatter:
-                        type: boolean
-                        default: False
-                      doDark:
-                        type: boolean
-                        default: False
-                      doFlat:
-                        type: boolean
-                        default: False
-                      doApplyGains:
-                        type: boolean
-                        default: True
-                      doFringe:
-                        type: boolean
-                        default: False
-                      doOverscan:
-                        type: boolean
-                        default: True
-            generateDonutCatalogWcsTask:
-                type: object
-                additionalProperties: false
-                properties:
-                    class:
-                        type: string
-                        default: >-
-                          lsst.ts.wep.task.GenerateDonutCatalogWcsTask.GenerateDonutCatalogWcsTask
-                    config:
-                        properties:
-                            filterName:
-                                type: string
-            estimateZernikesScienceSensorTask:
-                type: object
-                additionalProperties: false
-                properties:
-                  class:
-                    type: string
-                    default: >-
-                      lsst.ts.wep.task.EstimateZernikesScienceSensorTask.EstimateZernikesScienceSensorTask
-                  config:
-                    type: object
-                    additionalProperties: false
-                    properties:
-                      donutTemplateSize:
-                        type: integer
-                        default: 160
-                      donutStampSize:
-                        type: integer
-                        default: 160
-                      initialCutoutPadding:
-                        type: integer
-                        default: 40
+    type: object
+    default:
+      isr:
+        class: lsst.ip.isr.isrTask.IsrTask
+    """
+)
+
+ISR_CONFIG = yaml.safe_load(
+    """isr:
+  type: object
+  additionalProperties: false
+  properties:
+    class:
+      type: string
+      default: lsst.ip.isr.isrTask.IsrTask
+    config:
+      additionalProperties: false
+      type: object
+      properties:
+        connections.outputExposure:
+          type: string
+          default: postISRCCD
+        doBias:
+          type: boolean
+          default: False
+        doVariance:
+          type: boolean
+          default: False
+        doLinearize:
+          type: boolean
+          default: False
+        doCrosstalk:
+          type: boolean
+          default: False
+        doDefect:
+          type: boolean
+          default: False
+        doNanMasking:
+          type: boolean
+          default: False
+        doInterpolate:
+          type: boolean
+          default: False
+        doBrighterFatter:
+          type: boolean
+          default: False
+        doDark:
+          type: boolean
+          default: False
+        doFlat:
+          type: boolean
+          default: False
+        doApplyGains:
+          type: boolean
+          default: True
+        doFringe:
+          type: boolean
+          default: False
+        doOverscan:
+          type: boolean
+          default: True
+  """
+)
+
+GENERATE_DONUT_CATALOG_CONFIG = yaml.safe_load(
+    """generateDonutCatalogWcsTask:
+  type: object
+  additionalProperties: false
+  properties:
+    class:
+      type: string
+      default: >-
+        lsst.ts.wep.task.GenerateDonutCatalogWcsTask.GenerateDonutCatalogWcsTask
+    config:
+      properties:
+        filterName:
+          type: string
+  """
+)
+
+SCIENCE_SENSOR_PIPELINE_CONFIG = yaml.safe_load(
+    """estimateZernikesScienceSensorTask:
+  type: object
+  additionalProperties: false
+  properties:
+    class:
+      type: string
+      default: >-
+        lsst.ts.wep.task.EstimateZernikesScienceSensorTask.EstimateZernikesScienceSensorTask
+    config:
+      type: object
+      additionalProperties: false
+      properties:
+        donutTemplateSize:
+          type: integer
+          default: 160
+        donutStampSize:
+          type: integer
+          default: 160
+        initialCutoutPadding:
+          type: integer
+          default: 40
 """
 )
