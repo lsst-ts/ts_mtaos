@@ -2,6 +2,24 @@
 Version History
 ===============
 
+v0.10.0
+-------
+
+* In Jenkinsfile, separate running tests marked as integtest and csc_integtest from the other unit tests. 
+  Run non-marked tests first and, if successful, run integtest and csc_integtest respectively.
+  The integration tests take quite some time and resources to execute so if a unit test fail we should not run those.
+* In `tests/test_mtaosCsc.py` add test_run_wep_lsst_cwfs (annotated as `csc_integtest`) to test processing corner wavefront sensor.
+* In `Model.run_wep` enable `process_lsstcam_corner_wfs`.
+* Rename test test_runWEP -> test_run_wep_comcam
+* Add integration tests for `Model.process_lsstcam_corner_wfs`.
+* In `Model` add `process_lsstcam_corner_wfs` method to process LSSTCam corner wavefront sensor data.
+* Move `process_comcam` tests from `tests/test_model.py` to `tests/wep_integration/test_comcam.py`. 
+  Test case is now decorated with `integtest` to allow us to differentiate them from the other tests.
+* In test_model, convert `TestModel` to an `unittest.IsolatedAsyncioTestCase` and merge `test_log_stream` into it. 
+  Remove `TestAsyncModel`, the `process_*` tests will be moved into their own test module.
+* In test_mtaosCsc, decorate tests involving WEP command with `csc_integtest` to allow them to be differentiated from other tests.
+* In test_utility, reduce sleep time to speed up `timeit` test.
+
 v0.9.0
 ------
 

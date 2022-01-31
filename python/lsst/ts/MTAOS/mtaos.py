@@ -270,7 +270,9 @@ class MTAOS(salobj.ConfigurableCsc):
             with open(self.config_dir / config.wep_config) as fp:
                 self.wep_config = yaml.safe_load(fp)
                 try:
-                    self.model.wep_configuration_validation.validate(self.wep_config)
+                    self.model.wep_configuration_validation[config.instrument].validate(
+                        self.wep_config
+                    )
                 except Exception as e:
                     self.log.exception("Failed to validate WEP configuration.")
                     raise salobj.ExpectedError(
@@ -402,7 +404,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
-        self.cmd_issueCorrection.ack_in_progress(
+        self.cmd_selectSources.ack_in_progress(
             data,
             timeout=self.LONG_TIMEOUT,
             result="selectSources started.",
@@ -428,7 +430,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
-        self.cmd_issueCorrection.ack_in_progress(
+        self.cmd_preProcess.ack_in_progress(
             data,
             timeout=self.LONG_TIMEOUT,
             result="preProcess started.",
@@ -456,7 +458,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
-        self.cmd_issueCorrection.ack_in_progress(
+        self.cmd_runWEP.ack_in_progress(
             data,
             timeout=self.LONG_TIMEOUT,
             result="runWEP started.",
@@ -516,7 +518,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
-        self.cmd_issueCorrection.ack_in_progress(
+        self.cmd_runOFC.ack_in_progress(
             data,
             timeout=self.LONG_TIMEOUT,
             result="runOFC started.",

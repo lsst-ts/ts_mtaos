@@ -34,15 +34,14 @@ from lsst.ts.ofc.utils import CorrectionType
 
 from lsst.ts import MTAOS
 
-from lsst.daf import butler as dafButler
 from lsst.afw.image import VisitInfo
 from lsst.geom import SpherePoint, degrees
 
-from lsst.ts.wep.Utility import writeCleanUpRepoCmd, runProgram
-from lsst.ts.wep.Utility import getModulePath as getModulePathWep
+# A short wait time in seconds
+SHORT_WAIT_TIME = 1.0
 
 
-class TestModel(unittest.TestCase):
+class TestModel(unittest.IsolatedAsyncioTestCase):
     """Test the Model class."""
 
     @classmethod
@@ -323,7 +322,6 @@ class TestModel(unittest.TestCase):
     def test_generate_wep_configuration(self):
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
-            reference_id=12345,
             config=dict(),
         )
 
@@ -361,7 +359,6 @@ class TestModel(unittest.TestCase):
     def test_generate_wep_configuration_custom_donut_catalog_online(self):
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
-            reference_id=12345,
             config=dict(
                 tasks=dict(
                     generateDonutCatalogWcsTask=dict(
@@ -412,7 +409,6 @@ class TestModel(unittest.TestCase):
     def test_generate_wep_configuration_custom_isr(self):
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
-            reference_id=12345,
             config=dict(
                 tasks=dict(
                     isr=dict(
@@ -458,7 +454,6 @@ class TestModel(unittest.TestCase):
     def test_generate_wep_configuration_custom_zernike_science_sensor(self):
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
-            reference_id=12345,
             config=dict(
                 tasks=dict(
                     estimateZernikesScienceSensorTask=dict(
@@ -594,162 +589,10 @@ class TestModel(unittest.TestCase):
                 == expected_zernike_science_sensor_config[config]
             )
 
-
-class TestAsyncModel(unittest.IsolatedAsyncioTestCase):
-    @classmethod
-    def setUpClass(cls):
-
-        cls.dataDir = MTAOS.getModulePath().joinpath("tests", "tmp")
-        cls.isrDir = cls.dataDir.joinpath("input")
-
-        # Let the MTAOS to set WEP based on this path variable
-        os.environ["ISRDIRPATH"] = cls.isrDir.as_posix()
-
-        ofc_data = OFCData("comcam")
-
-        dof_state0 = yaml.safe_load(
-            MTAOS.getModulePath()
-            .joinpath("tests", "testData", "state0inDof.yaml")
-            .open()
-            .read()
-        )
-        ofc_data.dof_state0 = dof_state0
-
-        data_path = os.path.join(
-            getModulePathWep(), "tests", "testData", "gen3TestRepo"
-        )
-        run_name = "run1"
-
-        # Check that run doesn't already exist due to previous improper cleanup
-        butler = dafButler.Butler(data_path)
-        registry = butler.registry
-
-        # This is the expected index of the maximum zernike coefficient.
-        cls.zernike_coefficient_maximum_expected = {1, 2}
-
-        if run_name in list(registry.queryCollections()):
-            cleanUpCmd = writeCleanUpRepoCmd(data_path, run_name)
-            runProgram(cleanUpCmd)
-
-        cls.model = MTAOS.Model(
-            instrument=ofc_data.name,
-            data_path=data_path,
-            ofc_data=ofc_data,
-            run_name=run_name,
-            collections="LSSTCam/calib/unbounded,LSSTCam/raw/all",
-            pipeline_instrument=dict(comcam="lsst.obs.lsst.LsstCam"),
-            data_instrument_name=dict(comcam="LSSTCam"),
-            reference_detector=94,
-        )
-
-        cls.short_waittime = 1.0
-
-    @classmethod
-    def tearDownClass(cls):
-        # Check that run doesn't already exist due to previous improper cleanup
-        butler = dafButler.Butler(cls.model.data_path)
-
-        if cls.model.run_name in list(butler.registry.queryCollections()):
-            runProgram(writeCleanUpRepoCmd(cls.model.data_path, cls.model.run_name))
-
-    async def test_process_comcam(self):
-
-        await self.model.process_comcam(
-            4021123106001,
-            4021123106002,
-            {
-                "tasks": {
-                    "generateDonutCatalogWcsTask": {
-                        "config": {"donutSelector.fluxField": "g_flux"}
-                    }
-                }
-            },
-        )
-
-        self.assertEqual(self.model.wavefront_errors.getNumOfData(), 1)
-
-        data = self.model.wavefront_errors.pop()
-
-        # There is one element for each sensor, 2 sensors have data.
-        self.assertEqual(len(data), 2)
-
-        zk_avg = self.model.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
-
-        # The sensors with data are 93 and 94
-        self.assertTrue(93 in zk_avg)
-        self.assertTrue(94 in zk_avg)
-
-        # It is not possible to guaranteee here that the values of the zernike
-        # coefficients will always be the same. Instead of trying to chase our
-        # tails here, let's check that the returning arrays has the expected
-        # dimensions and that the maximum absolute value of all zernike
-        # coefficients is always the same.
-        self.assertEqual(
-            len(zk_avg[93]),
-            len(self.model.ofc.ofc_data.zn3_idx),
-            msg="Wrong size of zernike coefficients in sensor 93.",
-        )
-        self.assertTrue(
-            np.argmax(np.abs(zk_avg[93])) in self.zernike_coefficient_maximum_expected
-        )
-        self.assertEqual(
-            len(zk_avg[94]),
-            len(self.model.ofc.ofc_data.zn3_idx),
-            msg="Wrong size of zernike coefficients in sensor 94.",
-        )
-        self.assertTrue(
-            np.argmax(np.abs(zk_avg[94])) in self.zernike_coefficient_maximum_expected
-        )
-
-    async def test_interrupt_wep_process(self):
-
-        task = asyncio.create_task(
-            self.model.process_comcam(
-                4021123106001,
-                4021123106002,
-                {
-                    "tasks": {
-                        "generateDonutCatalogWcsTask": {
-                            "config": {"donutSelector.fluxField": "g_flux"}
-                        }
-                    }
-                },
-            )
-        )
-
-        await asyncio.sleep(self.short_waittime)
-
-        await self.model.interrupt_wep_process()
-
-        with self.assertRaises(RuntimeError):
-            await task
-
-    async def test_wep_process_fail_bad_config(self):
-
-        task = asyncio.create_task(
-            self.model.process_comcam(
-                4021123106001,
-                4021123106002,
-                {
-                    "tasks": {
-                        "generateDonutCatalogWcsTask": {
-                            "config": {
-                                "donutSelector.fluxField": "g_flux",
-                                "bad_key": "bad_value",
-                            }
-                        }
-                    }
-                },
-            )
-        )
-
-        with self.assertRaises(RuntimeError):
-            await task
-
     async def test_log_stream(self):
 
         task = await asyncio.create_subprocess_shell(
-            f"echo THIS IS A TEST; sleep {self.short_waittime};echo THIS IS A TEST",
+            f"echo THIS IS A TEST; sleep {SHORT_WAIT_TIME};echo THIS IS A TEST",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -759,7 +602,7 @@ class TestAsyncModel(unittest.IsolatedAsyncioTestCase):
 
             await asyncio.wait_for(
                 log_task,
-                timeout=self.short_waittime * 2.0,
+                timeout=SHORT_WAIT_TIME * 2.0,
             )
 
             self.assertEqual(

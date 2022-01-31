@@ -132,7 +132,7 @@ class TestUtility(unittest.TestCase):
             return arg1, arg2, arg3, arg4
 
         exec_time = {}
-        sleep_time = 1.0
+        sleep_time = 0.1
 
         for i in range(10):
             r_a1, r_a2, r_a3, r_a4 = my_retval(
