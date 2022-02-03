@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.10.1
+-------
+
+* Fill `softwareVersions.subsystemVersions` event attribute with information about ts_ofc, ts_wep and lsst_distrib packages.
+
 v0.10.0
 -------
 

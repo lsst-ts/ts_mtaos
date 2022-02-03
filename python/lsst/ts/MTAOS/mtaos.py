@@ -21,6 +21,7 @@
 
 __all__ = ["MTAOS"]
 
+import eups
 import yaml
 import typing
 import inspect
@@ -42,6 +43,16 @@ from . import Config
 from . import Model
 from . import utility
 from . import __version__
+
+try:
+    from lsst.ts.ofc import __version__ as __ofc_version__
+except ImportError:
+    __ofc_version__ = "unknown"
+
+try:
+    from lsst.ts.wep import __version__ as __wep_version__
+except ImportError:
+    __wep_version__ = "unknown"
 
 
 class MTAOS(salobj.ConfigurableCsc):
@@ -132,6 +143,8 @@ class MTAOS(salobj.ConfigurableCsc):
             initial_state=salobj.State.STANDBY,
             simulation_mode=int(simulation_mode),
         )
+
+        self.evt_softwareVersions.set(subsystemVersions=self.get_subsystems_versions())
 
         # Logger attribute comes from the upstream Controller class
         if log_to_file:
@@ -1001,6 +1014,22 @@ class MTAOS(salobj.ConfigurableCsc):
             else 0.0
         )
         self.evt_ofcDuration.set_put(calcTime=duration)
+
+    def get_subsystems_versions(self) -> str:
+        """Get subsystems versions string.
+
+        Returns
+        -------
+        subsystems_versions : `str`
+            A comma delimited list of key=value pairs relating subsystem name
+            (key) to its version number (value).
+        """
+
+        lsst_distrib_version = ":".join(
+            eups.Eups().findSetupProduct("lsst_distrib").tags
+        )
+
+        return f"ts_ofc={__ofc_version__},ts_wep={__wep_version__},lsst_distrib={lsst_distrib_version}"
 
     @classmethod
     def add_arguments(cls, parser):
