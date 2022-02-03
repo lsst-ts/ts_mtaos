@@ -140,6 +140,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     }
                 )
 
+            self.assert_software_versions(
+                await self.remote.evt_softwareVersions.aget(timeout=STD_TIMEOUT)
+            )
+
             await self.check_standard_state_transitions(
                 enabled_commands=enabled_commands,
                 timeout=STD_TIMEOUT,
@@ -604,6 +608,33 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             with self.assertRaises(salobj.AckError):
                 await run_wep_task
+
+    def assert_software_versions(self, sofware_versions) -> None:
+        """Assert software versions payload is correctly populated.
+
+        Raises
+        ------
+        AssertionError
+            If software_versions does not match expected values.
+        """
+        # salVersion must not be empty
+        assert len(sofware_versions.salVersion) > 0
+
+        # xmlVersion must not be empty
+        assert len(sofware_versions.xmlVersion) > 0
+
+        # openSpliceVersion must not be empty
+        assert len(sofware_versions.openSpliceVersion) > 0
+
+        # cscVersion must not be empty
+        assert len(sofware_versions.cscVersion) > 0
+
+        # subsystemVersions must not be empty
+        assert len(sofware_versions.subsystemVersions) > 0
+
+        assert "ts_ofc" in sofware_versions.subsystemVersions
+        assert "ts_wep" in sofware_versions.subsystemVersions
+        assert "lsst_distrib" in sofware_versions.subsystemVersions
 
 
 if __name__ == "__main__":
