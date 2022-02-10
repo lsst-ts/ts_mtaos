@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.10.2
+-------
+
+* Fix bug in `begin_disable` that would prevent CSC from going out of ENABLED if last time`runWEP` execution failed.
+
 v0.10.1
 -------
 
