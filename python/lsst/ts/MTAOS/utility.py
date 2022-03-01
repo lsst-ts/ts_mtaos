@@ -32,11 +32,13 @@ __all__ = [
     "addRotFileHandler",
     "timeit",
     "support_interrupt_wep_cmd",
+    "get_formatted_corner_wavefront_sensors_ids",
 ]
 
 import asyncio
 import logging
 import os
+import re
 import time
 
 from logging.handlers import RotatingFileHandler
@@ -44,6 +46,8 @@ from enum import Enum, auto
 from pathlib import Path
 
 from lsst.utils import getPackageDir
+
+from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
 
 from lsst.ts.salobj import parse_idl
 from lsst.ts.idl import get_idl_dir
@@ -310,6 +314,27 @@ def support_interrupt_wep_cmd() -> bool:
     idl_metadata = parse_idl(csc_name, get_idl_dir() / f"sal_revCoded_{csc_name}.idl")
 
     return "command_interruptWEP" in idl_metadata.topic_info
+
+
+def get_formatted_corner_wavefront_sensors_ids() -> str:
+    """Return a list of ids for the corner wavefront sensors for LSSTCam.
+
+    Returns
+    -------
+    str
+        Comma-separeted string with the ids of the corner wavefront sensor for
+        LSSTCam.
+    """
+    detector_mapping = LsstCamTranslator.detector_mapping()
+    pattern = re.compile("R(?P<r>\\d{2})_SW(?P<sw>\\d{1})")
+
+    return ", ".join(
+        [
+            f"{detector_mapping[detector][0]}"
+            for detector in detector_mapping
+            if pattern.match(detector) is not None
+        ]
+    )
 
 
 if __name__ == "__main__":
