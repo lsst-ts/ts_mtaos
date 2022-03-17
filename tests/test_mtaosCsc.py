@@ -494,6 +494,57 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     @pytest.mark.csc_integtest
+    async def test_run_wep_comcam_disable_after_execution_error(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
+
+            ofc_data = OFCData("comcam")
+
+            dof_state0 = yaml.safe_load(
+                MTAOS.getModulePath()
+                .joinpath("tests", "testData", "state0inDof.yaml")
+                .open()
+                .read()
+            )
+            ofc_data.dof_state0 = dof_state0
+
+            self.csc.model = MTAOS.Model(
+                instrument=ofc_data.name,
+                data_path=self.data_path,
+                ofc_data=ofc_data,
+                run_name=self.run_name,
+                collections="LSSTCam/calib/unbounded,LSSTCam/raw/all",
+                pipeline_instrument=dict(comcam="lsst.obs.lsst.LsstCam"),
+                data_instrument_name=dict(comcam="LSSTCam"),
+                reference_detector=94,
+            )
+
+            remote = self._getRemote()
+            self.remote.evt_wavefrontError.flush()
+            self.remote.evt_wepDuration.flush()
+
+            with self.assertRaises(salobj.AckError):
+                await remote.cmd_runWEP.set_start(
+                    visitId=4021123106003,  # Passing inexistent data.
+                    extraId=4021123106004,
+                    config=yaml.safe_dump(
+                        {
+                            "tasks": {
+                                "generateDonutCatalogWcsTask": {
+                                    "config": {"donutSelector.fluxField": "g_flux"}
+                                }
+                            }
+                        }
+                    ),
+                )
+
+            await salobj.set_summary_state(self.remote, salobj.State.STANDBY)
+
+    @pytest.mark.csc_integtest
     async def test_run_wep_lsst_cwfs(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,

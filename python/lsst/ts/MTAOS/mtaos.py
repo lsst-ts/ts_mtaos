@@ -322,7 +322,10 @@ class MTAOS(salobj.ConfigurableCsc):
         data : `DataType`
             Command data
         """
-        await self.model.interrupt_wep_process()
+        try:
+            await self.model.interrupt_wep_process()
+        except Exception:
+            self.log.exception("Error trying to interrupt wep process.")
 
     async def do_resetCorrection(self, data):
         """Command to reset the current wavefront error calculations.

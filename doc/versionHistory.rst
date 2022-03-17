@@ -2,6 +2,14 @@
 Version History
 ===============
 
+v0.10.2
+-------
+
+* Fix bug in `begin_disable` that would prevent CSC from going out of ENABLED if last time`runWEP` execution failed.
+* Update `Model.process_lsstcam_corner_wfs` to restrict processing to corner wavefront sensor detectors.
+  Without this additional restriction the pipeline task would process (with isr, source selection, etcs) all the detectors, taking a considerable ammount of unnecessary compute and time to complete.
+* Add `get_formatted_corner_wavefront_sensors_ids` utility method to generate a comma-separated string with the ids of the corner wavefront sensors for LSSTCam.
+
 v0.10.1
 -------
 

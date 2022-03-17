@@ -49,7 +49,7 @@ from .config_schema import (
 )
 
 from .wavefront_collection import WavefrontCollection
-from .utility import timeit
+from .utility import timeit, get_formatted_corner_wavefront_sensors_ids
 
 from lsst.ts.wep.Utility import writePipetaskCmd
 
@@ -588,7 +588,8 @@ class Model:
 
         async with self.handle_wep_process(
             instrument="lsstCam",
-            exposures_str=f"exposure IN ({visit_id})",
+            exposures_str=f"exposure IN ({visit_id}) "
+            f"AND detector IN ({get_formatted_corner_wavefront_sensors_ids()})",
             run_name=run_name,
             config=config,
         ):
