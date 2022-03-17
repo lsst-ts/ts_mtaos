@@ -31,6 +31,8 @@ from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
 from lsst.ts.wep.Utility import CamType
+from lsst.ts.wep.task.EstimateZernikesCwfsTask import EstimateZernikesCwfsTask
+from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
 
 from lsst.ts import MTAOS
 
@@ -119,6 +121,31 @@ class TestUtility(unittest.TestCase):
         files = [aItem for aItem in items if aItem.is_file()]
 
         return len(files)
+
+    def test_get_formatted_corner_wavefront_sensors_ids(self):
+
+        mtaos_cwfs_detector_ids = set(
+            [
+                int(detector_id)
+                for detector_id in MTAOS.get_formatted_corner_wavefront_sensors_ids().split(
+                    ","
+                )
+            ]
+        )
+
+        detector_mapping = LsstCamTranslator.detector_mapping()
+
+        cwfs_task = EstimateZernikesCwfsTask()
+
+        expected_cwfs_detector_ids = set(
+            [
+                detector_mapping[cwfs_detector_name][0]
+                for cwfs_detector_name in cwfs_task.extraFocalNames
+                + cwfs_task.intraFocalNames
+            ]
+        )
+
+        assert mtaos_cwfs_detector_ids == expected_cwfs_detector_ids
 
     def test_timeit(self):
         @MTAOS.timeit
