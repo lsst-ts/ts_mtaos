@@ -267,7 +267,11 @@ class MTAOS(salobj.ConfigurableCsc):
             log=self.log,
             run_name=config.run_name,
             collections=config.collections,
-            pipeline_instrument=config.pipeline_instrument,
+            pipeline_instrument=(
+                config.pipeline_instrument
+                if hasattr(config, "pipeline_instrument")
+                else None
+            ),
             pipeline_n_processes=config.pipeline_n_processes,
             zernike_table_name=config.zernike_table_name,
         )
@@ -343,11 +347,11 @@ class MTAOS(salobj.ConfigurableCsc):
         # will be rejected. Events will not be published.
         self.model.reset_wfe_correction()
 
-        self.pubEvent_degreeOfFreedom()
-        self.pubEvent_m2HexapodCorrection()
-        self.pubEvent_cameraHexapodCorrection()
-        self.pubEvent_m1m3Correction()
-        self.pubEvent_m2Correction()
+        await self.pubEvent_degreeOfFreedom()
+        await self.pubEvent_m2HexapodCorrection()
+        await self.pubEvent_cameraHexapodCorrection()
+        await self.pubEvent_m1m3Correction()
+        await self.pubEvent_m2Correction()
 
     async def do_issueCorrection(self, data):
         """Command to issue the wavefront corrections to the M2 hexapod, camera
@@ -364,7 +368,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
-        self.cmd_issueCorrection.ack_in_progress(
+        await self.cmd_issueCorrection.ack_in_progress(
             data,
             timeout=self.DEFAULT_TIMEOUT,
             result="issueCorrection started.",
@@ -393,14 +397,14 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
         self.assert_enabled()
 
-        self.pubEvent_rejectedDegreeOfFreedom()
+        await self.pubEvent_rejectedDegreeOfFreedom()
         self.model.reject_correction()
 
-        self.pubEvent_degreeOfFreedom()
-        self.pubEvent_m2HexapodCorrection()
-        self.pubEvent_cameraHexapodCorrection()
-        self.pubEvent_m1m3Correction()
-        self.pubEvent_m2Correction()
+        await self.pubEvent_degreeOfFreedom()
+        await self.pubEvent_m2HexapodCorrection()
+        await self.pubEvent_cameraHexapodCorrection()
+        await self.pubEvent_m1m3Correction()
+        await self.pubEvent_m2Correction()
 
     async def do_selectSources(self, data):
         """Run source selection algorithm for a specific field and visit
@@ -416,7 +420,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
-        self.cmd_selectSources.ack_in_progress(
+        await self.cmd_selectSources.ack_in_progress(
             data,
             timeout=self.LONG_TIMEOUT,
             result="selectSources started.",
@@ -442,7 +446,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
-        self.cmd_preProcess.ack_in_progress(
+        await self.cmd_preProcess.ack_in_progress(
             data,
             timeout=self.LONG_TIMEOUT,
             result="preProcess started.",
@@ -470,7 +474,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
-        self.cmd_runWEP.ack_in_progress(
+        await self.cmd_runWEP.ack_in_progress(
             data,
             timeout=self.LONG_TIMEOUT,
             result="runWEP started.",
@@ -505,9 +509,9 @@ class MTAOS(salobj.ConfigurableCsc):
                 log_time=self.execution_times,
             )
 
-            self.pubEvent_wavefrontError()
-            self.pubEvent_rejectedWavefrontError()
-            self.pubEvent_wepDuration()
+            await self.pubEvent_wavefrontError()
+            await self.pubEvent_rejectedWavefrontError()
+            await self.pubEvent_wepDuration()
 
             while len(self.execution_times["RUN_WEP"]) > self.MAX_TIME_SAMPLE:
                 self.execution_times["RUN_WEP"].pop(0)
@@ -530,7 +534,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
-        self.cmd_runOFC.ack_in_progress(
+        await self.cmd_runOFC.ack_in_progress(
             data,
             timeout=self.LONG_TIMEOUT,
             result="runOFC started.",
@@ -564,12 +568,12 @@ class MTAOS(salobj.ConfigurableCsc):
 
             self.log.debug("Calculate the subsystem correction successfully.")
 
-            self.pubEvent_degreeOfFreedom()
-            self.pubEvent_m2HexapodCorrection()
-            self.pubEvent_cameraHexapodCorrection()
-            self.pubEvent_m1m3Correction()
-            self.pubEvent_m2Correction()
-            self.pubEvent_ofcDuration()
+            await self.pubEvent_degreeOfFreedom()
+            await self.pubEvent_m2HexapodCorrection()
+            await self.pubEvent_cameraHexapodCorrection()
+            await self.pubEvent_m1m3Correction()
+            await self.pubEvent_m2Correction()
+            await self.pubEvent_ofcDuration()
 
     async def do_addAberration(self, data):
         """Utility command to add aberration to the system based on user
@@ -585,7 +589,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # This command may take some time to execute, so will send
         # ack_in_progress with estimated timeout.
-        self.cmd_addAberration.ack_in_progress(
+        await self.cmd_addAberration.ack_in_progress(
             data,
             timeout=self.LONG_TIMEOUT,
             result="addAberration started.",
@@ -663,9 +667,9 @@ class MTAOS(salobj.ConfigurableCsc):
         if any(
             [task.exception() is not None for task in issue_corrections_tasks.values()]
         ):
-            self.pubEvent_rejectedDegreeOfFreedom()
+            await self.pubEvent_rejectedDegreeOfFreedom()
             self.model.reject_correction()
-            self.pubEvent_degreeOfFreedom()
+            await self.pubEvent_degreeOfFreedom()
 
             # Undo corrections that completed.
             error_repor = await self.handle_undo_corrections(issue_corrections_tasks)
@@ -743,7 +747,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         except Exception:
             self.log.exception("M2 hexapod correction command failed.")
-            self.pubEvent_rejectedM2HexapodCorrection()
+            await self.pubEvent_rejectedM2HexapodCorrection()
             raise
 
     async def issue_camhex_correction(self, undo=False):
@@ -769,7 +773,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         except Exception:
             self.log.exception("Camera hexapod correction command failed.")
-            self.pubEvent_rejectedCameraHexapodCorrection()
+            await self.pubEvent_rejectedCameraHexapodCorrection()
             raise
 
     async def issue_m1m3_correction(self, undo=False):
@@ -796,7 +800,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         except Exception:
             self.log.exception("M1M3 correction command failed.")
-            self.pubEvent_rejectedM1M3Correction()
+            await self.pubEvent_rejectedM1M3Correction()
             raise
 
     async def issue_m2_correction(self, undo=False):
@@ -823,10 +827,10 @@ class MTAOS(salobj.ConfigurableCsc):
 
         except Exception:
             self.log.exception("M2 correction command failed.")
-            self.pubEvent_rejectedM2Correction()
+            await self.pubEvent_rejectedM2Correction()
             raise
 
-    def pubEvent_wavefrontError(self):
+    async def pubEvent_wavefrontError(self):
         """Publish the calculated wavefront error calculated by WEP.
 
         WEP: Wavefront estimation pipeline.
@@ -836,13 +840,13 @@ class MTAOS(salobj.ConfigurableCsc):
 
         for sensor_id, zernike_coefficients in self.model.get_wfe():
             for zernike_coefficient in zernike_coefficients:
-                self.evt_wavefrontError.set_put(
+                await self.evt_wavefrontError.set_write(
                     sensorId=sensor_id,
                     annularZernikeCoeff=zernike_coefficient,
                     force_output=True,
                 )
 
-    def pubEvent_rejectedWavefrontError(self):
+    async def pubEvent_rejectedWavefrontError(self):
         """Publish the rejected calculated wavefront error calculated by WEP.
 
         WEP: Wavefront estimation pipeline.
@@ -855,13 +859,13 @@ class MTAOS(salobj.ConfigurableCsc):
             zernike_coefficients,
         ) in self.model.get_rejected_wfe():
             for zernike_coefficient in zernike_coefficients:
-                self.evt_rejectedWavefrontError.set_put(
+                await self.evt_rejectedWavefrontError.set_write(
                     sensorId=sensor_id,
                     annularZernikeCoeff=zernike_coefficient,
                     force_output=True,
                 )
 
-    def pubEvent_degreeOfFreedom(self):
+    async def pubEvent_degreeOfFreedom(self):
         """Publish the degree of freedom generated by the OFC calculation.
 
         OFC: Optical feedback control.
@@ -871,13 +875,13 @@ class MTAOS(salobj.ConfigurableCsc):
 
         dofAggr = self.model.get_dof_aggr()
         dofVisit = self.model.get_dof_lv()
-        self.evt_degreeOfFreedom.set_put(
+        await self.evt_degreeOfFreedom.set_write(
             aggregatedDoF=dofAggr,
             visitDoF=dofVisit,
             force_output=True,
         )
 
-    def pubEvent_rejectedDegreeOfFreedom(self):
+    async def pubEvent_rejectedDegreeOfFreedom(self):
         """Publish the rejected degree of freedom generated by the OFC
         calculation.
 
@@ -888,13 +892,13 @@ class MTAOS(salobj.ConfigurableCsc):
 
         dofAggr = self.model.get_dof_aggr()
         dofVisit = self.model.get_dof_lv()
-        self.evt_rejectedDegreeOfFreedom.set_put(
+        await self.evt_rejectedDegreeOfFreedom.set_write(
             aggregatedDoF=dofAggr,
             visitDoF=dofVisit,
             force_output=True,
         )
 
-    def pubEvent_m2HexapodCorrection(self):
+    async def pubEvent_m2HexapodCorrection(self):
         """Publish the M2 hexapod correction that would be commanded if the
         issueWavefrontCorrection command was sent.
         """
@@ -902,11 +906,11 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         x, y, z, u, v, w = self.model.m2_hexapod_correction()
-        self.evt_m2HexapodCorrection.set_put(
+        await self.evt_m2HexapodCorrection.set_write(
             x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
         )
 
-    def pubEvent_rejectedM2HexapodCorrection(self):
+    async def pubEvent_rejectedM2HexapodCorrection(self):
         """Publish the rejected M2 hexapod correction that would be commanded
         if the issueWavefrontCorrection command was sent.
         """
@@ -914,11 +918,11 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         x, y, z, u, v, w = self.model.m2_hexapod_correction()
-        self.evt_rejectedM2HexapodCorrection.set_put(
+        await self.evt_rejectedM2HexapodCorrection.set_write(
             x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
         )
 
-    def pubEvent_cameraHexapodCorrection(self):
+    async def pubEvent_cameraHexapodCorrection(self):
         """Publish the camera hexapod correction that would be commanded if the
         issueWavefrontCorrection command was sent.
         """
@@ -926,11 +930,11 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         x, y, z, u, v, w = self.model.cam_hexapod_correction()
-        self.evt_cameraHexapodCorrection.set_put(
+        await self.evt_cameraHexapodCorrection.set_write(
             x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
         )
 
-    def pubEvent_rejectedCameraHexapodCorrection(self):
+    async def pubEvent_rejectedCameraHexapodCorrection(self):
         """Publish the rejected camera hexapod correction that would be
         commanded if the issueWavefrontCorrection command was sent.
         """
@@ -938,11 +942,11 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         x, y, z, u, v, w = self.model.cam_hexapod_correction()
-        self.evt_rejectedCameraHexapodCorrection.set_put(
+        await self.evt_rejectedCameraHexapodCorrection.set_write(
             x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
         )
 
-    def pubEvent_m1m3Correction(self):
+    async def pubEvent_m1m3Correction(self):
         """Publish the M1M3 correction that would be commanded if the
         issueWavefrontCorrection command was sent.
         """
@@ -950,9 +954,9 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         zForces = self.model.m1m3_correction()
-        self.evt_m1m3Correction.set_put(zForces=zForces, force_output=True)
+        await self.evt_m1m3Correction.set_write(zForces=zForces, force_output=True)
 
-    def pubEvent_rejectedM1M3Correction(self):
+    async def pubEvent_rejectedM1M3Correction(self):
         """Publish the rejected M1M3 correction that would be commanded if the
         issueWavefrontCorrection command was sent.
         """
@@ -960,9 +964,11 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         zForces = self.model.m1m3_correction()
-        self.evt_rejectedM1M3Correction.set_put(zForces=zForces, force_output=True)
+        await self.evt_rejectedM1M3Correction.set_write(
+            zForces=zForces, force_output=True
+        )
 
-    def pubEvent_m2Correction(self):
+    async def pubEvent_m2Correction(self):
         """Publish the M2 correction that would be commanded if the
         issueWavefrontCorrection command was sent.
         """
@@ -970,9 +976,9 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         zForces = self.model.m2_correction()
-        self.evt_m2Correction.set_put(zForces=zForces, force_output=True)
+        await self.evt_m2Correction.set_write(zForces=zForces, force_output=True)
 
-    def pubEvent_rejectedM2Correction(self):
+    async def pubEvent_rejectedM2Correction(self):
         """Publish the rejected M2 correction that would be commanded if the
         issueWavefrontCorrection command was sent.
         """
@@ -980,9 +986,11 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         zForces = self.model.m2_correction()
-        self.evt_rejectedM2Correction.set_put(zForces=zForces, force_output=True)
+        await self.evt_rejectedM2Correction.set_write(
+            zForces=zForces, force_output=True
+        )
 
-    def pubEvent_wepDuration(self):
+    async def pubEvent_wepDuration(self):
         """Publish the duration of the WEP calculation."""
 
         self._logExecFunc()
@@ -993,9 +1001,9 @@ class MTAOS(salobj.ConfigurableCsc):
             and len(self.execution_times["RUN_WEP"]) > 0
             else 0.0
         )
-        self.evt_wepDuration.set_put(calcTime=duration)
+        await self.evt_wepDuration.set_write(calcTime=duration)
 
-    def pubEvent_ofcDuration(self):
+    async def pubEvent_ofcDuration(self):
         """Publish the duration of the OFC calculation."""
 
         self._logExecFunc()
@@ -1006,7 +1014,7 @@ class MTAOS(salobj.ConfigurableCsc):
             and len(self.execution_times["CALCULATE_CORRECTIONS"]) > 0
             else 0.0
         )
-        self.evt_ofcDuration.set_put(calcTime=duration)
+        await self.evt_ofcDuration.set_write(calcTime=duration)
 
     def get_subsystems_versions(self) -> str:
         """Get subsystems versions string.

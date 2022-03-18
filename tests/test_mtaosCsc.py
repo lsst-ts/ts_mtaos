@@ -159,7 +159,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 with self.subTest(bad_config_name=bad_config_name):
                     with salobj.assertRaisesAckError():
                         await self.remote.cmd_start.set_start(
-                            settingsToApply=bad_config_name, timeout=STD_TIMEOUT
+                            configurationOverride=bad_config_name, timeout=STD_TIMEOUT
                         )
 
             valid_files = glob.glob(os.path.join(TEST_CONFIG_DIR, "valid_*.yaml"))
@@ -173,7 +173,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     config_data = yaml.safe_load(fp)
 
                 await self.remote.cmd_start.set_start(
-                    settingsToApply=good_config_name, timeout=STD_TIMEOUT
+                    configurationOverride=good_config_name, timeout=STD_TIMEOUT
                 )
 
                 self.assertEqual(

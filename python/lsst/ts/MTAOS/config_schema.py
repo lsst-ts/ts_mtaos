@@ -36,7 +36,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v2
+title: MTAOS v3
 description: Schema for MTAOS configuration files
 type: object
 
@@ -46,68 +46,56 @@ properties:
     description: Type of camera for wavefront estimation pipeline (WEP) to use
     type: string
     enum: [lsstCam, lsstFamCam, comcam]
-    default: comcam
 
   instrument:
     description: Type of instrument for optical feedback control (OFC) to use
     type: string
-    default: comcam
 
   data_path:
     description: Path to the data butler.
     type: string
-    default: /project/shared/
 
   run_name:
     description: >-
       Which name to use when running the pipeline task. This defines
       the location where the data is written in the butler.
     type: string
-    default: mtaos_wep
 
   collections:
     description: Name of the collections where the data is written in the butler.
     type: string
-    default: refcats, LSSTComCam/raw/all, LSSTComCam/calib
 
   pipeline_instrument:
     description: >-
       A dictionary that maps the name of the instrument to the name used in
       the pipeline task.
-    anyOf:
-      - type: object
-        properties:
-          comcam:
-            type: string
-          lsstCam:
-            type: string
-          lsstFamCam:
-            type: string
-        additionalProperties: false
-      - type: "null"
-    default: null
+      type: object
+      properties:
+        comcam:
+          type: string
+        lsstCam:
+          type: string
+        lsstFamCam:
+          type: string
+      additionalProperties: false
 
   pipeline_n_processes:
     description: Number of processes to use when running pipeline.
     type: integer
-    default: 9
 
   zernike_table_name:
     description: Name of the table in the butler with zernike coefficients.
     type: string
-    default: zernikeEstimateRaw
 
   reference_detector:
     description: Which detector to use as a reference for determining the boresight information.
     type: integer
-    default: 0
 
   visit_id_offset:
     description: >-
       Offset applied to the visit ID. TODO (DM-31365): Remove workaround to
       visitId being of type long in MTAOS runWEP command.
     type: integer
-    default: 0
     minimum: 0
 
   wep_config:
