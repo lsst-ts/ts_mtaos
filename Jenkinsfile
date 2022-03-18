@@ -9,6 +9,7 @@ pipeline {
         docker {
             image 'lsstts/develop-env:develop'
             args "-u root --entrypoint=''"
+            alwaysPull true
         }
     }
 
@@ -42,7 +43,7 @@ pipeline {
         LTD_USERNAME = "${user_ci_USR}"
         LTD_PASSWORD = "${user_ci_PSW}"
         DOCUMENT_NAME = "ts-mtaos"
-        WORK_BRANCHES = "${GIT_BRANCH} ${CHANGE_BRANCH} develop"
+        WORK_BRANCHES = "${env.BRANCH_NAME} ${CHANGE_BRANCH} develop"
     }
 
     stages {
@@ -90,6 +91,18 @@ pipeline {
                         cd ../ts_wep/
                         setup -k -r .
                         scons python
+                    """
+                }
+            }
+        }
+        stage("Checkout ts_config_mttcs") {
+            steps {
+                withEnv(["HOME=${env.WORKSPACE}"]) {
+                    sh """
+                        source ${env.SAL_SETUP_FILE}
+                        cd ${env.SAL_USERS_HOME}/repos/ts_config_mttcs
+                        ${env.SAL_USERS_HOME}/.checkout_repo.sh \${WORK_BRANCHES}
+                        git pull
                     """
                 }
             }
