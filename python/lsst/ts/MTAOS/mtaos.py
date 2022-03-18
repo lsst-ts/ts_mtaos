@@ -131,10 +131,6 @@ class MTAOS(salobj.ConfigurableCsc):
 
         cscName = utility.getCscName()
 
-        # TODO: Remove when xml 11 is available (DM-33401).
-        if utility.support_interrupt_wep_cmd():
-            setattr(self, "do_interruptWEP", self._handle_interrupt_wep)
-
         super().__init__(
             cscName,
             index=0,
@@ -617,25 +613,19 @@ class MTAOS(salobj.ConfigurableCsc):
                     self.log.debug("Restoring ofc_data values.")
                     await self.model.set_ofc_data_values(**original_ofc_data_values)
 
-            self.pubEvent_degreeOfFreedom()
-            self.pubEvent_m2HexapodCorrection()
-            self.pubEvent_cameraHexapodCorrection()
-            self.pubEvent_m1m3Correction()
-            self.pubEvent_m2Correction()
+            await self.pubEvent_degreeOfFreedom()
+            await self.pubEvent_m2HexapodCorrection()
+            await self.pubEvent_cameraHexapodCorrection()
+            await self.pubEvent_m1m3Correction()
+            await self.pubEvent_m2Correction()
 
-    async def _handle_interrupt_wep(
-        self, data: salobj.type_hints.BaseDdsDataType
-    ) -> None:
+    async def do_interruptWEP(self, data: salobj.type_hints.BaseDdsDataType) -> None:
         """Interrupt a running wep process.
-
-        This method will be converted to do_interruptWEP when xml 11 is
-        released (DM-33401).
 
         Parameters
         ----------
         data : ``cmd_interrupWEP.DataType``
         """
-        # TODO: Rename to do_interruptWEP when xml 11 is available (DM-33401).
         self.assert_enabled()
 
         await self.model.interrupt_wep_process()
