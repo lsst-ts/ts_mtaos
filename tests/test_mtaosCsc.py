@@ -129,16 +129,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 "runWEP",
                 "runOFC",
                 "addAberration",
+                "interruptWEP",
             }
-
-            # TODO: Remove when xml 11 is available and add interruptWEP to the
-            # list of enabled_commands above (DM-33401).
-            if MTAOS.utility.support_interrupt_wep_cmd():
-                enabled_commands.update(
-                    {
-                        "interruptWEP",
-                    }
-                )
 
             self.assert_software_versions(
                 await self.remote.evt_softwareVersions.aget(timeout=STD_TIMEOUT)
@@ -167,7 +159,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 with self.subTest(bad_config_name=bad_config_name):
                     with salobj.assertRaisesAckError():
                         await self.remote.cmd_start.set_start(
-                            settingsToApply=bad_config_name, timeout=STD_TIMEOUT
+                            configurationOverride=bad_config_name, timeout=STD_TIMEOUT
                         )
 
             valid_files = glob.glob(os.path.join(TEST_CONFIG_DIR, "valid_*.yaml"))
@@ -181,7 +173,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     config_data = yaml.safe_load(fp)
 
                 await self.remote.cmd_start.set_start(
-                    settingsToApply=good_config_name, timeout=STD_TIMEOUT
+                    configurationOverride=good_config_name, timeout=STD_TIMEOUT
                 )
 
                 self.assertEqual(

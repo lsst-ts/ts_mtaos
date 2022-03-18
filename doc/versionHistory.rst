@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.11.0
+-------
+
+* Upgrade CSC to work with salobj 7/xml 11.
+
 v0.10.2
 -------
 
