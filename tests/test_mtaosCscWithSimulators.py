@@ -317,7 +317,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     def hexapod_move_callbck(self, data):
 
-        if data.MTHexapodID == MTAOS.utility.MTHexapodIndex.M2.value:
+        if data.salIndex == MTAOS.utility.MTHexapodIndex.M2.value:
             self.m2_hex_corrections.append(data)
         else:
             self.cam_hex_corrections.append(data)
