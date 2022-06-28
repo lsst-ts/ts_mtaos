@@ -2,6 +2,12 @@
 Version History
 ===============
 
+v0.11.1
+-------
+
+* Replace reference to MTHexapodID -> salIndex, for compatibility with salobj >7.1.
+* Update Jenkinsfile to replace HOME -> WHOME.
+
 v0.11.0
 -------
 

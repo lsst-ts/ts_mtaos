@@ -50,7 +50,7 @@ pipeline {
 
         stage ('Install the Libraries') {
             steps {
-                withEnv(["HOME=${env.WORKSPACE}"]) {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
 
@@ -80,7 +80,7 @@ pipeline {
 
         stage ('Building the Dependencies') {
             steps {
-                withEnv(["HOME=${env.WORKSPACE}"]) {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
 
@@ -97,7 +97,7 @@ pipeline {
         }
         stage("Checkout ts_config_mttcs") {
             steps {
-                withEnv(["HOME=${env.WORKSPACE}"]) {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
                         cd ${env.SAL_USERS_HOME}/repos/ts_config_mttcs
@@ -109,7 +109,7 @@ pipeline {
         }
         stage("Checkout xml") {
             steps {
-                withEnv(["HOME=${env.WORKSPACE}"]) {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
                         cd ${env.SAL_USERS_HOME}/repos/ts_xml
@@ -121,7 +121,7 @@ pipeline {
         }
         stage("Checkout IDL") {
             steps {
-                withEnv(["HOME=${env.WORKSPACE}"]) {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
                         cd ${env.SAL_USERS_HOME}/repos/ts_idl
@@ -133,7 +133,7 @@ pipeline {
         }
         stage("Build IDL files") {
             steps {
-                withEnv(["HOME=${env.WORKSPACE}"]) {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
                         source ${env.SAL_USERS_HOME}/.bashrc
@@ -146,7 +146,7 @@ pipeline {
         stage ('Unit Tests and Coverage Analysis') {
             steps {
                 // Pytest needs to export the junit report.
-                withEnv(["HOME=${env.WORKSPACE}"]) {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
 
@@ -175,7 +175,7 @@ pipeline {
 
         stage ('Build and Upload Documentation') {
             steps {
-                withEnv(["HOME=${env.WORKSPACE}"]) {
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
                         source ${env.SAL_SETUP_FILE}
 
@@ -207,8 +207,8 @@ pipeline {
             // is 1003 on TSSW Jenkins instance. In this post stage, it is the
             // jenkins to do the following clean up instead of the root in the
             // docker container.
-            withEnv(["HOME=${env.WORKSPACE}"]) {
-                sh 'chown -R 1003:1003 ${HOME}/'
+            withEnv(["WHOME=${env.WORKSPACE}"]) {
+                sh 'chown -R 1003:1003 ${WHOME}/'
             }
 
             // The path of xml needed by JUnit is relative to
