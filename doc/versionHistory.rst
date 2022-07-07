@@ -2,6 +2,25 @@
 Version History
 ===============
 
+v0.11.2
+-------
+
+* In `Model` class:
+
+  * Add new `define_visits` coroutine that executes `utility.define_visits` in a process pool.
+    The method is called in `_start_wep_process` before running the pipeline task.
+    This is required by the current version of the pipeline task to process more than one exposure at a time.
+
+* Add utility method to define visits.
+
+* Update executable script: bin/run_mtaos.py -> bin/run_mtaos.
+
+* Add .hypothesis/ to gitignore and expand ignore to all .log files.
+
+* Rename package ``lsst.ts.MTAOS`` -> ``lsst.ts.mtaos``.
+
+* In CI Jenkinsfile, enable abort previous build.
+
 v0.11.1
 -------
 
