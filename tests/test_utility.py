@@ -34,7 +34,7 @@ from lsst.ts.wep.Utility import CamType
 from lsst.ts.wep.task.EstimateZernikesCwfsTask import EstimateZernikesCwfsTask
 from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
 
-from lsst.ts import MTAOS
+from lsst.ts import mtaos
 
 
 class TestUtility(unittest.TestCase):
@@ -43,7 +43,7 @@ class TestUtility(unittest.TestCase):
     def setUp(self):
 
         self.dataDir = tempfile.TemporaryDirectory(
-            dir=MTAOS.getModulePath().joinpath("tests").as_posix()
+            dir=mtaos.getModulePath().joinpath("tests").as_posix()
         )
 
     def tearDown(self):
@@ -52,24 +52,24 @@ class TestUtility(unittest.TestCase):
 
     def testGetModulePath(self):
 
-        modulePath = MTAOS.getModulePath()
+        modulePath = mtaos.getModulePath()
         self.assertTrue(modulePath.exists())
         self.assertTrue("ts_MTAOS" in modulePath.name)
 
     def testGetConfigDir(self):
 
-        ansConfigDir = MTAOS.getModulePath().joinpath("policy")
-        self.assertEqual(MTAOS.getConfigDir(), ansConfigDir)
+        ansConfigDir = mtaos.getModulePath().joinpath("policy")
+        self.assertEqual(mtaos.getConfigDir(), ansConfigDir)
 
     def testGetLogDir(self):
 
-        ansLogDir = MTAOS.getModulePath().joinpath("logs")
-        self.assertEqual(MTAOS.getLogDir(), ansLogDir)
+        ansLogDir = mtaos.getModulePath().joinpath("logs")
+        self.assertEqual(mtaos.getLogDir(), ansLogDir)
         self.assertTrue(ansLogDir.exists())
 
     def testGetIsrDirPathNotAssigned(self):
 
-        isrDir = MTAOS.getIsrDirPath()
+        isrDir = mtaos.getIsrDirPath()
         self.assertEqual(isrDir, None)
 
     def testGetIsrDirPath(self):
@@ -77,22 +77,22 @@ class TestUtility(unittest.TestCase):
         ISRDIRPATH = "/path/to/isr/dir"
         os.environ["ISRDIRPATH"] = ISRDIRPATH
 
-        isrDir = MTAOS.getIsrDirPath()
+        isrDir = mtaos.getIsrDirPath()
         self.assertEqual(isrDir, Path(ISRDIRPATH))
 
         os.environ.pop("ISRDIRPATH")
 
     def testGetCamType(self):
 
-        self.assertEqual(MTAOS.getCamType("lsstCam"), CamType.LsstCam)
-        self.assertEqual(MTAOS.getCamType("lsstFamCam"), CamType.LsstFamCam)
-        self.assertEqual(MTAOS.getCamType("comcam"), CamType.ComCam)
+        self.assertEqual(mtaos.getCamType("lsstCam"), CamType.LsstCam)
+        self.assertEqual(mtaos.getCamType("lsstFamCam"), CamType.LsstFamCam)
+        self.assertEqual(mtaos.getCamType("comcam"), CamType.ComCam)
 
-        self.assertRaises(ValueError, MTAOS.getCamType, "wrongType")
+        self.assertRaises(ValueError, mtaos.getCamType, "wrongType")
 
     def testGetCscName(self):
 
-        cscName = MTAOS.getCscName()
+        cscName = mtaos.getCscName()
         self.assertEqual(cscName, "MTAOS")
 
     def testAddRotFileHandler(self):
@@ -100,7 +100,7 @@ class TestUtility(unittest.TestCase):
         log = logging.Logger("test")
         dataDirPath = self.dataDir.name
         filePath = Path(dataDirPath).joinpath("test.log")
-        MTAOS.addRotFileHandler(
+        mtaos.addRotFileHandler(
             log, filePath, logging.DEBUG, maxBytes=1e3, backupCount=5
         )
 
@@ -127,7 +127,7 @@ class TestUtility(unittest.TestCase):
         mtaos_cwfs_detector_ids = set(
             [
                 int(detector_id)
-                for detector_id in MTAOS.get_formatted_corner_wavefront_sensors_ids().split(
+                for detector_id in mtaos.get_formatted_corner_wavefront_sensors_ids().split(
                     ","
                 )
             ]
@@ -148,12 +148,12 @@ class TestUtility(unittest.TestCase):
         assert mtaos_cwfs_detector_ids == expected_cwfs_detector_ids
 
     def test_timeit(self):
-        @MTAOS.timeit
+        @mtaos.timeit
         def my_retval(arg1, arg2, arg3, arg4, sleep_time, **kwargs):
             time.sleep(sleep_time)
             return arg1, arg2, arg3, arg4
 
-        @MTAOS.timeit
+        @mtaos.timeit
         async def amy_retval(arg1, arg2, arg3, arg4, sleep_time, **kwargs):
             await asyncio.sleep(sleep_time)
             return arg1, arg2, arg3, arg4

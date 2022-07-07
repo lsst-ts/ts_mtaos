@@ -24,7 +24,7 @@ import unittest
 
 from lsst.ts.wep.Utility import CamType
 
-from lsst.ts import MTAOS
+from lsst.ts import mtaos
 
 
 class Config(object):
@@ -52,7 +52,7 @@ class TestConfigByObj(unittest.TestCase):
 
         os.environ["ISRDIRPATH"] = os.path.join(os.sep, "isrDir")
 
-        self.configObj = MTAOS.Config(Config())
+        self.configObj = mtaos.Config(Config())
 
     def tearDown(self):
 
@@ -93,7 +93,7 @@ class TestConfigByObj(unittest.TestCase):
     def testGetDefaultSkyFileNot(self):
 
         config = Config(hasSkyFile=False)
-        configObj = MTAOS.Config(config)
+        configObj = mtaos.Config(config)
 
         skyFilePath = configObj.getDefaultSkyFile()
         self.assertTrue(skyFilePath is None)
@@ -106,7 +106,7 @@ class TestConfigByObj(unittest.TestCase):
     def testGetState0DofFileNot(self):
 
         config = Config(hasState0Dof=False)
-        configObj = MTAOS.Config(config)
+        configObj = mtaos.Config(config)
 
         state0DofFile = configObj.getState0DofFile()
         self.assertTrue(state0DofFile is None)

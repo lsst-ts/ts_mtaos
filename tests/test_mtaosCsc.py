@@ -31,7 +31,7 @@ import numpy as np
 from pathlib import Path
 
 from lsst.ts import salobj
-from lsst.ts import MTAOS
+from lsst.ts import mtaos
 
 from lsst.ts.ofc import OFCData
 
@@ -48,15 +48,15 @@ TEST_CONFIG_DIR = Path(__file__).parents[1].joinpath("tests", "testData", "confi
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
-        return MTAOS.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
+        return mtaos.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
 
     @classmethod
     def setUpClass(cls):
 
-        cls.dataDir = MTAOS.getModulePath().joinpath("tests", "tmp")
+        cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         cls.isrDir = cls.dataDir.joinpath("input")
 
-        # Let the MTAOS to set WEP based on this path variable
+        # Let the mtaos to set WEP based on this path variable
         os.environ["ISRDIRPATH"] = cls.isrDir.as_posix()
 
         cls.data_path = os.path.join(
@@ -77,10 +77,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
 
-        self.dataDir = MTAOS.getModulePath().joinpath("tests", "tmp")
+        self.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         self.isrDir = self.dataDir.joinpath("input")
 
-        # Let the MTAOS to set WEP based on this path variable
+        # Let the mtaos to set WEP based on this path variable
         os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
 
     def tearDown(self):
@@ -90,7 +90,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         except KeyError:
             pass
 
-        logFile = Path(MTAOS.getLogDir()).joinpath("MTAOS.log")
+        logFile = Path(mtaos.getLogDir()).joinpath("mtaos.log")
         if logFile.exists():
             logFile.unlink()
 
@@ -438,14 +438,14 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             ofc_data = OFCData("comcam")
 
             dof_state0 = yaml.safe_load(
-                MTAOS.getModulePath()
+                mtaos.getModulePath()
                 .joinpath("tests", "testData", "state0inDof.yaml")
                 .open()
                 .read()
             )
             ofc_data.dof_state0 = dof_state0
 
-            self.csc.model = MTAOS.Model(
+            self.csc.model = mtaos.Model(
                 instrument=ofc_data.name,
                 data_path=self.data_path,
                 ofc_data=ofc_data,
@@ -497,14 +497,14 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             ofc_data = OFCData("comcam")
 
             dof_state0 = yaml.safe_load(
-                MTAOS.getModulePath()
+                mtaos.getModulePath()
                 .joinpath("tests", "testData", "state0inDof.yaml")
                 .open()
                 .read()
             )
             ofc_data.dof_state0 = dof_state0
 
-            self.csc.model = MTAOS.Model(
+            self.csc.model = mtaos.Model(
                 instrument=ofc_data.name,
                 data_path=self.data_path,
                 ofc_data=ofc_data,
@@ -548,14 +548,14 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             ofc_data = OFCData("lsst")
 
             dof_state0 = yaml.safe_load(
-                MTAOS.getModulePath()
+                mtaos.getModulePath()
                 .joinpath("tests", "testData", "state0inDof.yaml")
                 .open()
                 .read()
             )
             ofc_data.dof_state0 = dof_state0
 
-            self.csc.model = MTAOS.Model(
+            self.csc.model = mtaos.Model(
                 instrument=ofc_data.name,
                 data_path=self.data_path,
                 ofc_data=ofc_data,
@@ -594,7 +594,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     # TODO: Remove skipIf when xml 11 is available (DM-33401).
     @unittest.skipIf(
-        not MTAOS.utility.support_interrupt_wep_cmd(),
+        not mtaos.utility.support_interrupt_wep_cmd(),
         "interruptWEP command not defined. See DM-33401.",
     )
     @pytest.mark.csc_integtest
@@ -607,14 +607,14 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             ofc_data = OFCData("comcam")
 
             dof_state0 = yaml.safe_load(
-                MTAOS.getModulePath()
+                mtaos.getModulePath()
                 .joinpath("tests", "testData", "state0inDof.yaml")
                 .open()
                 .read()
             )
             ofc_data.dof_state0 = dof_state0
 
-            self.csc.model = MTAOS.Model(
+            self.csc.model = mtaos.Model(
                 instrument=ofc_data.name,
                 data_path=self.data_path,
                 ofc_data=ofc_data,

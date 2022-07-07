@@ -22,7 +22,7 @@
 import numpy as np
 import unittest
 
-from lsst.ts.MTAOS import WavefrontCollection
+from lsst.ts.mtaos import WavefrontCollection
 
 
 class TestWavefrontCollection(unittest.TestCase):

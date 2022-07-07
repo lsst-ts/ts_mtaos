@@ -26,7 +26,7 @@ import unittest
 import numpy as np
 from pathlib import Path
 from lsst.ts import salobj
-from lsst.ts import MTAOS
+from lsst.ts import mtaos
 
 # standard command timeout (sec)
 SHORT_TIMEOUT = 5
@@ -35,7 +35,7 @@ STD_TIMEOUT = 60
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
-        return MTAOS.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
+        return mtaos.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
 
     def setUp(self):
 
@@ -52,7 +52,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     def tearDown(self):
 
-        logFile = Path(MTAOS.getLogDir()).joinpath("MTAOS.log")
+        logFile = Path(mtaos.getLogDir()).joinpath("mtaos.log")
         if logFile.exists():
             logFile.unlink()
 
@@ -288,10 +288,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def _simulateCSCs(self):
 
         self.cscM2Hex = salobj.Controller(
-            "MTHexapod", index=MTAOS.utility.MTHexapodIndex.M2.value
+            "MTHexapod", index=mtaos.utility.MTHexapodIndex.M2.value
         )
         self.cscCamHex = salobj.Controller(
-            "MTHexapod", index=MTAOS.utility.MTHexapodIndex.Camera.value
+            "MTHexapod", index=mtaos.utility.MTHexapodIndex.Camera.value
         )
         self.cscM1M3 = salobj.Controller("MTM1M3")
         self.cscM2 = salobj.Controller("MTM2")
@@ -317,7 +317,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     def hexapod_move_callbck(self, data):
 
-        if data.salIndex == MTAOS.utility.MTHexapodIndex.M2.value:
+        if data.salIndex == mtaos.utility.MTHexapodIndex.M2.value:
             self.m2_hex_corrections.append(data)
         else:
             self.cam_hex_corrections.append(data)
