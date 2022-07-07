@@ -14,8 +14,10 @@ pipeline {
     }
 
     options {
-      disableConcurrentBuilds()
-      skipDefaultCheckout()
+        disableConcurrentBuilds(
+            abortPrevious: true,
+        )
+        skipDefaultCheckout()
     }
 
     triggers {
