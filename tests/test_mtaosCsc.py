@@ -112,9 +112,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def testBinScript(self):
         cmdline_args = ["--log-to-file", "--log-level", "20"]
-        await self.check_bin_script(
-            "MTAOS", 0, "run_mtaos.py", cmdline_args=cmdline_args
-        )
+        await self.check_bin_script("MTAOS", 0, "run_mtaos", cmdline_args=cmdline_args)
 
     async def testStandardStateTransitions(self):
         async with self.make_csc(
