@@ -1,9 +1,8 @@
 .sconsign.dblite
-config.log
 .sconf_temp
 *.cfgc
 *.pyc
-ospl-*.log
+*.log
 logs/
 
 # Built by sconsUtils
@@ -21,3 +20,4 @@ pytest_session.txt
 
 # Mac related files
 .DS_Store
+.hypothesis/
