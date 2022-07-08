@@ -107,7 +107,7 @@ class MTAOS(salobj.ConfigurableCsc):
             Set with the name of the component in self.remote that also makes
             the name of the method to issue the correction, e.g.,
             `m2hex` -> `issue_m2hex_correction`.
-        model : `None` or `lsst.ts.MTAOS.Model`
+        model : `None` or `lsst.ts.mtaos.Model`
             MTAOS Model class. This attribute is initialized during
             configuration.
         issue_correction_lock : `asyncio.Lock`
