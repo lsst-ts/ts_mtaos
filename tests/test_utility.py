@@ -58,7 +58,7 @@ class TestUtility(unittest.TestCase):
 
         modulePath = mtaos.getModulePath()
         self.assertTrue(modulePath.exists())
-        self.assertTrue("ts_MTAOS" in modulePath.name)
+        self.assertTrue("ts_mtaos" in modulePath.name.lower())
 
     def testGetConfigDir(self):
 
