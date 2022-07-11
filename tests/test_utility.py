@@ -25,12 +25,16 @@ import logging
 import tempfile
 import time
 import unittest
+import pytest
 
 import numpy as np
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
+from lsst.daf.butler.registry.interfaces import DatabaseConflictError
+
 from lsst.ts.wep.Utility import CamType
+from lsst.ts.wep.Utility import getModulePath as getModulePathWep
 from lsst.ts.wep.task.EstimateZernikesCwfsTask import EstimateZernikesCwfsTask
 from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
 
@@ -196,6 +200,23 @@ class TestUtility(unittest.TestCase):
 
         self.assertAlmostEqual(sleep_time, np.mean(exec_time["MY_RETVAL"]), 2)
         self.assertAlmostEqual(sleep_time, np.mean(exec_time["AMY_RETVAL"]), 2)
+
+    @pytest.mark.xfail(
+        reason="There is something wrong with the test data that causes this to fail.",
+        raises=DatabaseConflictError,
+    )
+    def test_define_visit(self) -> None:
+
+        data_path = os.path.join(
+            getModulePathWep(), "tests", "testData", "gen3TestRepo"
+        )
+
+        mtaos.define_visit(
+            data_path=data_path,
+            collections=["LSSTCam/raw/all"],
+            instrument_name="LSSTCam",
+            exposures_str="exposure IN (4021123106001, 4021123106002)",
+        )
 
 
 if __name__ == "__main__":
