@@ -1,4 +1,4 @@
-# This file is part of ts_MTAOS.
+# This file is part of ts_mtaos.
 #
 # Developed for the LSST Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -24,7 +24,7 @@ import unittest
 
 from lsst.ts.wep.Utility import CamType
 
-from lsst.ts import MTAOS
+from lsst.ts import mtaos
 
 
 class TestConfigByFile(unittest.TestCase):
@@ -34,8 +34,8 @@ class TestConfigByFile(unittest.TestCase):
 
         os.environ["ISRDIRPATH"] = os.path.join(os.sep, "isrDir")
 
-        configFile = MTAOS.getModulePath().joinpath("tests", "testData", "default.yaml")
-        self.config = MTAOS.Config(str(configFile))
+        configFile = mtaos.getModulePath().joinpath("tests", "testData", "default.yaml")
+        self.config = mtaos.Config(str(configFile))
 
     def tearDown(self):
 

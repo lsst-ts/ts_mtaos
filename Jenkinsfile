@@ -14,8 +14,10 @@ pipeline {
     }
 
     options {
-      disableConcurrentBuilds()
-      skipDefaultCheckout()
+        disableConcurrentBuilds(
+            abortPrevious: true,
+        )
+        skipDefaultCheckout()
     }
 
     triggers {
@@ -32,7 +34,7 @@ pipeline {
         // XML report path
         XML_REPORT = "jenkinsReport/report.xml"
         // Module name used in the pytest coverage analysis
-        MODULE_NAME = "lsst.ts.MTAOS"
+        MODULE_NAME = "lsst.ts.mtaos"
         // Stack version
         STACK_VERSION = "current"
         // Target branch - either develop or master, depending on where we are

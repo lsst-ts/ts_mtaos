@@ -4,9 +4,9 @@ This configuration only affects single-package Sphinx documentation builds.
 """
 
 from documenteer.conf.pipelinespkg import *
-import lsst.ts.MTAOS
+import lsst.ts.mtaos
 
-project = "ts_MTAOS"
+project = "ts_mtaos"
 html_theme_options["logotext"] = project
 html_title = project
 html_short_title = project
