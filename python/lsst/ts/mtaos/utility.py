@@ -82,7 +82,7 @@ def getModulePath():
         Directory path of module.
     """
 
-    return Path(getPackageDir("ts_MTAOS"))
+    return Path(getPackageDir("ts_mtaos"))
 
 
 def getConfigDir():
