@@ -139,7 +139,7 @@ Telemetry is received using *tel_* prefix instead of *evt_*.
 Adding Aberration
 -----------------
 
-The MTAOS provides a :py:meth:`addAberration <lsst.ts.MTAOS.MtaosCsc.cmd_addAberration>` command designed to allow users to add optical aberration to the system by providing an array of Zernike wavefront errors.
+The MTAOS provides a :py:meth:`addAberration <lsst.ts.mtaos.MTAOS.cmd_addAberration>` command designed to allow users to add optical aberration to the system by providing an array of Zernike wavefront errors.
 
 The coefficients provided by the user are first translated into a uniform aberration measured over the entire FoV (considering the current MTAOS configuration) and later processed by the ofc to provide the data to be sent to the components.
 Using the ofc also allows the user-provided aberrations to be accounted for in the internal system state, improving the system interoperability.

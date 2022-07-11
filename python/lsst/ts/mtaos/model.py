@@ -28,7 +28,9 @@ import shutil
 import asyncio
 import logging
 import tempfile
+import functools
 import contextlib
+import concurrent.futures
 
 import numpy as np
 
@@ -49,7 +51,7 @@ from .config_schema import (
 )
 
 from .wavefront_collection import WavefrontCollection
-from .utility import timeit, get_formatted_corner_wavefront_sensors_ids
+from .utility import define_visit, timeit, get_formatted_corner_wavefront_sensors_ids
 
 from lsst.ts.wep.Utility import writePipetaskCmd
 
@@ -750,6 +752,11 @@ class Model:
 
             self.wep_process_started_task = asyncio.Future()
 
+            await self.define_visit(
+                exposures_str=exposures_str,
+                instrument=instrument,
+            )
+
             config_file = self._save_wep_configuration(
                 instrument=instrument,
                 config=config,
@@ -781,6 +788,48 @@ class Model:
             asyncio.create_task(self.log_stream(self.wep_process.stderr)),
             config_file,
         )
+
+    async def define_visit(self, exposures_str: str, instrument: str) -> None:
+        """Define visit for a pair of images.
+
+        This is required so that the DM pipeline can process the pair of
+        intra/extra focal images together.
+
+        Parameters
+        ----------
+        exposures_str : `str`
+            A string that can be used by the pipeline task to query the data
+            to be processed.
+        instrument : `str`
+            Name of the instrument.
+        """
+        loop = asyncio.get_running_loop()
+
+        with concurrent.futures.ProcessPoolExecutor(max_workers=1) as pool:
+
+            self.log.debug(
+                "Defining visit: "
+                f"data_path={self.data_path}, "
+                f"collections={self.collections}, "
+                f"instrument_name={self.data_instrument_name[instrument]}, "
+                f"exposures_str={exposures_str}."
+            )
+
+            define_visit_task = loop.run_in_executor(
+                pool,
+                functools.partial(
+                    define_visit,
+                    data_path=self.data_path,
+                    collections=self.collections.split(","),
+                    instrument_name=self.data_instrument_name[instrument],
+                    exposures_str=exposures_str,
+                ),
+            )
+
+            try:
+                await define_visit_task
+            except Exception:
+                self.log.exception("Error defining visit. Pipeline task may fail.")
 
     async def interrupt_wep_process(self):
         """Interrupt a currently executing processing."""

@@ -32,7 +32,7 @@ from unittest.mock import Mock
 from lsst.ts.ofc import OFC, OFCData
 from lsst.ts.ofc.utils import CorrectionType
 
-from lsst.ts import MTAOS
+from lsst.ts import mtaos
 
 from lsst.afw.image import VisitInfo
 from lsst.geom import SpherePoint, degrees
@@ -47,23 +47,23 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
 
-        cls.dataDir = MTAOS.getModulePath().joinpath("tests", "tmp")
+        cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         cls.isrDir = cls.dataDir.joinpath("input")
 
-        # Let the MTAOS to set WEP based on this path variable
+        # Let the mtaos to set WEP based on this path variable
         os.environ["ISRDIRPATH"] = cls.isrDir.as_posix()
 
         ofc_data = OFCData("comcam")
 
         dof_state0 = yaml.safe_load(
-            MTAOS.getModulePath()
+            mtaos.getModulePath()
             .joinpath("tests", "testData", "state0inDof.yaml")
             .open()
             .read()
         )
         ofc_data.dof_state0 = dof_state0
 
-        cls.model = MTAOS.Model(
+        cls.model = mtaos.Model(
             instrument=ofc_data.name, data_path=None, ofc_data=ofc_data
         )
 

@@ -33,20 +33,23 @@ __all__ = [
     "timeit",
     "support_interrupt_wep_cmd",
     "get_formatted_corner_wavefront_sensors_ids",
+    "define_visit",
 ]
 
-import asyncio
-import logging
 import os
 import re
 import time
+import typing
+import asyncio
+import logging
 
 from logging.handlers import RotatingFileHandler
 from enum import Enum, auto
 from pathlib import Path
 
 from lsst.utils import getPackageDir
-
+from lsst.daf.butler import Butler
+from lsst.obs.base import DefineVisitsTask, Instrument
 from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
 
 from lsst.ts.salobj import parse_idl
@@ -79,7 +82,7 @@ def getModulePath():
         Directory path of module.
     """
 
-    return Path(getPackageDir("ts_MTAOS"))
+    return Path(getPackageDir("ts_mtaos"))
 
 
 def getConfigDir():
@@ -335,6 +338,47 @@ def get_formatted_corner_wavefront_sensors_ids() -> str:
             if pattern.match(detector) is not None
         ]
     )
+
+
+def define_visit(
+    data_path: str,
+    collections: typing.List[str],
+    instrument_name: str,
+    exposures_str: str,
+) -> None:
+    """Define visit for a pair of images.
+
+    This is required so that the DM pipeline can process the pair of
+    intra/extra focal images together.
+
+    Parameters
+    ----------
+    data_path : `str`
+        Path to the butler repository.
+    collections : `list` of `str`
+        List of collections.
+    instrument_name : `str`
+        Instrument name.
+    exposures_str : `str`
+        A string that can be used by the pipeline task to query the data
+        to be processed.
+    """
+
+    butler = Butler(data_path, collections=collections, writeable=True)
+
+    exposure_data_ids = set(
+        butler.registry.queryDataIds(["exposure"], where=exposures_str)
+    )
+
+    Instrument.fromName(instrument_name, registry=butler.registry)
+
+    config = DefineVisitsTask.ConfigClass()
+
+    config.groupExposures.name = "one-to-one"
+
+    task = DefineVisitsTask(config=config, butler=butler)
+
+    task.run(exposure_data_ids)
 
 
 if __name__ == "__main__":
