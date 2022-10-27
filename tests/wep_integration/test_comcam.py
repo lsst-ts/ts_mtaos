@@ -79,7 +79,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
             data_path=data_path,
             ofc_data=ofc_data,
             run_name=run_name,
-            collections="LSSTCam/calib/unbounded,LSSTCam/raw/all",
+            collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all",
             pipeline_instrument=dict(comcam="lsst.obs.lsst.LsstCam"),
             data_instrument_name=dict(comcam="LSSTCam"),
             reference_detector=94,
