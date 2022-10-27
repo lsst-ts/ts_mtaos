@@ -2,6 +2,12 @@
 Version History
 ===============
 
+v0.11.3
+-------
+
+* In ``Model._generate_pipetask_command`` stop adding refcats to the collections.
+* Update unit tests to work with latest version of ``ts_wep``.
+
 v0.11.2
 -------
 
