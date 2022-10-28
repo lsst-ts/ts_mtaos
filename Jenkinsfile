@@ -50,19 +50,6 @@ pipeline {
 
     stages {
 
-        stage ('Install the Libraries') {
-            steps {
-                withEnv(["WHOME=${env.WORKSPACE}"]) {
-                    sh """
-                        source ${env.SAL_SETUP_FILE}
-
-                        cd ${env.SAL_USERS_HOME} && { curl -O ${env.PLANTUML_URL} ; cd -; }
-                        pip install sphinxcontrib-plantuml
-                    """
-                }
-            }
-        }
-
         stage ('Cloning Repos') {
             steps {
                 dir(env.WORKSPACE + '/ts_MTAOS') {
@@ -80,11 +67,16 @@ pipeline {
             }
         }
 
-        stage ('Building the Dependencies') {
+        stage ('Install dependencies') {
             steps {
                 withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
+                        set +x
                         source ${env.SAL_SETUP_FILE}
+                        source ${env.SAL_USERS_HOME}/.bashrc
+
+                        cd ${env.SAL_USERS_HOME} && { curl -O ${env.PLANTUML_URL} ; cd -; }
+                        pip install sphinxcontrib-plantuml
 
                         cd phosim_utils/
                         setup -k -r . -t ${env.STACK_VERSION}
@@ -93,52 +85,19 @@ pipeline {
                         cd ../ts_wep/
                         setup -k -r .
                         scons python
-                    """
-                }
-            }
-        }
-        stage("Checkout ts_config_mttcs") {
-            steps {
-                withEnv(["WHOME=${env.WORKSPACE}"]) {
-                    sh """
-                        source ${env.SAL_SETUP_FILE}
+
                         cd ${env.SAL_USERS_HOME}/repos/ts_config_mttcs
                         ${env.SAL_USERS_HOME}/.checkout_repo.sh \${WORK_BRANCHES}
                         git pull
-                    """
-                }
-            }
-        }
-        stage("Checkout xml") {
-            steps {
-                withEnv(["WHOME=${env.WORKSPACE}"]) {
-                    sh """
-                        source ${env.SAL_SETUP_FILE}
+
                         cd ${env.SAL_USERS_HOME}/repos/ts_xml
                         ${env.SAL_USERS_HOME}/.checkout_repo.sh \${WORK_BRANCHES}
                         git pull
-                    """
-                }
-            }
-        }
-        stage("Checkout IDL") {
-            steps {
-                withEnv(["WHOME=${env.WORKSPACE}"]) {
-                    sh """
-                        source ${env.SAL_SETUP_FILE}
+
                         cd ${env.SAL_USERS_HOME}/repos/ts_idl
                         ${env.SAL_USERS_HOME}/.checkout_repo.sh \${WORK_BRANCHES}
                         git pull
-                    """
-                }
-            }
-        }
-        stage("Build IDL files") {
-            steps {
-                withEnv(["WHOME=${env.WORKSPACE}"]) {
-                    sh """
-                        source ${env.SAL_SETUP_FILE}
-                        source ${env.SAL_USERS_HOME}/.bashrc
+
                         make_idl_files.py MTAOS
                     """
                 }
@@ -150,6 +109,7 @@ pipeline {
                 // Pytest needs to export the junit report.
                 withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
+                        set +x
                         source ${env.SAL_SETUP_FILE}
 
                         cd phosim_utils/
@@ -179,6 +139,7 @@ pipeline {
             steps {
                 withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
+                        set +x
                         source ${env.SAL_SETUP_FILE}
 
                         cd phosim_utils/

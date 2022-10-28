@@ -973,7 +973,7 @@ class Model:
             self.data_path,
             run_name,
             self.pipeline_instrument[instrument],
-            "refcats," + self.collections,
+            self.collections,
             pipelineYaml=config_filename,
         )
 
