@@ -53,7 +53,7 @@ from .config_schema import (
 from .wavefront_collection import WavefrontCollection
 from .utility import define_visit, timeit, get_formatted_corner_wavefront_sensors_ids
 
-from lsst.ts.wep.Utility import writePipetaskCmd
+from lsst.ts.wep.utility import writePipetaskCmd
 
 from lsst.daf import butler as dafButler
 
