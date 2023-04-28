@@ -54,7 +54,7 @@ from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
 
 from lsst.ts.salobj import parse_idl
 from lsst.ts.idl import get_idl_dir
-from lsst.ts.wep.Utility import CamType
+from lsst.ts.wep.utility import CamType
 
 
 class WEPWarning(Enum):
