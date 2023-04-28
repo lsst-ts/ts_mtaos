@@ -33,9 +33,9 @@ from logging.handlers import RotatingFileHandler
 
 from lsst.daf.butler.registry.interfaces import DatabaseConflictError
 
-from lsst.ts.wep.Utility import CamType
-from lsst.ts.wep.Utility import getModulePath as getModulePathWep
-from lsst.ts.wep.task.EstimateZernikesCwfsTask import EstimateZernikesCwfsTask
+from lsst.ts.wep.utility import CamType
+from lsst.ts.wep.utility import getModulePath as getModulePathWep
+from lsst.ts.wep.task.cutOutDonutsCwfsTask import CutOutDonutsCwfsTask
 from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
 
 from lsst.ts import mtaos
@@ -45,39 +45,32 @@ class TestUtility(unittest.TestCase):
     """Test the Utility functions."""
 
     def setUp(self):
-
         self.dataDir = tempfile.TemporaryDirectory(
             dir=mtaos.getModulePath().joinpath("tests").as_posix()
         )
 
     def tearDown(self):
-
         self.dataDir.cleanup()
 
     def testGetModulePath(self):
-
         modulePath = mtaos.getModulePath()
         self.assertTrue(modulePath.exists())
         self.assertTrue("ts_mtaos" in modulePath.name.lower())
 
     def testGetConfigDir(self):
-
         ansConfigDir = mtaos.getModulePath().joinpath("policy")
         self.assertEqual(mtaos.getConfigDir(), ansConfigDir)
 
     def testGetLogDir(self):
-
         ansLogDir = mtaos.getModulePath().joinpath("logs")
         self.assertEqual(mtaos.getLogDir(), ansLogDir)
         self.assertTrue(ansLogDir.exists())
 
     def testGetIsrDirPathNotAssigned(self):
-
         isrDir = mtaos.getIsrDirPath()
         self.assertEqual(isrDir, None)
 
     def testGetIsrDirPath(self):
-
         ISRDIRPATH = "/path/to/isr/dir"
         os.environ["ISRDIRPATH"] = ISRDIRPATH
 
@@ -87,7 +80,6 @@ class TestUtility(unittest.TestCase):
         os.environ.pop("ISRDIRPATH")
 
     def testGetCamType(self):
-
         self.assertEqual(mtaos.getCamType("lsstCam"), CamType.LsstCam)
         self.assertEqual(mtaos.getCamType("lsstFamCam"), CamType.LsstFamCam)
         self.assertEqual(mtaos.getCamType("comcam"), CamType.ComCam)
@@ -95,12 +87,10 @@ class TestUtility(unittest.TestCase):
         self.assertRaises(ValueError, mtaos.getCamType, "wrongType")
 
     def testGetCscName(self):
-
         cscName = mtaos.getCscName()
         self.assertEqual(cscName, "MTAOS")
 
     def testAddRotFileHandler(self):
-
         log = logging.Logger("test")
         dataDirPath = self.dataDir.name
         filePath = Path(dataDirPath).joinpath("test.log")
@@ -120,14 +110,12 @@ class TestUtility(unittest.TestCase):
         self.assertEqual(numOfFile, 2)
 
     def _getNumOfFileInFolder(self, folder):
-
         items = Path(folder).glob("*")
         files = [aItem for aItem in items if aItem.is_file()]
 
         return len(files)
 
     def test_get_formatted_corner_wavefront_sensors_ids(self):
-
         mtaos_cwfs_detector_ids = set(
             [
                 int(detector_id)
@@ -139,7 +127,7 @@ class TestUtility(unittest.TestCase):
 
         detector_mapping = LsstCamTranslator.detector_mapping()
 
-        cwfs_task = EstimateZernikesCwfsTask()
+        cwfs_task = CutOutDonutsCwfsTask()
 
         expected_cwfs_detector_ids = set(
             [
@@ -206,7 +194,6 @@ class TestUtility(unittest.TestCase):
         raises=DatabaseConflictError,
     )
     def test_define_visit(self) -> None:
-
         data_path = os.path.join(
             getModulePathWep(), "tests", "testData", "gen3TestRepo"
         )
@@ -220,6 +207,5 @@ class TestUtility(unittest.TestCase):
 
 
 if __name__ == "__main__":
-
     # Do the unit test
     unittest.main()

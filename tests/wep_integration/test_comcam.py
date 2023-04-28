@@ -33,15 +33,14 @@ from lsst.ts.ofc import OFCData
 
 from lsst.daf import butler as dafButler
 
-from lsst.ts.wep.Utility import writeCleanUpRepoCmd, runProgram
-from lsst.ts.wep.Utility import getModulePath as getModulePathWep
+from lsst.ts.wep.utility import writeCleanUpRepoCmd, runProgram
+from lsst.ts.wep.utility import getModulePath as getModulePathWep
 
 
 @pytest.mark.integtest
 class TestComCam(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
-
         cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         cls.isrDir = cls.dataDir.joinpath("input")
 
@@ -96,17 +95,10 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
             runProgram(writeCleanUpRepoCmd(cls.model.data_path, cls.model.run_name))
 
     async def test_process_comcam(self):
-
         await self.model.process_comcam(
             4021123106001,
             4021123106002,
-            {
-                "tasks": {
-                    "generateDonutCatalogWcsTask": {
-                        "config": {"donutSelector.fluxField": "g_flux"}
-                    }
-                }
-            },
+            dict(),
         )
 
         self.assertEqual(self.model.wavefront_errors.getNumOfData(), 1)
@@ -145,18 +137,11 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_interrupt_wep_process(self):
-
         task = asyncio.create_task(
             self.model.process_comcam(
                 4021123106001,
                 4021123106002,
-                {
-                    "tasks": {
-                        "generateDonutCatalogWcsTask": {
-                            "config": {"donutSelector.fluxField": "g_flux"}
-                        }
-                    }
-                },
+                dict(),
             )
         )
 
@@ -176,43 +161,21 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
                 self.model.process_comcam(
                     4021123106001,
                     4021123106002,
-                    {
-                        "tasks": {
-                            "generateDonutCatalogWcsTask": {
-                                "config": {"donutSelector.fluxField": "g_flux"}
-                            }
-                        }
-                    },
+                    dict(),
                 ),
                 self.model.process_comcam(
                     4021123106001,
                     4021123106002,
-                    {
-                        "tasks": {
-                            "generateDonutCatalogWcsTask": {
-                                "config": {"donutSelector.fluxField": "g_flux"}
-                            }
-                        }
-                    },
+                    dict(),
                 ),
             )
 
     async def test_wep_process_fail_bad_config(self):
-
         task = asyncio.create_task(
             self.model.process_comcam(
                 4021123106001,
                 4021123106002,
-                {
-                    "tasks": {
-                        "generateDonutCatalogWcsTask": {
-                            "config": {
-                                "donutSelector.fluxField": "g_flux",
-                                "bad_key": "bad_value",
-                            }
-                        }
-                    }
-                },
+                dict(),
             )
         )
 
