@@ -59,7 +59,6 @@ from lsst.daf import butler as dafButler
 
 
 class Model:
-
     # Maximum length of queue for wavefront error
     MAX_LEN_QUEUE = 10
 
@@ -743,7 +742,6 @@ class Model:
         """
 
         async with self._wep_process_start_lock:
-
             if (self.wep_process is not None) and (self.wep_process.returncode is None):
                 raise RuntimeError(
                     "There is an ongoing wep process. To run a different process, "
@@ -806,7 +804,6 @@ class Model:
         loop = asyncio.get_running_loop()
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=1) as pool:
-
             self.log.debug(
                 "Defining visit: "
                 f"data_path={self.data_path}, "
@@ -1237,7 +1234,6 @@ class Model:
                     elif (key in self.ofc.ofc_data.__annotations__) and (
                         self.ofc.ofc_data.__annotations__[key] == np.ndarray
                     ):
-
                         setattr(
                             self.ofc.ofc_data,
                             key,
