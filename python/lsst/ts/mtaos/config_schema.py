@@ -353,7 +353,7 @@ GENERATE_DONUT_CATALOG_CONFIG = yaml.safe_load(
     class:
       type: string
       default: >-
-        lsst.ts.wep.task.GenerateDonutCatalogWcsTask.GenerateDonutCatalogWcsTask
+        lsst.ts.wep.task.generateDonutCatalogWcsTask.GenerateDonutCatalogWcsTask
     config:
       properties:
         filterName:
@@ -362,14 +362,13 @@ GENERATE_DONUT_CATALOG_CONFIG = yaml.safe_load(
 )
 
 SCIENCE_SENSOR_PIPELINE_CONFIG = yaml.safe_load(
-    """estimateZernikesScienceSensorTask:
+    """CutOutDonutsScienceSensorTask:
   type: object
   additionalProperties: false
   properties:
     class:
       type: string
-      default: >-
-        lsst.ts.wep.task.EstimateZernikesScienceSensorTask.EstimateZernikesScienceSensorTask
+      default: lsst.ts.wep.task.cutOutDonutsScienceSensorTask.CutOutDonutsScienceSensorTask
     config:
       type: object
       additionalProperties: false
@@ -383,30 +382,43 @@ SCIENCE_SENSOR_PIPELINE_CONFIG = yaml.safe_load(
         initialCutoutPadding:
           type: integer
           default: 40
+calcZernikesTask:
+  type: object
+  additionalProperties: false
+  properties:
+    class:
+      type: string
+      default: lsst.ts.wep.task.calcZernikesTask.CalcZernikesTask
 """
 )
 
 CWFS_PIPELINE_CONFIG = yaml.safe_load(
-    """estimateZernikesCWFSTask:
-    type: object
-    additionalProperties: false
-    properties:
-      class:
-        type: string
-        default: >-
-          lsst.ts.wep.task.EstimateZernikesCwfsTask.EstimateZernikesCwfsTask
-      config:
-        type: object
-        additionalProperties: false
-        properties:
-          donutTemplateSize:
-            type: integer
-            default: 160
-          donutStampSize:
-            type: integer
-            default: 160
-          initialCutoutPadding:
-            type: integer
-            default: 40
+    """cutOutDonutsCwfsTask:
+  type: object
+  additionalProperties: false
+  properties:
+    class:
+      type: string
+      default: lsst.ts.wep.task.cutOutDonutsCwfsTask.CutOutDonutsCwfsTask
+    config:
+      type: object
+      additionalProperties: false
+      properties:
+        donutTemplateSize:
+          type: integer
+          default: 160
+        donutStampSize:
+          type: integer
+          default: 160
+        initialCutoutPadding:
+          type: integer
+          default: 40
+calcZernikesTask:
+  type: object
+  additionalProperties: false
+  properties:
+    class:
+      type: string
+      default: lsst.ts.wep.task.calcZernikesTask.CalcZernikesTask
 """
 )

@@ -31,15 +31,14 @@ from lsst.ts.ofc import OFCData
 
 from lsst.daf import butler as dafButler
 
-from lsst.ts.wep.Utility import writeCleanUpRepoCmd, runProgram
-from lsst.ts.wep.Utility import getModulePath as getModulePathWep
+from lsst.ts.wep.utility import writeCleanUpRepoCmd, runProgram
+from lsst.ts.wep.utility import getModulePath as getModulePathWep
 
 
 @pytest.mark.integtest
 class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
-
         cls.log = logging.getLogger(__name__)
 
         cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
@@ -94,16 +93,9 @@ class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
             runProgram(writeCleanUpRepoCmd(cls.model.data_path, cls.model.run_name))
 
     async def test_process_lsstcam_corner_wfs(self):
-
         await self.model.process_lsstcam_corner_wfs(
             visit_id=4021123106000,
-            config={
-                "tasks": {
-                    "generateDonutCatalogWcsTask": {
-                        "config": {"donutSelector.fluxField": "g_flux"}
-                    }
-                }
-            },
+            config=dict(),
         )
 
         self.assertEqual(self.model.wavefront_errors.getNumOfData(), 1)

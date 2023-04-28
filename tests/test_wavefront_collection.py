@@ -29,42 +29,34 @@ class TestWavefrontCollection(unittest.TestCase):
     """Test the CollOfListOfWfErr class."""
 
     def setUp(self):
-
         self.wavefront_collection = WavefrontCollection(10)
 
     def testGetNumOfData(self):
-
         self.assertEqual(self.wavefront_collection.getNumOfData(), 0)
 
     def testGetNumOfDataTaken(self):
-
         self.assertEqual(self.wavefront_collection.getNumOfDataTaken(), 0)
 
     def testAppend(self):
-
         listOfWfErr = self._prepareListOfWfErr()
         self.wavefront_collection.append(listOfWfErr)
 
         self.assertEqual(self.wavefront_collection.getNumOfData(), 1)
 
     def _prepareListOfWfErr(self):
-
         listSensorId = [1, 2]
         listSensorZk = [np.random.rand(19)] * 2
         return self._getListOfWfErr(listSensorId, listSensorZk)
 
     def _getListOfWfErr(self, listSensorId, listSensorZk):
-
         listOfWfErr = list(zip(listSensorId, listSensorZk))
 
         return listOfWfErr
 
     def testPopWithoutData(self):
-
         self.assertEqual(self.wavefront_collection.pop(), [])
 
     def testPopWithData(self):
-
         self.assertEqual(self.wavefront_collection.getNumOfDataTaken(), 0)
 
         listOfWfErr = self._prepareListOfWfErr()
@@ -78,7 +70,6 @@ class TestWavefrontCollection(unittest.TestCase):
         self.assertEqual(self.wavefront_collection.getNumOfDataTaken(), 1)
 
     def testClear(self):
-
         listOfWfErr = self._prepareListOfWfErr()
         for idx in range(3):
             self.wavefront_collection.append(listOfWfErr)
@@ -93,14 +84,12 @@ class TestWavefrontCollection(unittest.TestCase):
         self.assertEqual(self.wavefront_collection.getNumOfDataTaken(), 0)
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithoutData(self):
-
         self.assertRaises(
             RuntimeError,
             self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData,
         )
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithSglData(self):
-
         self._collectListOfWfErrForAvgTest()
         self.wavefront_collection.pop()
 
@@ -113,18 +102,15 @@ class TestWavefrontCollection(unittest.TestCase):
             self.assertTrue(np.all(listOfWfErrAvg[sensor_id] == 1.0))
 
     def _collectListOfWfErrForAvgTest(self):
-
         self._collectListOfWfErrForAvgTestSgl([1, 2, 3], [np.ones(19)] * 3)
         self._collectListOfWfErrForAvgTestSgl([2, 1, 3], [np.zeros(19)] * 3)
         self._collectListOfWfErrForAvgTestSgl([3, 2, 1], [np.ones(19) * 5] * 3)
 
     def _collectListOfWfErrForAvgTestSgl(self, listSensorId, listSensorZk):
-
         listOfWfErr = self._getListOfWfErr(listSensorId, listSensorZk)
         self.wavefront_collection.append(listOfWfErr)
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithMultiData(self):
-
         self._collectListOfWfErrForAvgTest()
         for idx in range(3):
             self.wavefront_collection.pop()
@@ -139,7 +125,6 @@ class TestWavefrontCollection(unittest.TestCase):
             self.assertTrue(np.all(listOfWfErrAvg[sensor_id] == 2.0))
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithMultiDataAndMissData(self):
-
         # There are 3 sensor data hera
         self._collectListOfWfErrForAvgTest()
 
@@ -160,6 +145,5 @@ class TestWavefrontCollection(unittest.TestCase):
 
 
 if __name__ == "__main__":
-
     # Do the unit test
     unittest.main()
