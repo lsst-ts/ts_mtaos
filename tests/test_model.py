@@ -46,7 +46,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
 
     @classmethod
     def setUpClass(cls):
-
         cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         cls.isrDir = cls.dataDir.joinpath("input")
 
@@ -75,11 +74,9 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self._makeDir(self.isrDir)
 
     def _makeDir(self, directory):
-
         Path(directory).mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
-
         self.model.reset_fwhm_data()
         self.model.reset_wfe_correction()
 
@@ -117,12 +114,10 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_init(self):
-
         self.assertTrue(isinstance(self.model.ofc, OFC))
         self.assertEqual(self.model.ofc.ofc_data.name, "comcam")
 
     def test_user_gain(self):
-
         self.assertTrue(self.model.user_gain is not None)
 
         self.model.user_gain = 0.0
@@ -141,15 +136,12 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             self.model.user_gain = 1.1
 
     def test_get_wfe(self):
-
         self.assertEqual(self.model.get_wfe(), [])
 
     def test_get_rejected_wfe(self):
-
         self.assertEqual(self.model.get_rejected_wfe(), [])
 
     def test_get_fwhm_sensors(self):
-
         self.assertEqual(self.model.get_fwhm_sensors(), [])
 
         self.model.set_fwhm_data(5, np.zeros(2))
@@ -157,7 +149,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.model.get_fwhm_sensors()[0], 5)
 
     def test_set_fwhm_data(self):
-
         self.model.set_fwhm_data(1, np.zeros(2))
 
         fwhm_data = self.model.get_fwhm_data()
@@ -170,7 +161,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(fwhm_data), 3)
 
     def test_set_fwhm_data_repeat_sensor(self):
-
         self.model.set_fwhm_data(1, np.zeros(2))
 
         new_fwhm_values = np.array([1, 2, 3])
@@ -184,7 +174,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(np.all(fwhm_values_in_list == new_fwhm_values))
 
     def test_reset_fwhm_data(self):
-
         self.model.set_fwhm_data(1, np.zeros(2))
         self.model.reset_fwhm_data()
 
@@ -192,15 +181,12 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(fwhm_data), 0)
 
     def test_get_dof_aggr(self):
-
         self.assertEqual(len(self.model.get_dof_aggr()), 50)
 
     def test_get_dof(self):
-
         self.assertEqual(len(self.model.get_dof_lv()), 50)
 
     def test_add_correction(self):
-
         wavefront_erros = np.zeros(19)
 
         # Passing in zeros for wavefront_errors should return 0 in correction
@@ -267,7 +253,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_m2_hexapod_correction(self):
-
         x, y, z, u, v, w = self.model.m2_hexapod_correction()
         self.assertEqual(
             self.model.m2_hexapod_correction.correction_type, CorrectionType.POSITION
@@ -280,7 +265,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(w, 0)
 
     def test_cam_hexapod_correction(self):
-
         self.assertEqual(
             self.model.cam_hexapod_correction.correction_type, CorrectionType.POSITION
         )
@@ -293,19 +277,16 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(w, 0)
 
     def test_m1m3_correction(self):
-
         self.assertEqual(
             self.model.m1m3_correction.correction_type, CorrectionType.FORCE
         )
         self.assertEqual(len(self.model.m1m3_correction()), 156)
 
     def test_m2_correction(self):
-
         self.assertEqual(self.model.m2_correction.correction_type, CorrectionType.FORCE)
         self.assertEqual(len(self.model.m2_correction()), 72)
 
     def test_reset_wfe_correction(self):
-
         data = [1, 2, 3]
         self.model.wavefront_errors.append(data)
         self.model.rejected_wavefront_errors.append(data)
@@ -316,7 +297,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.model.get_rejected_wfe(), [])
 
     def test_reject_unreasonable_wfe(self):
-
         self.assertEqual(self.model.reject_unreasonable_wfe([]), [])
 
     def test_generate_wep_configuration(self):
@@ -456,7 +436,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             instrument="comcam",
             config=dict(
                 tasks=dict(
-                    estimateZernikesScienceSensorTask=dict(
+                    CutOutDonutsScienceSensorTask=dict(
                         config=dict(
                             initialCutoutPadding=80,
                         )
@@ -502,7 +482,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         expected_isr_config,
         expected_zernike_science_sensor_config,
     ):
-
         assert "tasks" in wep_configuration
 
         self.assert_generate_donut_catalog_wcs_task_config(
@@ -537,7 +516,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
                 )
 
     def assert_isr_config(self, wep_configuration, expected_isr_config):
-
         assert "isr" in wep_configuration["tasks"]
         assert "config" in wep_configuration["tasks"]["isr"]
         for config in set(
@@ -568,29 +546,25 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
     def assert_estimate_zernikes_science_sensor_task(
         self, wep_configuration, expected_zernike_science_sensor_config
     ):
-        assert "estimateZernikesScienceSensorTask" in wep_configuration["tasks"]
-        assert (
-            "config" in wep_configuration["tasks"]["estimateZernikesScienceSensorTask"]
-        )
+        assert "CutOutDonutsScienceSensorTask" in wep_configuration["tasks"]
+        assert "calcZernikesTask" in wep_configuration["tasks"]
+        assert "config" in wep_configuration["tasks"]["CutOutDonutsScienceSensorTask"]
         for config in set(
             ("donutTemplateSize", "donutStampSize", "initialCutoutPadding")
         ).union(expected_zernike_science_sensor_config):
             assert (
                 config
-                in wep_configuration["tasks"]["estimateZernikesScienceSensorTask"][
-                    "config"
-                ]
+                in wep_configuration["tasks"]["CutOutDonutsScienceSensorTask"]["config"]
             )
 
             assert (
-                wep_configuration["tasks"]["estimateZernikesScienceSensorTask"][
-                    "config"
-                ][config]
+                wep_configuration["tasks"]["CutOutDonutsScienceSensorTask"]["config"][
+                    config
+                ]
                 == expected_zernike_science_sensor_config[config]
             )
 
     async def test_log_stream(self):
-
         task = await asyncio.create_subprocess_shell(
             f"echo THIS IS A TEST; sleep {SHORT_WAIT_TIME};echo THIS IS A TEST",
             stdout=asyncio.subprocess.PIPE,
@@ -615,6 +589,5 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
 
 
 if __name__ == "__main__":
-
     # Do the unit test
     unittest.main()

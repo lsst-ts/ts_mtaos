@@ -56,7 +56,6 @@ except ImportError:
 
 
 class MTAOS(salobj.ConfigurableCsc):
-
     # Class attribute comes from the upstream BaseCsc class
     valid_simulation_modes = (0,)
     version = __version__
@@ -305,11 +304,9 @@ class MTAOS(salobj.ConfigurableCsc):
 
     @staticmethod
     def get_config_pkg():
-
         return "ts_config_mttcs"
 
     async def start(self):
-
         self._logExecFunc()
 
         await super().start()
@@ -378,7 +375,6 @@ class MTAOS(salobj.ConfigurableCsc):
         # This lock will block any subsequent command from being executed until
         # this one is done.
         async with self.issue_correction_lock:
-
             # This is where the bulk of the work is done. If any correction
             # fail this method will take care of unsetting the ones that
             # succedded and generate a report at the end. Also, if it fails,
@@ -546,7 +542,6 @@ class MTAOS(salobj.ConfigurableCsc):
             )
 
         async with self.issue_correction_lock:
-
             if data.userGain != 0.0:
                 warnings.warn(
                     "Using userGain parameter is deprecated. Use the config yaml string instead.",
@@ -599,7 +594,6 @@ class MTAOS(salobj.ConfigurableCsc):
         # This lock will block any subsequent command from being executed until
         # this one is done.
         async with self.issue_correction_lock:
-
             config = yaml.safe_load(data.config)
 
             if config is not None:

@@ -2,6 +2,12 @@
 Version History
 ===============
 
+v0.12.0
+-------
+
+* Updates to work with ts_wep 6.
+* Update Jenkinsfile to remove root workaround.
+
 v0.11.3
 -------
 

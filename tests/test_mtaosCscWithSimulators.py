@@ -38,7 +38,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         return mtaos.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
 
     def setUp(self):
-
         # Simulated CSCs
         self.cscM2Hex = None
         self.cscCamHex = None
@@ -51,7 +50,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         self.m2_corrections = []
 
     def tearDown(self):
-
         logFile = Path(mtaos.getLogDir()).joinpath("mtaos.log")
         if logFile.exists():
             logFile.unlink()
@@ -286,7 +284,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await self._cancelCSCs()
 
     async def _simulateCSCs(self):
-
         self.cscM2Hex = salobj.Controller(
             "MTHexapod", index=mtaos.utility.MTHexapodIndex.M2.value
         )
@@ -316,22 +313,18 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         self.cscM2.cmd_applyForces.callback = self.m2_apply_forces_callbck
 
     def hexapod_move_callbck(self, data):
-
         if data.salIndex == mtaos.utility.MTHexapodIndex.M2.value:
             self.m2_hex_corrections.append(data)
         else:
             self.cam_hex_corrections.append(data)
 
     def m1m3_apply_forces_callbck(self, data):
-
         self.m1m3_corrections.append(data)
 
     def m1m3_apply_forces_fail_callbck(self, data):
-
         raise RuntimeError("This is a test.")
 
     def m2_apply_forces_callbck(self, data):
-
         self.m2_corrections.append(data)
 
     async def _startCsc(self):
@@ -343,7 +336,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         return self.remote
 
     async def _cancelCSCs(self):
-
         await asyncio.gather(
             self.cscM2Hex.close(),
             self.cscCamHex.close(),
@@ -353,6 +345,5 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
 
 if __name__ == "__main__":
-
     # Do the unit test
     unittest.main()

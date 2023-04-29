@@ -35,8 +35,8 @@ from lsst.ts import mtaos
 
 from lsst.ts.ofc import OFCData
 
-from lsst.ts.wep.Utility import writeCleanUpRepoCmd, runProgram
-from lsst.ts.wep.Utility import getModulePath as getModulePathWep
+from lsst.ts.wep.utility import writeCleanUpRepoCmd, runProgram
+from lsst.ts.wep.utility import getModulePath as getModulePathWep
 
 from lsst.daf import butler as dafButler
 
@@ -52,7 +52,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     @classmethod
     def setUpClass(cls):
-
         cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         cls.isrDir = cls.dataDir.joinpath("input")
 
@@ -76,7 +75,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             runProgram(cleanUpCmd)
 
     def setUp(self):
-
         self.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         self.isrDir = self.dataDir.joinpath("input")
 
@@ -84,7 +82,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
 
     def tearDown(self):
-
         try:
             os.environ.pop("ISRDIRPATH")
         except KeyError:
@@ -145,7 +142,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=0,
         ):
-
             self.assertEqual(self.csc.summary_state, salobj.State.STANDBY)
             await self.assert_next_summary_state(salobj.State.STANDBY)
 
@@ -214,7 +210,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self._checkCorrIsZero(remote)
 
     async def _checkCorrIsZero(self, remote):
-
         await self.assert_next_sample(
             remote.evt_m2HexapodCorrection,
             flush=False,
@@ -255,7 +250,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
-
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
             remote = self._getRemote()
@@ -289,7 +283,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
-
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
             remote = self._getRemote()
@@ -328,7 +321,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
-
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
             remote = self._getRemote()
@@ -461,15 +453,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await remote.cmd_runWEP.set_start(
                 visitId=4021123106001,
                 extraId=4021123106002,
-                config=yaml.safe_dump(
-                    {
-                        "tasks": {
-                            "generateDonutCatalogWcsTask": {
-                                "config": {"donutSelector.fluxField": "g_flux"}
-                            }
-                        }
-                    }
-                ),
             )
 
             await self.assert_next_sample(
@@ -521,15 +504,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 await remote.cmd_runWEP.set_start(
                     visitId=4021123106003,  # Passing inexistent data.
                     extraId=4021123106004,
-                    config=yaml.safe_dump(
-                        {
-                            "tasks": {
-                                "generateDonutCatalogWcsTask": {
-                                    "config": {"donutSelector.fluxField": "g_flux"}
-                                }
-                            }
-                        }
-                    ),
                 )
 
             await salobj.set_summary_state(self.remote, salobj.State.STANDBY)
@@ -568,15 +542,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             await remote.cmd_runWEP.set_start(
                 visitId=4021123106000,
-                config=yaml.safe_dump(
-                    {
-                        "tasks": {
-                            "generateDonutCatalogWcsTask": {
-                                "config": {"donutSelector.fluxField": "g_flux"}
-                            }
-                        }
-                    }
-                ),
             )
 
             await self.assert_next_sample(
@@ -631,15 +596,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 remote.cmd_runWEP.set_start(
                     visitId=4021123106001,
                     extraId=4021123106002,
-                    config=yaml.safe_dump(
-                        {
-                            "tasks": {
-                                "generateDonutCatalogWcsTask": {
-                                    "config": {"donutSelector.fluxField": "g_flux"}
-                                }
-                            }
-                        }
-                    ),
                 )
             )
 
@@ -679,6 +635,5 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
 
 if __name__ == "__main__":
-
     # Do the unit test
     unittest.main()
