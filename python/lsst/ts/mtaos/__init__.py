@@ -27,9 +27,9 @@ try:
 except ImportError:
     __version__ = "?"
 
-from .wavefront_collection import *
 from .config import *
 from .config_schema import *
 from .model import *
-from .utility import *
 from .mtaos import *
+from .utility import *
+from .wavefront_collection import *

@@ -21,8 +21,9 @@
 
 __all__ = ["Config"]
 
-from collections import namedtuple
 import warnings
+from collections import namedtuple
+
 import yaml
 
 from . import utility

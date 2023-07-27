@@ -21,41 +21,35 @@
 
 __all__ = ["Model"]
 
-import os
-import copy
-import yaml
-import shutil
 import asyncio
-import logging
-import tempfile
-import functools
-import contextlib
 import concurrent.futures
-
-import numpy as np
-
+import contextlib
+import copy
+import functools
+import logging
+import os
+import shutil
+import tempfile
 from typing import Optional
 
-from lsst.ts.ofc import OFC
-from lsst.ts.utils import make_done_future
-from lsst.ts.salobj import DefaultingValidator
-
+import numpy as np
+import yaml
 from lsst.afw.image import VisitInfo
+from lsst.daf import butler as dafButler
+from lsst.ts.ofc import OFC
+from lsst.ts.salobj import DefaultingValidator
+from lsst.ts.utils import make_done_future
+from lsst.ts.wep.utility import writePipetaskCmd
 
 from .config_schema import (
     CWFS_PIPELINE_CONFIG,
-    WEP_HEADER_CONFIG,
-    ISR_CONFIG,
     GENERATE_DONUT_CATALOG_CONFIG,
+    ISR_CONFIG,
     SCIENCE_SENSOR_PIPELINE_CONFIG,
+    WEP_HEADER_CONFIG,
 )
-
+from .utility import define_visit, get_formatted_corner_wavefront_sensors_ids, timeit
 from .wavefront_collection import WavefrontCollection
-from .utility import define_visit, timeit, get_formatted_corner_wavefront_sensors_ids
-
-from lsst.ts.wep.utility import writePipetaskCmd
-
-from lsst.daf import butler as dafButler
 
 
 class Model:

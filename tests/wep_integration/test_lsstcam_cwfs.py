@@ -19,20 +19,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import os
-import yaml
-import pytest
 import logging
+import os
 import unittest
 
-from lsst.ts import mtaos
-
-from lsst.ts.ofc import OFCData
-
+import pytest
+import yaml
 from lsst.daf import butler as dafButler
-
-from lsst.ts.wep.utility import writeCleanUpRepoCmd, runProgram
+from lsst.ts import mtaos
+from lsst.ts.ofc import OFCData
 from lsst.ts.wep.utility import getModulePath as getModulePathWep
+from lsst.ts.wep.utility import runProgram, writeCleanUpRepoCmd
 
 
 @pytest.mark.integtest
