@@ -21,3 +21,7 @@ pytest_session.txt
 # Mac related files
 .DS_Store
 .hypothesis/
+.pre-commit-config.yaml
+.flake8
+.isort.cfg
+.mypy.ini
