@@ -1,6 +1,6 @@
-# This file is part of ts_ATDomeTrajectory.
+# This file is part of ts_mtaos.
 #
-# Developed for the LSST Data Management System.
+# Developed for the Vera Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -19,17 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# The version file is gotten by the scons. However, the scons does not support
-# the build without unit tests. This is a needed function for the Jenkins to
-# use.
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
+import setuptools_scm
+from setuptools import setup
 
-from .config import *
-from .config_schema import *
-from .model import *
-from .mtaos import *
-from .utility import *
-from .wavefront_collection import *
+setup(version=setuptools_scm.get_version())

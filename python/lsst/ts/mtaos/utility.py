@@ -36,25 +36,23 @@ __all__ = [
     "define_visit",
 ]
 
+import asyncio
+import logging
 import os
 import re
 import time
 import typing
-import asyncio
-import logging
-
-from logging.handlers import RotatingFileHandler
 from enum import Enum, auto
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from lsst.utils import getPackageDir
 from lsst.daf.butler import Butler
 from lsst.obs.base import DefineVisitsTask, Instrument
 from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
-
-from lsst.ts.salobj import parse_idl
 from lsst.ts.idl import get_idl_dir
+from lsst.ts.salobj import parse_idl
 from lsst.ts.wep.utility import CamType
+from lsst.utils import getPackageDir
 
 
 class WEPWarning(Enum):

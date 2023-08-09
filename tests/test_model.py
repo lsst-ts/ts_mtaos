@@ -19,23 +19,20 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import asyncio
 import os
 import shutil
-import asyncio
 import unittest
-import numpy as np
-import yaml
-
 from pathlib import Path
 from unittest.mock import Mock
 
-from lsst.ts.ofc import OFC, OFCData
-from lsst.ts.ofc.utils import CorrectionType
-
-from lsst.ts import mtaos
-
+import numpy as np
+import yaml
 from lsst.afw.image import VisitInfo
 from lsst.geom import SpherePoint, degrees
+from lsst.ts import mtaos
+from lsst.ts.ofc import OFC, OFCData
+from lsst.ts.ofc.utils import CorrectionType
 
 # A short wait time in seconds
 SHORT_WAIT_TIME = 1.0

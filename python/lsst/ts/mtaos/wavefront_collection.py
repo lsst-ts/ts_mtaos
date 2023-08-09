@@ -21,8 +21,9 @@
 
 __all__ = ["WavefrontCollection"]
 
-import numpy as np
 from collections import deque
+
+import numpy as np
 
 
 class WavefrontCollection(object):

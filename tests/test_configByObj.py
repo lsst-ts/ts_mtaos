@@ -22,9 +22,8 @@
 import os
 import unittest
 
-from lsst.ts.wep.utility import CamType
-
 from lsst.ts import mtaos
+from lsst.ts.wep.utility import CamType
 
 
 class Config(object):
