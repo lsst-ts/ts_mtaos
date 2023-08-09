@@ -2,6 +2,14 @@
 Version History
 ===============
 
+v0.12.1
+-------
+
+* Add support for ts-pre-commit-config.
+* Update package setup files.
+* Add git workflows to check version history is updated and linting.
+* Run isort.
+
 v0.12.0
 -------
 

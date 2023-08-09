@@ -20,25 +20,22 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
-import os
 import logging
+import os
 import tempfile
 import time
 import unittest
-import pytest
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 import numpy as np
-from pathlib import Path
-from logging.handlers import RotatingFileHandler
-
+import pytest
 from lsst.daf.butler.registry.interfaces import DatabaseConflictError
-
+from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
+from lsst.ts import mtaos
+from lsst.ts.wep.task.cutOutDonutsCwfsTask import CutOutDonutsCwfsTask
 from lsst.ts.wep.utility import CamType
 from lsst.ts.wep.utility import getModulePath as getModulePathWep
-from lsst.ts.wep.task.cutOutDonutsCwfsTask import CutOutDonutsCwfsTask
-from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
-
-from lsst.ts import mtaos
 
 
 class TestUtility(unittest.TestCase):

@@ -55,9 +55,6 @@ pipeline {
                 dir(env.WORKSPACE + '/ts_mtaos') {
                     checkout scm
                 }
-                dir(env.WORKSPACE + '/phosim_utils') {
-                    git branch: 'main', url: 'https://github.com/lsst-dm/phosim_utils.git'
-                }
                 dir(env.WORKSPACE + '/ts_wep') {
                     git branch: "${BRANCH}", url: 'https://github.com/lsst-ts/ts_wep.git'
                 }
@@ -78,11 +75,7 @@ pipeline {
                         cd ${env.SAL_USERS_HOME} && { curl -O ${env.PLANTUML_URL} ; cd -; }
                         pip install sphinxcontrib-plantuml
 
-                        cd phosim_utils/
-                        setup -k -r . -t ${env.STACK_VERSION}
-                        scons
-
-                        cd ../ts_wep/
+                        cd ${env.WHOME}/ts_wep/
                         setup -k -r .
                         scons python
 
@@ -112,16 +105,19 @@ pipeline {
                         set +x
                         source ${env.SAL_SETUP_FILE}
 
-                        cd phosim_utils/
-                        setup -k -r . -t ${env.STACK_VERSION}
-
-                        cd ../ts_wep/
+                        cd ${env.WHOME}/ts_wep/
                         setup -k -r .
 
-                        cd ../ts_ofc/
+                        echo Checkout wep lfs data
+                        git lfs install || echo  git lfs install FAILED
+                        git lfs fetch --all || echo git lfs fetch FAILED
+                        git lfs checkout || echo git lfs checkout FAILED
+                        
+
+                        cd ${env.WHOME}/ts_ofc/
                         setup -k -r .
 
-                        cd ../ts_mtaos/
+                        cd ${env.WHOME}/ts_mtaos/
                         setup -k -r .
 
                         # Exclude integration tests from the initial run. 
@@ -142,16 +138,13 @@ pipeline {
                         set +x
                         source ${env.SAL_SETUP_FILE}
 
-                        cd phosim_utils/
-                        setup -k -r . -t ${env.STACK_VERSION}
-
-                        cd ../ts_wep/
+                        cd ${env.WHOME}/ts_wep/
                         setup -k -r .
 
-                        cd ../ts_ofc/
+                        cd ${env.WHOME}/ts_ofc/
                         setup -k -r .
 
-                        cd ../ts_mtaos/
+                        cd ${env.WHOME}/ts_mtaos/
                         setup -k -r .
 
                         package-docs build

@@ -19,26 +19,20 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import os
-import yaml
-import glob
-import pytest
 import asyncio
+import glob
+import os
 import unittest
-
-import numpy as np
-
 from pathlib import Path
 
-from lsst.ts import salobj
-from lsst.ts import mtaos
-
-from lsst.ts.ofc import OFCData
-
-from lsst.ts.wep.utility import writeCleanUpRepoCmd, runProgram
-from lsst.ts.wep.utility import getModulePath as getModulePathWep
-
+import numpy as np
+import pytest
+import yaml
 from lsst.daf import butler as dafButler
+from lsst.ts import mtaos, salobj
+from lsst.ts.ofc import OFCData
+from lsst.ts.wep.utility import getModulePath as getModulePathWep
+from lsst.ts.wep.utility import runProgram, writeCleanUpRepoCmd
 
 # standard command timeout (sec)
 STD_TIMEOUT = 60

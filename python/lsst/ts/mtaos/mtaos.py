@@ -21,28 +21,22 @@
 
 __all__ = ["MTAOS"]
 
-import eups
-import yaml
-import typing
-import inspect
 import asyncio
+import inspect
 import logging
+import typing
 import warnings
 
-from astropy import units as u
-
+import eups
 import numpy as np
-
+import yaml
+from astropy import units as u
 from lsst.ts import salobj
 from lsst.ts.idl.enums.MTAOS import FilterType
 from lsst.ts.ofc import OFCData
 from lsst.ts.utils import astropy_time_from_tai_unix
 
-from . import CONFIG_SCHEMA, TELESCOPE_DOF_SCHEMA
-from . import Config
-from . import Model
-from . import utility
-from . import __version__
+from . import CONFIG_SCHEMA, TELESCOPE_DOF_SCHEMA, Config, Model, __version__, utility
 
 try:
     from lsst.ts.ofc import __version__ as __ofc_version__

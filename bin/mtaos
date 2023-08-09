@@ -33,7 +33,9 @@ class MTAOSCommander(salobj.CscCommander):
         self.mtaos_remote = salobj.Remote(
             domain=self.remote.salinfo.domain, name="MTAOS"
         )
-        self.mtaos_remote.evt_settingsApplied = functools.partial(self.settings_callback)
+        self.mtaos_remote.evt_settingsApplied = functools.partial(
+            self.settings_callback
+        )
 
         self.mtaos_remote.tel_wepDuration.callback = functools.partial(
             self.duration_callback, name="wepDuration"

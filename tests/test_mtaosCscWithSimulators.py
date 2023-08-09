@@ -19,14 +19,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import yaml
 import asyncio
 import unittest
+from pathlib import Path
 
 import numpy as np
-from pathlib import Path
-from lsst.ts import salobj
-from lsst.ts import mtaos
+import yaml
+from lsst.ts import mtaos, salobj
 
 # standard command timeout (sec)
 SHORT_TIMEOUT = 5
