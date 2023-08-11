@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.12.2
+-------
+
+* Base Jenkinsfile on LSST-TS template
+
 v0.12.1
 -------
 
