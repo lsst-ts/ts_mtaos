@@ -317,6 +317,26 @@ def support_interrupt_wep_cmd() -> bool:
     return "command_interruptWEP" in idl_metadata.topic_info
 
 
+# TODO: Remove when xml 19 is available (DM-33401).
+def support_offset_dof_cmd() -> bool:
+    """Check if offsetDOF command is defined in MTAOS idl file.
+
+    This is a workaround to provide backward compatibility with xml 19
+    and will be removed in the future.
+
+    Returns
+    -------
+    `bool`
+        True if CSC interfaces defines the command "offsetDOF", False
+        otherwise.
+    """
+    csc_name = getCscName()
+
+    idl_metadata = parse_idl(csc_name, get_idl_dir() / f"sal_revCoded_{csc_name}.idl")
+
+    return "command_offsetDOF" in idl_metadata.topic_info
+
+
 def get_formatted_corner_wavefront_sensors_ids() -> str:
     """Return a list of ids for the corner wavefront sensors for LSSTCam.
 
