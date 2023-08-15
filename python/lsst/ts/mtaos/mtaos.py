@@ -109,7 +109,7 @@ class MTAOS(salobj.ConfigurableCsc):
             Default configuration for the wep. This is used in `do_runWEP()`,
             when the user does not provide an override configuration.
         execution_times : `dict`
-            Dictionary to store cricital execution times.
+            Dictionary to store critical execution times.
         DEFAULT_TIMEOUT : `float`
             Default timeout (in seconds). Used on normal operations, e.g.
             issuing corrections to the CSCs.
@@ -123,6 +123,15 @@ class MTAOS(salobj.ConfigurableCsc):
         """
 
         cscName = utility.getCscName()
+
+        compatibility_commands = dict(
+            offsetDOF=self._do_offset_dof,
+            resetOffsetDOF=self._do_reset_offset_dof,
+        )
+
+        if utility.support_offset_dof_cmd():
+            for command_name, command_method in compatibility_commands.items():
+                setattr(self, f"do_{command_name}", command_method)
 
         super().__init__(
             cscName,
@@ -621,6 +630,42 @@ class MTAOS(salobj.ConfigurableCsc):
         self.assert_enabled()
 
         await self.model.interrupt_wep_process()
+
+    async def _do_offset_dof(self, data: salobj.type_hints.BaseDdsDataType) -> None:
+        """Implement command offsetDOF.
+
+        Parameters
+        ----------
+        data : salobj.type_hints.BaseDdsDataType
+            Data for the command.
+
+        Raises
+        ------
+        NotImplementedError
+            Command not implemented yet.
+        """
+        self.assert_enabled()
+
+        raise NotImplementedError("Command offsetDOF not implemented.")
+
+    async def _do_reset_offset_dof(
+        self, data: salobj.type_hints.BaseDdsDataType
+    ) -> None:
+        """Implement command reset offset dof.
+
+        Parameters
+        ----------
+        data : salobj.type_hints.BaseDdsDataType
+            Data for the command.
+
+        Raises
+        ------
+        NotImplementedError
+            Command not implemented yet.
+        """
+        self.assert_enabled()
+
+        raise NotImplementedError("Command resetOffsetDOF not implemented.")
 
     async def handle_corrections(self):
         """Handle applying the corrections to all components.
