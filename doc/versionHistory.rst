@@ -2,6 +2,12 @@
 Version History
 ===============
 
+v0.12.2
+-------
+
+* Add stubs for the new commands introduced in the CSC in xml 19.
+  For now only add backward compatibility.
+
 v0.12.1
 -------
 
