@@ -39,7 +39,7 @@ class Config(object):
             Source of the configuration. Either object received in configure
             CSC call, or string for a filename.
         """
-        if type(config) == str:
+        if isinstance(config, str):
             data = yaml.safe_load(open(config).read())
             self.configObj = namedtuple("configObj", data.keys())(*data.values())
         else:
