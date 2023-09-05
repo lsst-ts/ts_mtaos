@@ -549,11 +549,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 timeout=SHORT_TIMEOUT,
             )
 
-    # TODO: Remove skipIf when xml 11 is available (DM-33401).
-    @unittest.skipIf(
-        not mtaos.utility.support_interrupt_wep_cmd(),
-        "interruptWEP command not defined. See DM-33401.",
-    )
     @pytest.mark.csc_integtest
     async def test_interruptWEP(self):
         async with self.make_csc(

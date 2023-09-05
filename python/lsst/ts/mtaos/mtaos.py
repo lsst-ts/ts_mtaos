@@ -124,15 +124,6 @@ class MTAOS(salobj.ConfigurableCsc):
 
         cscName = utility.getCscName()
 
-        compatibility_commands = dict(
-            offsetDOF=self._do_offset_dof,
-            resetOffsetDOF=self._do_reset_offset_dof,
-        )
-
-        if utility.support_offset_dof_cmd():
-            for command_name, command_method in compatibility_commands.items():
-                setattr(self, f"do_{command_name}", command_method)
-
         super().__init__(
             cscName,
             index=0,
@@ -631,7 +622,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         await self.model.interrupt_wep_process()
 
-    async def _do_offset_dof(self, data: salobj.type_hints.BaseDdsDataType) -> None:
+    async def do_offsetDOF(self, data: salobj.type_hints.BaseDdsDataType) -> None:
         """Implement command offsetDOF.
 
         Parameters
@@ -648,9 +639,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         raise NotImplementedError("Command offsetDOF not implemented.")
 
-    async def _do_reset_offset_dof(
-        self, data: salobj.type_hints.BaseDdsDataType
-    ) -> None:
+    async def do_resetOffsetDOF(self, data: salobj.type_hints.BaseDdsDataType) -> None:
         """Implement command reset offset dof.
 
         Parameters
@@ -671,7 +660,7 @@ class MTAOS(salobj.ConfigurableCsc):
         """Handle applying the corrections to all components.
 
         If one or more correction fail to apply to method will try to undo the
-        successfull corrections. If any of those fails to undo, it will
+        successful corrections. If any of those fails to undo, it will
         continue and generate a report at the end.
 
         Raises
@@ -713,7 +702,7 @@ class MTAOS(salobj.ConfigurableCsc):
         """Handle undoing corrections.
 
         The method will inspect the `issued_corrections` list of tasks, will
-        undo all the successful corrections and log the unsuccesful. If any
+        undo all the successful corrections and log the unsuccessful. If any
         successful correction fail to be undone, it will log the issue and skip
         the error.
 

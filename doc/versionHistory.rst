@@ -2,6 +2,12 @@
 Version History
 ===============
 
+v0.13.0
+-------
+
+* Remove compatibility with xml<19.
+* Update to ts-pre-commit-config 0.6.
+
 v0.12.2
 -------
 
