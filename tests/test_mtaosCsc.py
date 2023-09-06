@@ -604,10 +604,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             If software_versions does not match expected values.
         """
         # xmlVersion matches xml version
-        assert len(sofware_versions.xmlVersion) == xml.__version__
+        assert sofware_versions.xmlVersion == xml.__version__
 
         # cscVersion matches csc version
-        assert len(sofware_versions.cscVersion) == mtaos.__version__
+        assert sofware_versions.cscVersion == mtaos.__version__
 
         # subsystemVersions must not be empty
         assert len(sofware_versions.subsystemVersions) > 0
