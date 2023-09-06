@@ -29,7 +29,7 @@ import numpy as np
 import pytest
 import yaml
 from lsst.daf import butler as dafButler
-from lsst.ts import mtaos, salobj
+from lsst.ts import mtaos, salobj, xml
 from lsst.ts.ofc import OFCData
 from lsst.ts.wep.utility import getModulePath as getModulePathWep
 from lsst.ts.wep.utility import runProgram, writeCleanUpRepoCmd
@@ -603,17 +603,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         AssertionError
             If software_versions does not match expected values.
         """
-        # salVersion must not be empty
-        assert len(sofware_versions.salVersion) > 0
+        # xmlVersion matches xml version
+        assert sofware_versions.xmlVersion == xml.__version__
 
-        # xmlVersion must not be empty
-        assert len(sofware_versions.xmlVersion) > 0
-
-        # openSpliceVersion must not be empty
-        assert len(sofware_versions.openSpliceVersion) > 0
-
-        # cscVersion must not be empty
-        assert len(sofware_versions.cscVersion) > 0
+        # cscVersion matches csc version
+        assert sofware_versions.cscVersion == mtaos.__version__
 
         # subsystemVersions must not be empty
         assert len(sofware_versions.subsystemVersions) > 0
