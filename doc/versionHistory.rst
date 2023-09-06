@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.13.1
+-------
+
+* Update ``tests/test_mtaosCsc.py`` to work with the kafka version of salobj.
+
 v0.13.0
 -------
 
