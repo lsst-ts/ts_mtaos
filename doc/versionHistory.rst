@@ -2,6 +2,12 @@
 Version History
 ===============
 
+v0.13.1
+-------
+
+* Update ``tests/test_mtaosCsc.py`` to work with the kafka version of salobj.
+* Update to work with ``ts_wep>=7``.
+
 v0.13.0
 -------
 
