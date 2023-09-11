@@ -1,7 +1,7 @@
 black: true
 check-xml: true
 check-yaml: true
-clang-format: true
+clang-format: false
 flake8: true
 format-xmllint: true
 isort: true
