@@ -36,6 +36,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(self, initial_state, config_dir, simulation_mode):
         return mtaos.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
 
+    @classmethod
+    def setUpClass(cls):
+        cls._randomize_topic_subname = False
+
     def setUp(self):
         # Simulated CSCs
         self.cscM2Hex = None
