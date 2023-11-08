@@ -48,7 +48,7 @@ from pathlib import Path
 from lsst.daf.butler import Butler
 from lsst.obs.base import DefineVisitsTask, Instrument
 from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
-from lsst.ts.wep.utility import CamType
+from lsst.ts.wep.utils import CamType
 from lsst.utils import getPackageDir
 
 

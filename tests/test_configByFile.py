@@ -23,7 +23,7 @@ import os
 import unittest
 
 from lsst.ts import mtaos
-from lsst.ts.wep.utility import CamType
+from lsst.ts.wep.utils import CamType
 
 
 class TestConfigByFile(unittest.TestCase):
