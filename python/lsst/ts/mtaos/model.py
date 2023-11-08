@@ -39,7 +39,7 @@ from lsst.daf import butler as dafButler
 from lsst.ts.ofc import OFC
 from lsst.ts.salobj import DefaultingValidator
 from lsst.ts.utils import make_done_future
-from lsst.ts.wep.utility import writePipetaskCmd
+from lsst.ts.wep.utils import writePipetaskCmd
 
 from .config_schema import (
     CWFS_PIPELINE_CONFIG,

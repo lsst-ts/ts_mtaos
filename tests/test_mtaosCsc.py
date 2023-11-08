@@ -31,8 +31,8 @@ import yaml
 from lsst.daf import butler as dafButler
 from lsst.ts import mtaos, salobj
 from lsst.ts.ofc import OFCData
-from lsst.ts.wep.utility import getModulePath as getModulePathWep
-from lsst.ts.wep.utility import runProgram, writeCleanUpRepoCmd
+from lsst.ts.wep.utils import getModulePath as getModulePathWep
+from lsst.ts.wep.utils import runProgram, writeCleanUpRepoCmd
 
 # standard command timeout (sec)
 STD_TIMEOUT = 60
@@ -46,6 +46,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls._randomize_topic_subname = True
         cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         cls.isrDir = cls.dataDir.joinpath("input")
 
@@ -603,17 +604,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         AssertionError
             If software_versions does not match expected values.
         """
-        # salVersion must not be empty
-        assert len(sofware_versions.salVersion) > 0
-
-        # xmlVersion must not be empty
-        assert len(sofware_versions.xmlVersion) > 0
-
-        # openSpliceVersion must not be empty
-        assert len(sofware_versions.openSpliceVersion) > 0
-
-        # cscVersion must not be empty
-        assert len(sofware_versions.cscVersion) > 0
+        # cscVersion matches csc version
+        assert sofware_versions.cscVersion == mtaos.__version__
 
         # subsystemVersions must not be empty
         assert len(sofware_versions.subsystemVersions) > 0

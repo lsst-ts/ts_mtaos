@@ -29,8 +29,8 @@ import yaml
 from lsst.daf import butler as dafButler
 from lsst.ts import mtaos
 from lsst.ts.ofc import OFCData
-from lsst.ts.wep.utility import getModulePath as getModulePathWep
-from lsst.ts.wep.utility import runProgram, writeCleanUpRepoCmd
+from lsst.ts.wep.utils import getModulePath as getModulePathWep
+from lsst.ts.wep.utils import runProgram, writeCleanUpRepoCmd
 
 
 @pytest.mark.integtest
