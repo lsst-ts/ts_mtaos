@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.13.2
+-------
+
+* Add SConstruct file to allow building package with scons.
+
 v0.13.1
 -------
 
