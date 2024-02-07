@@ -489,12 +489,14 @@ class MTAOS(salobj.ConfigurableCsc):
             # in MTAOS runWEP command.
             await self.model.run_wep(
                 visit_id=self.visit_id_offset + data.visitId,
-                extra_id=self.visit_id_offset + data.extraId
-                if data.extraId > 0
-                else None,
-                config=yaml.safe_load(data.config)
-                if len(data.config) > 0
-                else self.wep_config,
+                extra_id=(
+                    self.visit_id_offset + data.extraId if data.extraId > 0 else None
+                ),
+                config=(
+                    yaml.safe_load(data.config)
+                    if len(data.config) > 0
+                    else self.wep_config
+                ),
                 run_name_extention=run_name_extention,
                 log_time=self.execution_times,
             )
