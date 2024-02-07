@@ -115,6 +115,7 @@ pipeline {
                         
 
                         cd ${env.WHOME}/ts_ofc/
+                        ${env.SAL_USERS_HOME}/.checkout_repo.sh \${WORK_BRANCHES}
                         setup -k -r .
 
                         cd ${env.WHOME}/ts_mtaos/

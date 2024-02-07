@@ -31,3 +31,4 @@ pytest_session.txt
 # setuptools
 .eggs
 *.egg-info
+towncrier.toml
