@@ -387,9 +387,6 @@ SCIENCE_SENSOR_PIPELINE_CONFIG = yaml.safe_load(
       type: object
       additionalProperties: false
       properties:
-        donutTemplateSize:
-          type: integer
-          default: 160
         donutStampSize:
           type: integer
           default: 160
@@ -418,9 +415,6 @@ CWFS_PIPELINE_CONFIG = yaml.safe_load(
       type: object
       additionalProperties: false
       properties:
-        donutTemplateSize:
-          type: integer
-          default: 160
         donutStampSize:
           type: integer
           default: 160
