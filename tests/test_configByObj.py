@@ -23,7 +23,6 @@ import os
 import unittest
 
 from lsst.ts import mtaos
-from lsst.ts.wep.utils import CamType
 
 
 class Config(object):
@@ -56,10 +55,6 @@ class TestConfigByObj(unittest.TestCase):
             os.environ.pop("ISRDIRPATH")
         except KeyError:
             pass
-
-    def testGetCamType(self):
-        camType = self.configObj.getCamType()
-        self.assertEqual(camType, CamType.ComCam)
 
     def testGetInstName(self):
         instName = self.configObj.getInstName()
