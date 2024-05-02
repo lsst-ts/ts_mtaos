@@ -537,11 +537,6 @@ class MTAOS(salobj.ConfigurableCsc):
             result="runOFC started.",
         )
 
-        if len(data.config) > 0:
-            raise NotImplementedError(
-                "User provided configuration overrides not supported yet."
-            )
-
         async with self.issue_correction_lock:
             if data.userGain != 0.0:
                 warnings.warn(
