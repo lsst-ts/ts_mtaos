@@ -106,6 +106,7 @@ pipeline {
                         source ${env.SAL_SETUP_FILE}
 
                         cd ${env.WHOME}/ts_wep/
+                        ${env.SAL_USERS_HOME}/.checkout_repo.sh \${WORK_BRANCHES}
                         setup -k -r .
 
                         echo Checkout wep lfs data
