@@ -90,12 +90,63 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         if cls.model.run_name in list(butler.registry.queryCollections()):
             runProgram(writeCleanUpRepoCmd(cls.model.data_path, cls.model.run_name))
 
-    async def test_process_comcam(self):
+    async def test_process_comcam_default(self):
         await self.model.process_comcam(
             4021123106001,
             4021123106002,
             dict(),
         )
+
+        self.assertEqual(self.model.wavefront_errors.getNumOfData(), 1)
+
+        data = self.model.wavefront_errors.pop()
+
+        # There is one element for each sensor, 2 sensors have data.
+        self.assertEqual(len(data), 2)
+
+        zk_avg = self.model.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
+
+        # The sensors with data are 93 and 94
+        self.assertTrue(93 in zk_avg)
+        self.assertTrue(94 in zk_avg)
+
+        # It is not possible to guaranteee here that the values of the zernike
+        # coefficients will always be the same. Instead of trying to chase our
+        # tails here, let's check that the returning arrays has the expected
+        # dimensions and that the maximum absolute value of all zernike
+        # coefficients is always the same.
+        self.assertEqual(
+            len(zk_avg[93]),
+            len(self.model.ofc.ofc_data.zn3_idx),
+            msg="Wrong size of zernike coefficients in sensor 93.",
+        )
+        self.assertTrue(
+            np.argmax(np.abs(zk_avg[93])) in self.zernike_coefficient_maximum_expected
+        )
+        self.assertEqual(
+            len(zk_avg[94]),
+            len(self.model.ofc.ofc_data.zn3_idx),
+            msg="Wrong size of zernike coefficients in sensor 94.",
+        )
+        self.assertTrue(
+            np.argmax(np.abs(zk_avg[94])) in self.zernike_coefficient_maximum_expected
+        )
+
+    async def test_process_comcam_use_avg_estimate(self):
+        initial_zernike_table_name = self.model.zernike_table_name
+
+        self.model.zernike_table_name = "zernikeEstimateAvg"
+
+        try:
+            await self.model.process_comcam(
+                4021123106001,
+                4021123106002,
+                dict(),
+            )
+        finally:
+            print(f"{self.model.zernike_table_name} {initial_zernike_table_name}")
+            self.model.zernike_table_name = initial_zernike_table_name
+            print(f"{self.model.zernike_table_name} {initial_zernike_table_name}")
 
         self.assertEqual(self.model.wavefront_errors.getNumOfData(), 1)
 
