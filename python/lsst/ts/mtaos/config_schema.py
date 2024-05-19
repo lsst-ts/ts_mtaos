@@ -400,6 +400,13 @@ calcZernikesTask:
     class:
       type: string
       default: lsst.ts.wep.task.calcZernikesTask.CalcZernikesTask
+    config:
+      type: object
+      additionalProperties: false
+      properties:
+        estimateZernikes.maxNollIndex:
+          type: integer
+          default: 28
 """
 )
 
@@ -428,5 +435,12 @@ calcZernikesTask:
     class:
       type: string
       default: lsst.ts.wep.task.calcZernikesTask.CalcZernikesTask
+    config:
+      type: object
+      additionalProperties: false
+      properties:
+        estimateZernikes.maxNollIndex:
+          type: integer
+          default: 28
 """
 )

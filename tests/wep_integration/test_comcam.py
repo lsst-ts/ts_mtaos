@@ -117,7 +117,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         # coefficients is always the same.
         self.assertEqual(
             len(zk_avg[93]),
-            len(self.model.ofc.ofc_data.zn3_idx),
+            len(self.model.ofc.ofc_data.zn_idx),
             msg="Wrong size of zernike coefficients in sensor 93.",
         )
         self.assertTrue(
@@ -125,7 +125,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             len(zk_avg[94]),
-            len(self.model.ofc.ofc_data.zn3_idx),
+            len(self.model.ofc.ofc_data.zn_idx),
             msg="Wrong size of zernike coefficients in sensor 94.",
         )
         self.assertTrue(
@@ -168,7 +168,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         # coefficients is always the same.
         self.assertEqual(
             len(zk_avg[93]),
-            len(self.model.ofc.ofc_data.zn3_idx),
+            len(self.model.ofc.ofc_data.zn_idx),
             msg="Wrong size of zernike coefficients in sensor 93.",
         )
         self.assertTrue(
@@ -176,7 +176,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             len(zk_avg[94]),
-            len(self.model.ofc.ofc_data.zn3_idx),
+            len(self.model.ofc.ofc_data.zn_idx),
             msg="Wrong size of zernike coefficients in sensor 94.",
         )
         self.assertTrue(
