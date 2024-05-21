@@ -321,7 +321,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             "doOverscan": True,
         }
         expected_zernike_science_sensor_config = {
-            "donutTemplateSize": 160,
             "donutStampSize": 160,
             "initialCutoutPadding": 40,
         }
@@ -371,7 +370,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         }
 
         expected_zernike_science_sensor_config = {
-            "donutTemplateSize": 160,
             "donutStampSize": 160,
             "initialCutoutPadding": 40,
         }
@@ -416,7 +414,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             "doOverscan": True,
         }
         expected_zernike_science_sensor_config = {
-            "donutTemplateSize": 160,
             "donutStampSize": 160,
             "initialCutoutPadding": 40,
         }
@@ -460,7 +457,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             "doOverscan": True,
         }
         expected_zernike_science_sensor_config = {
-            "donutTemplateSize": 160,
             "donutStampSize": 160,
             "initialCutoutPadding": 80,
         }
@@ -546,9 +542,9 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         assert "CutOutDonutsScienceSensorTask" in wep_configuration["tasks"]
         assert "calcZernikesTask" in wep_configuration["tasks"]
         assert "config" in wep_configuration["tasks"]["CutOutDonutsScienceSensorTask"]
-        for config in set(
-            ("donutTemplateSize", "donutStampSize", "initialCutoutPadding")
-        ).union(expected_zernike_science_sensor_config):
+        for config in set(("donutStampSize", "initialCutoutPadding")).union(
+            expected_zernike_science_sensor_config
+        ):
             assert (
                 config
                 in wep_configuration["tasks"]["CutOutDonutsScienceSensorTask"]["config"]

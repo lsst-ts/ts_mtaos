@@ -1013,9 +1013,6 @@ class Model:
         # Get output
         data_ids = butler.registry.queryDatasets(
             self.zernike_table_name,
-            dataId=dict(
-                instrument=self.data_instrument_name[instrument], exposure=visit_id
-            ),
             collections=[run_name],
         )
 

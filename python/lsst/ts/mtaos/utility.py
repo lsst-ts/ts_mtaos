@@ -48,7 +48,6 @@ from pathlib import Path
 from lsst.daf.butler import Butler
 from lsst.obs.base import DefineVisitsTask, Instrument
 from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
-from lsst.ts.wep.utils import CamType
 from lsst.utils import getPackageDir
 
 
@@ -142,15 +141,7 @@ def getCamType(camera):
     ValueError
         The camera is not supported.
     """
-
-    if camera == "lsstCam":
-        return CamType.LsstCam
-    elif camera == "lsstFamCam":
-        return CamType.LsstFamCam
-    elif camera == "comcam":
-        return CamType.ComCam
-    else:
-        raise ValueError("The camera (%s) is not supported." % camera)
+    raise DeprecationWarning("This method is deprecated.")
 
 
 def getCscName():

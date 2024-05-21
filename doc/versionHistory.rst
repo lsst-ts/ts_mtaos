@@ -2,6 +2,27 @@
 Version History
 ===============
 
+v0.13.3
+-------
+
+* Update Jenkinsfile to checkout the work branches for ts_wep.
+
+* Update lint github action to pin python 3.11.
+
+* In mtaos, update do_runOFC to allow users to pass in configuration.
+
+* In model.py, update call to query datasets from the butler to retrieve the wavefront errors.
+
+* Update unit tests to conform with latest changes in wep.
+
+* In config_schema, remove configuration option from cutout pipeline.
+
+* In ``utility.py``, mark ``getCamType`` as deprecated.
+
+* In mtaos, pass data instrument name to the model class if it is defined in the configuration.
+
+* In config_schema, add option to override the data instrument name.
+
 v0.13.2
 -------
 

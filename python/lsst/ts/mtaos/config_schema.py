@@ -79,6 +79,20 @@ properties:
           type: string
       additionalProperties: false
 
+  data_instrument_name:
+    description: >-
+      A dictionary that maps the name of the instrument to the name used in
+      the pipeline task.
+      type: object
+      properties:
+        comcam:
+          type: string
+        lsstCam:
+          type: string
+        lsstFamCam:
+          type: string
+      additionalProperties: false
+
   pipeline_n_processes:
     description: Number of processes to use when running pipeline.
     type: integer
@@ -373,9 +387,6 @@ SCIENCE_SENSOR_PIPELINE_CONFIG = yaml.safe_load(
       type: object
       additionalProperties: false
       properties:
-        donutTemplateSize:
-          type: integer
-          default: 160
         donutStampSize:
           type: integer
           default: 160
@@ -404,9 +415,6 @@ CWFS_PIPELINE_CONFIG = yaml.safe_load(
       type: object
       additionalProperties: false
       properties:
-        donutTemplateSize:
-          type: integer
-          default: 160
         donutStampSize:
           type: integer
           default: 160
