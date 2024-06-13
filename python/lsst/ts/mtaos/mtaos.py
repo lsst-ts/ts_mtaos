@@ -267,6 +267,11 @@ class MTAOS(salobj.ConfigurableCsc):
             ),
             pipeline_n_processes=config.pipeline_n_processes,
             zernike_table_name=config.zernike_table_name,
+            data_instrument_name=(
+                config.data_instrument_name
+                if hasattr(config, "data_instrument_name")
+                else None
+            ),
         )
 
         if dof_state0 is not None:
@@ -531,11 +536,6 @@ class MTAOS(salobj.ConfigurableCsc):
             timeout=self.LONG_TIMEOUT,
             result="runOFC started.",
         )
-
-        if len(data.config) > 0:
-            raise NotImplementedError(
-                "User provided configuration overrides not supported yet."
-            )
 
         async with self.issue_correction_lock:
             if data.userGain != 0.0:
