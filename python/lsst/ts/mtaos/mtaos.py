@@ -639,7 +639,17 @@ class MTAOS(salobj.ConfigurableCsc):
         """
         self.assert_enabled()
 
-        raise NotImplementedError("Command offsetDOF not implemented.")
+        await self.cmd_offsetDOF.ack_in_progress(
+            data,
+            timeout=self.LONG_TIMEOUT,
+            result="offsetDOF started.",
+        )
+
+        async with self.issue_correction_lock:
+
+            self.model.offset_dof(offset=np.array(data.value))
+
+            await self.handle_corrections()
 
     async def do_resetOffsetDOF(self, data: salobj.type_hints.BaseDdsDataType) -> None:
         """Implement command reset offset dof.
