@@ -680,7 +680,20 @@ class MTAOS(salobj.ConfigurableCsc):
         """
         self.assert_enabled()
 
-        raise NotImplementedError("Command resetOffsetDOF not implemented.")
+        await self.cmd_resetOffsetDOF.ack_in_progress(
+            data,
+            timeout=self.LONG_TIMEOUT,
+            result="Reset dof offset started.",
+        )
+
+        async with self.issue_correction_lock:
+
+            self.model.reset_wfe_correction()
+
+            await self.pubEvent_degreeOfFreedom()
+            # if the corrections fails it will republish the dof event
+            # after undoing the offsets.
+            await self.handle_corrections()
 
     async def handle_corrections(self):
         """Handle applying the corrections to all components.
