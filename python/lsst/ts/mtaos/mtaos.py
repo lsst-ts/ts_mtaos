@@ -295,6 +295,17 @@ class MTAOS(salobj.ConfigurableCsc):
 
         self.log.debug("MTAOS configuration completed.")
 
+    async def end_enable(self, data):
+        """Runs after CSC goes into enable.
+
+        Parameters
+        ----------
+        data : `DataType`
+            Command data
+        """
+
+        await self.pubEvent_degreeOfFreedom()
+
     def _logExecFunc(self):
         """Log the executed function."""
 
@@ -649,6 +660,9 @@ class MTAOS(salobj.ConfigurableCsc):
 
             self.model.offset_dof(offset=np.array(data.value))
 
+            await self.pubEvent_degreeOfFreedom()
+            # if the corrections fails it will republish the dof event
+            # after undoing the offsets.
             await self.handle_corrections()
 
     async def do_resetOffsetDOF(self, data: salobj.type_hints.BaseDdsDataType) -> None:
