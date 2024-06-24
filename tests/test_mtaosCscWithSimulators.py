@@ -260,6 +260,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # set control algorithm
             config = dict(xref="x0")
 
+            remote.evt_degreeOfFreedom.flush()
             # Calculate the DOF and issue the correction for first time
             await remote.cmd_addAberration.set_start(
                 wf=wfe, config=yaml.safe_dump(config), timeout=STD_TIMEOUT
