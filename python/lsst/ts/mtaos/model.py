@@ -446,6 +446,26 @@ class Model:
             self.m2_correction,
         ) = self.ofc.reset()
 
+    def offset_dof(self, offset):
+        """Add offset to the degrees of freedom.
+
+        Parameters
+        ----------
+        offset : `np.array`
+            Offset to apply to the degrees of freedom.
+        """
+
+        self.ofc.ofc_controller.aggregate_state(offset, self.ofc.ofc_data.dof_idx)
+
+        self.ofc.lv_dof = self.ofc.ofc_controller.dof_state.copy()
+
+        (
+            self.m2_hexapod_correction,
+            self.cam_hexapod_correction,
+            self.m1m3_correction,
+            self.m2_correction,
+        ) = self.ofc.get_all_corrections()
+
     def _clear_wfe_collections(self):
         """Clear the collections of wavefront error contain the rejected
         one.
