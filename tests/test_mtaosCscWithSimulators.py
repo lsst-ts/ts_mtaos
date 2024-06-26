@@ -260,6 +260,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # set control algorithm
             config = dict(xref="x0")
 
+            remote.evt_degreeOfFreedom.flush()
             # Calculate the DOF and issue the correction for first time
             await remote.cmd_addAberration.set_start(
                 wf=wfe, config=yaml.safe_dump(config), timeout=STD_TIMEOUT
@@ -282,6 +283,52 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             # The two times calculation of visit DOF should be eqaul under "x0"
             np.testing.assert_array_equal(dof_first.visitDoF, dof_second.visitDoF)
+
+    async def test_offsetDOF(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
+        ):
+            await self._simulateCSCs()
+
+            await self._startCsc()
+
+            # Set the timeout > 20 seconds for the long calculation time
+            remote = self._getRemote()
+
+            dof_offset = np.zeros(50)
+            # Camera Hexapod z
+            dof_offset[0] = 0.1
+            # M2 Hexapod z
+            dof_offset[5] = 0.1
+            # m1m3 bending mode 1
+            dof_offset[10] = 0.1
+            # m2 bending mode 1
+            dof_offset[30] = 0.1
+
+            # Flush event before correction is issued
+            remote.evt_m2HexapodCorrection.flush()
+            remote.evt_cameraHexapodCorrection.flush()
+            remote.evt_m1m3Correction.flush()
+            remote.evt_m2Correction.flush()
+            remote.evt_degreeOfFreedom.flush()
+
+            dof_first = await remote.evt_degreeOfFreedom.aget(timeout=STD_TIMEOUT)
+
+            await remote.cmd_offsetDOF.set_start(value=dof_offset, timeout=STD_TIMEOUT)
+
+            dof_second = await remote.evt_degreeOfFreedom.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
+
+            assert dof_second.aggregatedDoF[0] - dof_first.aggregatedDoF[0] == 0.1
+            assert dof_second.aggregatedDoF[5] - dof_first.aggregatedDoF[5] == 0.1
+            assert dof_second.aggregatedDoF[10] - dof_first.aggregatedDoF[10] == 0.1
+            assert dof_second.aggregatedDoF[30] - dof_first.aggregatedDoF[30] == 0.1
+
+            assert len(self.m2_hex_corrections) == 1
+            assert len(self.cam_hex_corrections) == 1
+            assert len(self.m2_corrections) == 1
+            assert len(self.m1m3_corrections) == 1
 
     async def asyncTearDown(self):
         await self._cancelCSCs()
