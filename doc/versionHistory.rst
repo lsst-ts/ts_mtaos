@@ -2,6 +2,25 @@
 Version History
 ===============
 
+v0.14.0
+-------
+
+* In ``mtaos.py``, implement the ``resetOffsetOFC`` command.
+
+* In ``tests/test_mtaosCscWithSimulators.py``, update test_addAberration_issueCorrection_xref_x0 to flush the degreeOfFreedom event before running the test.
+
+  This is necessary because now the CSC publishes the state once it goes to enabled and the test needs to ignore that initial state published.
+
+* In ``tests/test_mtaosCscWithSimulators.py`` add unit test for the new offsetDOF command implementation.
+
+* In ``mtaos.py``, add end_enable method and publish DoF state.
+
+* In ``mtaos.py``, implement offsetDOF command.
+
+* In ``model.py``, add method to offset the degrees of freedom.
+
+  This allows us to add offsets to M1M3 and M2 bending modes as well as rigid body motions of the hexapods.
+
 v0.13.3
 -------
 

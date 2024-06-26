@@ -295,6 +295,17 @@ class MTAOS(salobj.ConfigurableCsc):
 
         self.log.debug("MTAOS configuration completed.")
 
+    async def end_enable(self, data):
+        """Runs after CSC goes into enable.
+
+        Parameters
+        ----------
+        data : `DataType`
+            Command data
+        """
+
+        await self.pubEvent_degreeOfFreedom()
+
     def _logExecFunc(self):
         """Log the executed function."""
 
@@ -639,7 +650,20 @@ class MTAOS(salobj.ConfigurableCsc):
         """
         self.assert_enabled()
 
-        raise NotImplementedError("Command offsetDOF not implemented.")
+        await self.cmd_offsetDOF.ack_in_progress(
+            data,
+            timeout=self.LONG_TIMEOUT,
+            result="offsetDOF started.",
+        )
+
+        async with self.issue_correction_lock:
+
+            self.model.offset_dof(offset=np.array(data.value))
+
+            await self.pubEvent_degreeOfFreedom()
+            # if the corrections fails it will republish the dof event
+            # after undoing the offsets.
+            await self.handle_corrections()
 
     async def do_resetOffsetDOF(self, data: salobj.type_hints.BaseDdsDataType) -> None:
         """Implement command reset offset dof.
@@ -656,7 +680,20 @@ class MTAOS(salobj.ConfigurableCsc):
         """
         self.assert_enabled()
 
-        raise NotImplementedError("Command resetOffsetDOF not implemented.")
+        await self.cmd_resetOffsetDOF.ack_in_progress(
+            data,
+            timeout=self.LONG_TIMEOUT,
+            result="Reset dof offset started.",
+        )
+
+        async with self.issue_correction_lock:
+
+            self.model.reset_wfe_correction()
+
+            await self.pubEvent_degreeOfFreedom()
+            # if the corrections fails it will republish the dof event
+            # after undoing the offsets.
+            await self.handle_corrections()
 
     async def handle_corrections(self):
         """Handle applying the corrections to all components.
