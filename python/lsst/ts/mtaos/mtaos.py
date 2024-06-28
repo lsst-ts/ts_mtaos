@@ -1000,6 +1000,10 @@ class MTAOS(salobj.ConfigurableCsc):
             z_forces = np.negative(z_forces)
 
         try:
+            await self.remotes["m1m3"].cmd_clearActiveOpticForces.start(
+                timeout=self.DEFAULT_TIMEOUT
+            )
+            await asyncio.sleep(self.DEFAULT_TIMEOUT / 2.0)
             await self.remotes["m1m3"].cmd_applyActiveOpticForces.set_start(
                 timeout=self.DEFAULT_TIMEOUT, zForces=z_forces
             )
