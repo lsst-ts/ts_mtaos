@@ -79,7 +79,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             remote.evt_m1m3Correction.flush()
             remote.evt_m2Correction.flush()
 
-            await remote.cmd_addAberration.set_start(wf=wfe, timeout=STD_TIMEOUT)
+            config = dict(filter_name="G", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+            await remote.cmd_addAberration.set_start(
+                wf=wfe, config=yaml.safe_dump(config), timeout=STD_TIMEOUT
+            )
 
             # Get the expected corrections.
             m2_hex_corrections = await remote.evt_m2HexapodCorrection.next(
@@ -136,7 +139,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 f"different than expected {m2_corrections.zForces}",
             )
 
-            # add random values for aberrations
+            # add random values for aberrations (19 zernikes)
             wf = np.random.rand(19) * 0.1
 
             dof_add_aberration_before = await remote.evt_degreeOfFreedom.aget(
@@ -145,7 +148,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             remote.evt_degreeOfFreedom.flush()
 
-            await remote.cmd_addAberration.set_start(wf=wf, timeout=10.0)
+            await remote.cmd_addAberration.set_start(
+                wf=wf, config=yaml.safe_dump(config), timeout=10.0
+            )
 
             dof_add_aberration_after = await remote.evt_degreeOfFreedom.next(
                 flush=False, timeout=SHORT_TIMEOUT
@@ -258,7 +263,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             wfe[7 - 4] = 1
 
             # set control algorithm
-            config = dict(xref="x0")
+            config = dict(xref="x0", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
 
             remote.evt_degreeOfFreedom.flush()
             # Calculate the DOF and issue the correction for first time

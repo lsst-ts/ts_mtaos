@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.15.0
+-------
+
+* Update to use version 3.2.0 of ts_ofc
+
 v0.14.0
 -------
 

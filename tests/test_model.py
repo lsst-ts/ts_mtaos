@@ -58,6 +58,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             .read()
         )
         ofc_data.dof_state0 = dof_state0
+        ofc_data.zn_selected = np.arange(4, 23)  # Use only from zk4-zk22
 
         cls.model = mtaos.Model(
             instrument=ofc_data.name, data_path=None, ofc_data=ofc_data
@@ -114,24 +115,6 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(isinstance(self.model.ofc, OFC))
         self.assertEqual(self.model.ofc.ofc_data.name, "comcam")
 
-    def test_user_gain(self):
-        self.assertTrue(self.model.user_gain is not None)
-
-        self.model.user_gain = 0.0
-        self.assertEqual(self.model.user_gain, 0.0)
-
-        self.model.user_gain = 0.5
-        self.assertEqual(self.model.user_gain, 0.5)
-
-        self.model.user_gain = 1.0
-        self.assertEqual(self.model.user_gain, 1.0)
-
-        with self.assertRaises(ValueError):
-            self.model.user_gain = -0.1
-
-        with self.assertRaises(ValueError):
-            self.model.user_gain = 1.1
-
     def test_get_wfe(self):
         self.assertEqual(self.model.get_wfe(), [])
 
@@ -185,9 +168,10 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
 
     def test_add_correction(self):
         wavefront_erros = np.zeros(19)
+        default_config = {"sensor_ids": [0, 1, 2, 3, 4, 5, 6, 7, 8]}
 
         # Passing in zeros for wavefront_errors should return 0 in correction
-        self.model.add_correction(wavefront_erros)
+        self.model.add_correction(wavefront_erros, config=default_config)
 
         x, y, z, u, v, w = self.model.m2_hexapod_correction()
 
@@ -212,11 +196,11 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         actCorr = self.model.m2_correction()
         self.assertListEqual(actCorr.tolist(), np.zeros_like(actCorr).tolist())
 
-        # Give 0.1 um of focus correction. All values must be close to zero
+        # Give 0.1 um of focus correction. All values must be close to zer
         # except z correction.
 
         wavefront_erros[0] = 0.1
-        self.model.add_correction(wavefront_erros)
+        self.model.add_correction(wavefront_erros, config=default_config)
 
         x, y, z_m2hex, u, v, w = self.model.m2_hexapod_correction()
 
@@ -235,7 +219,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(w, 0, 3)
 
         # Expected total hexapod offset
-        self.assertAlmostEqual(z_m2hex + z_camhex, 4.16211, 3)
+        self.assertAlmostEqual(z_m2hex + z_camhex, 6.1209, 3)
 
         actCorr = self.model.m1m3_correction()
         self.assertTrue(
