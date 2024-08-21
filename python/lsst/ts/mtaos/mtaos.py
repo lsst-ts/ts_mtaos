@@ -245,11 +245,10 @@ class MTAOS(salobj.ConfigurableCsc):
             ofc_config_dir = None
 
         ofc_data = OFCData(
+            name=config.instrument,
             config_dir=ofc_config_dir,
             log=self.log,
         )
-
-        await ofc_data.configure_instrument(config.instrument)
 
         self.log.debug("ofc data ready. Creating model")
 
@@ -556,6 +555,13 @@ class MTAOS(salobj.ConfigurableCsc):
                 )
 
             config = yaml.safe_load(data.config) if len(data.config) > 0 else dict()
+
+            # Set the ofc_data values based on configuration
+            # This is needed to set what degrees of freedom will be used,
+            # how many zernikes, etc.
+            self.log.debug("Customizing OFC parameters.")
+            await self.model.set_ofc_data_values(**config)
+
             # If this call fails (raise an exeception), command will be
             # rejected.
             # This is not a coroutine so it will block the event loop. Need

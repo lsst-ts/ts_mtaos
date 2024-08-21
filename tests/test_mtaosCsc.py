@@ -289,8 +289,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             remote.evt_m1m3Correction.flush()
             remote.evt_m2Correction.flush()
 
+            # set control algorithm
+            config = dict(filter_name="G", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+
             await remote.cmd_addAberration.set_start(
-                wf=np.zeros(19), timeout=STD_TIMEOUT
+                wf=np.zeros(19), config=yaml.safe_dump(config), timeout=STD_TIMEOUT
             )
 
             await self.assert_next_sample(
@@ -328,7 +331,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             remote.evt_m2Correction.flush()
 
             # set control algorithm
-            config = dict(xref="x0")
+            config = dict(xref="x0", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
 
             await remote.cmd_addAberration.set_start(
                 wf=np.zeros(19), config=yaml.safe_dump(config), timeout=STD_TIMEOUT
@@ -354,7 +357,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
             # Change alpha
-            config = dict(alpha=(self.csc.model.ofc.ofc_data.alpha / 2).tolist())
+            config = dict(
+                alpha=(self.csc.model.ofc.ofc_data.alpha / 2).tolist(),
+                sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8],
+            )
 
             await remote.cmd_addAberration.set_start(
                 wf=np.zeros(19), config=yaml.safe_dump(config), timeout=STD_TIMEOUT
@@ -386,7 +392,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 M1M3Bend=np.zeros(20, dtype=bool).tolist(),
                 M2Bend=np.zeros(20, dtype=bool).tolist(),
             )
-            config = dict(comp_dof_idx=new_comp_dof_idx)
+            config = dict(
+                comp_dof_idx=new_comp_dof_idx, sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8]
+            )
 
             await remote.cmd_addAberration.set_start(
                 wf=np.zeros(19), config=yaml.safe_dump(config), timeout=STD_TIMEOUT
