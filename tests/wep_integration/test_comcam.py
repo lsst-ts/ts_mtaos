@@ -52,6 +52,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
             .read()
         )
         ofc_data.dof_state0 = dof_state0
+        ofc_data.zn_selected = np.arange(4, 23)  # Use only from zk4-zk22
 
         data_path = os.path.join(
             getModulePathWep(), "tests", "testData", "gen3TestRepo"
@@ -117,7 +118,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         # coefficients is always the same.
         self.assertEqual(
             len(zk_avg[93]),
-            len(self.model.ofc.ofc_data.zn3_idx),
+            len(self.model.ofc.ofc_data.zn_idx),
             msg="Wrong size of zernike coefficients in sensor 93.",
         )
         self.assertTrue(
@@ -125,7 +126,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             len(zk_avg[94]),
-            len(self.model.ofc.ofc_data.zn3_idx),
+            len(self.model.ofc.ofc_data.zn_idx),
             msg="Wrong size of zernike coefficients in sensor 94.",
         )
         self.assertTrue(
