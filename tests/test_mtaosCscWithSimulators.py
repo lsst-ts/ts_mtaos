@@ -30,6 +30,7 @@ from lsst.ts import mtaos, salobj
 # standard command timeout (sec)
 SHORT_TIMEOUT = 5
 STD_TIMEOUT = 60
+TEST_CONFIG_DIR = Path(__file__).parents[1].joinpath("tests", "testData", "config")
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
@@ -334,6 +335,120 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             assert len(self.cam_hex_corrections) == 1
             assert len(self.m2_corrections) == 1
             assert len(self.m1m3_corrections) == 1
+
+    async def test_stress_below_limit(self):
+        # Scenario where stress is below the limit,
+        # so no scaling or truncation should happen
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await self._simulateCSCs()
+            await self._startCsc()
+            remote = self._getRemote()
+
+            dof_aggr = np.zeros(50)
+            dof_aggr[11] = 1.0
+
+            remote.evt_degreeOfFreedom.flush()
+            await remote.cmd_offsetDOF.set_start(value=dof_aggr, timeout=STD_TIMEOUT)
+
+            updated_dof = await self.assert_next_sample(
+                remote.evt_degreeOfFreedom, flush=False, timeout=STD_TIMEOUT
+            )
+            # Assert the DOF didn't change
+            np.testing.assert_array_equal(updated_dof.aggregatedDoF, dof_aggr)
+
+            # Check final total stress is smaller or equal than the limit
+            final_total_stress = await self.assert_next_sample(
+                remote.evt_mirrorStresses
+            )
+            self.assertLessEqual(
+                final_total_stress.stressM1M3, self.csc.m1m3_stress_limit
+            )
+
+    async def test_stress_above_limit_scale(self):
+        # Scenario where stress is above the
+        # limit and sclaing approach is used
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await self.assert_next_summary_state(salobj.State.STANDBY)
+            await self._simulateCSCs()
+            remote = self._getRemote()
+
+            await remote.cmd_start.set_start(
+                configurationOverride="valid_scale.yaml", timeout=STD_TIMEOUT
+            )
+
+            await self._startCsc()
+
+            bending_stresses = self.csc.model.ofc.ofc_data.bending_mode_stresses[
+                "M1M3"
+            ]["bending_mode_stress_positive"]
+
+            dof_aggr = np.zeros(50)
+            dof_aggr[15] = 100.0
+
+            remote.evt_degreeOfFreedom.flush()
+            await remote.cmd_offsetDOF.set_start(value=dof_aggr, timeout=STD_TIMEOUT)
+
+            updated_dof = await self.assert_next_sample(
+                remote.evt_degreeOfFreedom, flush=False, timeout=STD_TIMEOUT
+            )
+
+            self.assertAlmostEqual(
+                updated_dof.aggregatedDoF[15],
+                self.csc.m1m3_stress_limit
+                / (self.csc.stress_scale_factor * bending_stresses[5]),
+                places=7,
+            )
+
+            # Check final total stress is smaller or equal than the limit
+            final_total_stress = await self.assert_next_sample(
+                remote.evt_mirrorStresses
+            )
+            self.assertLessEqual(
+                final_total_stress.stressM1M3, self.csc.m1m3_stress_limit
+            )
+
+    async def test_stress_above_limit_truncate(self):
+        # Scenario where stress is above the
+        # limit and truncation approach is used
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await self._simulateCSCs()
+            await self._startCsc()
+            remote = self._getRemote()
+
+            dof_aggr = np.zeros(50)
+            dof_aggr[10:30] = 10.0
+
+            remote.evt_degreeOfFreedom.flush()
+            await remote.cmd_offsetDOF.set_start(value=dof_aggr, timeout=STD_TIMEOUT)
+
+            updated_dof = await self.assert_next_sample(
+                remote.evt_degreeOfFreedom, flush=False, timeout=STD_TIMEOUT
+            )
+
+            # Ensure that higher-order bending modes were set to 0
+            self.assertEqual(updated_dof.aggregatedDoF[29], 0)
+            # Ensure the first element was not truncated
+            self.assertEqual(updated_dof.aggregatedDoF[10], 10.0)
+
+            # Check final total stress is smaller or equal than the limit
+            final_total_stress = await self.assert_next_sample(
+                remote.evt_mirrorStresses
+            )
+            self.assertLessEqual(
+                final_total_stress.stressM1M3, self.csc.m1m3_stress_limit
+            )
 
     async def asyncTearDown(self):
         await self._cancelCSCs()

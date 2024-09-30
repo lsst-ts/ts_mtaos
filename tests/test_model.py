@@ -163,8 +163,18 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
     def test_get_dof_aggr(self):
         self.assertEqual(len(self.model.get_dof_aggr()), 50)
 
+    def test_set_dof_aggr(self):
+        new_dof_aggr = np.zeros(50)
+        self.model.set_dof_aggr(new_dof_aggr)
+
+        self.assertTrue(np.all(self.model.get_dof_aggr() == new_dof_aggr))
+
     def test_get_dof(self):
         self.assertEqual(len(self.model.get_dof_lv()), 50)
+
+    def test_get_bending_mode_stresses(self):
+        result = self.model.get_m1m3_bending_mode_stresses()
+        self.assertEqual(len(result), 20)
 
     def test_add_correction(self):
         wavefront_erros = np.zeros(19)

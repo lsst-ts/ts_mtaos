@@ -2,6 +2,15 @@
 Version History
 ===============
 
+v0.16.0
+-------
+
+* Add bending mode safety limits to prevent corrections from exceeding the mirror stress limits.
+
+* Add unit tests for the new safety limits.
+
+* Add `pubEvent_mirrorStresses` method to publish mirror stresses.
+
 v0.15.0
 -------
 

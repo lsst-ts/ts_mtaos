@@ -292,6 +292,12 @@ class MTAOS(salobj.ConfigurableCsc):
         else:
             self.wep_config = dict()
 
+        # Set the stress scale approach, factor, and limits
+        self.stress_scale_approach = config.stress_scale_approach
+        self.stress_scale_factor = config.stress_scale_factor
+        self.m1m3_stress_limit = config.m1m3_stress_limit
+        self.m2_stress_limit = config.m2_stress_limit
+
         self.log.debug("MTAOS configuration completed.")
 
     async def end_enable(self, data):
@@ -389,6 +395,7 @@ class MTAOS(salobj.ConfigurableCsc):
             # succedded and generate a report at the end. Also, if it fails,
             # it raises an exception and the command is rejected.
             await self.handle_corrections()
+            await self.pubEvent_mirrorStresses()
 
     async def do_rejectCorrection(self, data):
         """Reject the most recent wavefront correction.
@@ -666,10 +673,11 @@ class MTAOS(salobj.ConfigurableCsc):
 
             self.model.offset_dof(offset=np.array(data.value))
 
-            await self.pubEvent_degreeOfFreedom()
             # if the corrections fails it will republish the dof event
             # after undoing the offsets.
             await self.handle_corrections()
+            await self.pubEvent_degreeOfFreedom()
+            await self.pubEvent_mirrorStresses()
 
     async def do_resetOffsetDOF(self, data: salobj.type_hints.BaseDdsDataType) -> None:
         """Implement command reset offset dof.
@@ -696,10 +704,94 @@ class MTAOS(salobj.ConfigurableCsc):
 
             self.model.reset_wfe_correction()
 
-            await self.pubEvent_degreeOfFreedom()
             # if the corrections fails it will republish the dof event
             # after undoing the offsets.
             await self.handle_corrections()
+            await self.pubEvent_degreeOfFreedom()
+            await self.pubEvent_mirrorStresses()
+
+    def apply_stress_correction(
+        self,
+        stresses: np.ndarray[float],
+        stress_limit: float,
+        dof_aggr: np.ndarray[float],
+        start_idx: int,
+        end_idx: int,
+    ) -> np.ndarray[float]:
+        """
+        Apply the stress correction by either scaling or
+        truncating bending modes to keep the total stress within limits.
+
+        Parameters
+        ----------
+        stresses : np.ndarray
+            The individual bending mode stresses on the mirror.
+        stress_limit : float
+            The maximum allowable stress on the mirror.
+        dof_aggr : np.ndarray
+            The aggregated degrees of freedom.
+        start_idx : int
+            The starting index of the bending modes.
+        end_idx : int
+            The ending index of the bending modes.
+
+        Returns
+        -------
+        np.ndarray
+            The updated degrees of freedom with the stress correction applied.
+        """
+
+        # Get the bending modes within the specified range
+        bending_modes = dof_aggr[start_idx:end_idx].copy()
+        stress = self.stress_scale_factor * np.sqrt(np.sum(np.square(stresses)))
+
+        # Check if the stress is over the limit
+        if stress > stress_limit:
+            self.log.warning(
+                f"Stress {stress:.2f} psi is above the limit {stress_limit:.2f} psi. Applying correction."
+            )
+
+            if self.stress_scale_approach == "scale":
+                self.log.warning(
+                    "Using scale approach. Applying the same correction but with a lower amplitude."
+                )
+
+                scale = stress_limit / stress
+                bending_modes *= scale
+
+            elif self.stress_scale_approach == "truncate":
+                self.log.warning(
+                    "Using truncate approach. Truncating the correction"
+                    " to only apply lower-order bending modes."
+                )
+
+                for i in reversed(range(len(bending_modes))):
+                    if stress <= stress_limit:
+                        break  # RSS is within limits, stop truncating
+
+                    # Set the highest remaining bending mode to zero
+                    stresses[i] = 0
+                    bending_modes[i] = 0
+
+                    # Recalculate RSS with the truncated modes
+                    stress = self.stress_scale_factor * np.sqrt(
+                        np.sum(np.square(stresses))
+                    )
+
+                self.log.warning(
+                    f"After truncating, the new total stress is {stress:.2f} psi, "
+                    f"which is {'within' if stress <= stress_limit else 'above'} the limit."
+                )
+
+            # Update the dof_aggr with the modified bending modes
+            dof_aggr[start_idx:end_idx] = bending_modes.copy()
+
+        else:
+            self.log.info(
+                f"Stress {stress:.2f} psi is within the limit {stress_limit:.2f} psi. Applying correction."
+            )
+
+        return dof_aggr
 
     async def handle_corrections(self):
         """Handle applying the corrections to all components.
@@ -713,6 +805,27 @@ class MTAOS(salobj.ConfigurableCsc):
         RuntimeError:
             If one or more correction failed.
         """
+
+        aggr_dof = self.model.get_dof_aggr()
+
+        # Ensure the bending modes are within stress limits,
+        # otherwise modify them to be within the limits.
+        m1m3_stresses = self.model.get_m1m3_bending_mode_stresses()
+        m2_stresses = self.model.get_m2_bending_mode_stresses()
+
+        # Apply the stress correction to the M1M3 mirror
+        dof_aggr_m1m3_stress_corrected = self.apply_stress_correction(
+            m1m3_stresses, self.m1m3_stress_limit, aggr_dof, 10, 30
+        )
+
+        # Apply the stress correction to the M2 mirror
+        dof_aggr_stress_corrected = self.apply_stress_correction(
+            m2_stresses, self.m2_stress_limit, dof_aggr_m1m3_stress_corrected, 30, 50
+        )
+
+        # Update the model with the corrected degrees of freedom
+        self.model.set_dof_aggr(dof_aggr_stress_corrected)
+        self.model.get_updated_corrections()
 
         # Issue all corrections concurrently. If any of them fails, undo
         # corrections and reject command.
@@ -852,7 +965,6 @@ class MTAOS(salobj.ConfigurableCsc):
             If `True` apply the negative value of each correction.
 
         """
-
         z_forces = self.model.m1m3_correction()
 
         if undo:
@@ -946,6 +1058,31 @@ class MTAOS(salobj.ConfigurableCsc):
             aggregatedDoF=dofAggr,
             visitDoF=dofVisit,
             force_output=True,
+        )
+
+    async def pubEvent_mirrorStresses(self):
+        """Publish the calculated mirror stresses
+        from the applied degrees of freedom.
+
+        OFC: Optical feedback control.
+        """
+
+        self._logExecFunc()
+
+        m1m3_stresses = self.model.get_m1m3_bending_mode_stresses()
+        m2_stresses = self.model.get_m2_bending_mode_stresses()
+
+        # Calculate the total stress on the mirror
+        m1m3_total_stress = self.stress_scale_factor * np.sqrt(
+            np.sum(np.square(m1m3_stresses))
+        )
+        m2_total_stress = self.stress_scale_factor * np.sqrt(
+            np.sum(np.square(m2_stresses))
+        )
+
+        await self.evt_mirrorStresses.set_write(
+            stressM2=m2_total_stress,
+            stressM1M3=m1m3_total_stress,
         )
 
     async def pubEvent_rejectedDegreeOfFreedom(self):
