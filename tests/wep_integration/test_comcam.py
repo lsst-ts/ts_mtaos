@@ -52,7 +52,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
             .read()
         )
         ofc_data.dof_state0 = dof_state0
-        ofc_data.zn_selected = np.arange(4, 23)  # Use only from zk4-zk22
+        ofc_data.zn_selected = np.arange(4, 29)  # Use only from zk4-zk22
 
         data_path = os.path.join(
             getModulePathWep(), "tests", "testData", "gen3TestRepo"
