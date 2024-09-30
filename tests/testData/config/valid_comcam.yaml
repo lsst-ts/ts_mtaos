@@ -13,3 +13,7 @@ pipeline_n_processes: 123
 zernike_table_name: zernikeEstimateRawTest
 reference_detector: 2
 visit_id_offset: 4000000000000
+m1m3_stress_limit: 137900.0 # Pascals (approx. 20 psi)
+m2_stress_limit: 344737.0 # Pascals (approx. 50 psi)
+stress_scale_approach: "truncate"
+stress_scale_factor: 1.25

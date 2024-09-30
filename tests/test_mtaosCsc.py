@@ -172,6 +172,20 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(self.csc.model.run_name, config_data["run_name"])
                 self.assertEqual(self.csc.model.collections, config_data["collections"])
                 self.assertEqual(
+                    self.csc.m1m3_stress_limit, config_data["m1m3_stress_limit"]
+                )
+                self.assertEqual(
+                    self.csc.m2_stress_limit, config_data["m2_stress_limit"]
+                )
+                self.assertEqual(
+                    self.csc.stress_scale_approach,
+                    config_data["stress_scale_approach"],
+                )
+                self.assertEqual(
+                    self.csc.stress_scale_factor,
+                    config_data["stress_scale_factor"],
+                )
+                self.assertEqual(
                     self.csc.model.pipeline_instrument,
                     config_data["pipeline_instrument"],
                 )
