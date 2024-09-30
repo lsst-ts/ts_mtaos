@@ -36,7 +36,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v4
+title: MTAOS v5
 description: Schema for MTAOS configuration files
 type: object
 
@@ -117,10 +117,36 @@ properties:
       A yaml configuration file to use as default values for the wep.
     type: string
 
+  m1m3_stress_limit:
+    description: >-
+      Stress limit for M1M3 in psi.
+    type: number
+
+  m2_stress_limit:
+    description: >-
+      Stress limit for M2 in psi.
+    type: number
+
+  stress_scale_approach:
+    description: >-
+      Approach to scale the bending modes.
+    type: string
+    enum: [scale, truncate]
+
+  stress_scale_factor:
+    description: >-
+      Factor to scale the bending modes when rss'ing
+      the individual bending mode stresses.
+    type: number
+
 required:
   - camera
   - instrument
   - data_path
+  - m1m3_stress_limit
+  - m2_stress_limit
+  - stress_scale_approach
+  - stress_scale_factor
 
 additionalProperties: false
 """

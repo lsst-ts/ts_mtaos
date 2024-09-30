@@ -36,7 +36,7 @@ import numpy as np
 import yaml
 from lsst.afw.image import VisitInfo
 from lsst.daf import butler as dafButler
-from lsst.ts.ofc import OFC
+from lsst.ts.ofc import OFC, BendModeToForce
 from lsst.ts.ofc.utils.ofc_data_helpers import get_intrinsic_zernikes, get_sensor_names
 from lsst.ts.salobj import DefaultingValidator
 from lsst.ts.utils import make_done_future
@@ -360,6 +360,19 @@ class Model:
 
         return self.ofc.controller.aggregated_state
 
+    def set_dof_aggr(self, dof_aggr):
+        """Set the aggregated DOF.
+
+        DOF: Degree of freedom.
+
+        Parameters
+        ----------
+        dof_aggr : `numpy.ndarray`
+            Aggregated DOF.
+        """
+
+        self.ofc.controller.set_aggregated_state(dof_aggr)
+
     def get_dof_lv(self):
         """Get the DOF correction from the last visit.
 
@@ -372,6 +385,40 @@ class Model:
         """
 
         return self.ofc.lv_dof
+
+    def get_m1m3_bending_mode_stresses(self) -> np.ndarray:
+        """Get the total M1M3 mirror stresses per bending mode.
+
+        Returns
+        -------
+        np.ndarray
+            Bending mode stresses for M1M3.
+        """
+        m1m3_bending_mode = BendModeToForce("M1M3", self.ofc.ofc_data)
+        indices = self.ofc.ofc_data.dof_indices["M1M3_bending"]
+
+        m1m3_stresses = m1m3_bending_mode.get_stresses_from_dof(
+            self.ofc.controller.aggregated_state[indices[0] : indices[1]]
+        )
+
+        return m1m3_stresses
+
+    def get_m2_bending_mode_stresses(self) -> np.ndarray:
+        """Get the total M2 mirror stresses per bending mode.
+
+        Returns
+        -------
+        np.ndarray
+            Bending mode stresses for M2.
+        """
+        m2_bending_mode = BendModeToForce("M2", self.ofc.ofc_data)
+        indices = self.ofc.ofc_data.dof_indices["M2_bending"]
+
+        m2_stresses = m2_bending_mode.get_stresses_from_dof(
+            self.ofc.controller.aggregated_state[indices[0] : indices[1]]
+        )
+
+        return m2_stresses
 
     def reject_correction(self):
         """Reject the correction of subsystems."""
@@ -419,6 +466,15 @@ class Model:
         # applied dof not the aggregated one.
         self.ofc.lv_dof = offset
 
+        (
+            self.m2_hexapod_correction,
+            self.cam_hexapod_correction,
+            self.m1m3_correction,
+            self.m2_correction,
+        ) = self.ofc.get_all_corrections()
+
+    def get_updated_corrections(self):
+        """Get the updated corrections."""
         (
             self.m2_hexapod_correction,
             self.cam_hexapod_correction,
