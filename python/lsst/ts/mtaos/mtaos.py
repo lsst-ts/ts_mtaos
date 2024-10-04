@@ -1031,6 +1031,9 @@ class MTAOS(salobj.ConfigurableCsc):
             z_forces = np.negative(z_forces)
 
         try:
+            await self.remotes["m2"].cmd_resetForceOffsets.start(
+                timeout=self.DEFAULT_TIMEOUT
+            )
             await self.remotes["m2"].cmd_applyForces.set_start(
                 timeout=self.DEFAULT_TIMEOUT, axial=z_forces
             )
