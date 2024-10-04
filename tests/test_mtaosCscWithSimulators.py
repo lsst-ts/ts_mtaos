@@ -482,19 +482,19 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         )
         self.cscM2.cmd_applyForces.callback = self.m2_apply_forces_callbck
 
-    def hexapod_move_callbck(self, data):
+    async def hexapod_move_callbck(self, data):
         if data.salIndex == mtaos.utility.MTHexapodIndex.M2.value:
             self.m2_hex_corrections.append(data)
         else:
             self.cam_hex_corrections.append(data)
 
-    def m1m3_apply_forces_callbck(self, data):
+    async def m1m3_apply_forces_callbck(self, data):
         self.m1m3_corrections.append(data)
 
-    def m1m3_apply_forces_fail_callbck(self, data):
+    async def m1m3_apply_forces_fail_callbck(self, data):
         raise RuntimeError("This is a test.")
 
-    def m2_apply_forces_callbck(self, data):
+    async def m2_apply_forces_callbck(self, data):
         self.m2_corrections.append(data)
 
     async def _startCsc(self):
