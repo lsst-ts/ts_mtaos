@@ -477,10 +477,14 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
         self.cscM2Hex.cmd_move.callback = self.hexapod_move_callbck
         self.cscCamHex.cmd_move.callback = self.hexapod_move_callbck
+        self.cscM1M3.cmd_clearActiveOpticForces.callback = (
+            self.m1m3_clear_active_optic_forces_callback
+        )
         self.cscM1M3.cmd_applyActiveOpticForces.callback = (
             self.m1m3_apply_forces_callbck
         )
         self.cscM2.cmd_applyForces.callback = self.m2_apply_forces_callbck
+        self.cscM2.cmd_resetForceOffsets.callback = self.m2_reset_force_offsets_callback
 
     async def hexapod_move_callbck(self, data):
         if data.salIndex == mtaos.utility.MTHexapodIndex.M2.value:
@@ -488,11 +492,17 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         else:
             self.cam_hex_corrections.append(data)
 
+    async def m1m3_clear_active_optic_forces_callback(self, data):
+        await asyncio.sleep(1.0)
+
     async def m1m3_apply_forces_callbck(self, data):
         self.m1m3_corrections.append(data)
 
     async def m1m3_apply_forces_fail_callbck(self, data):
         raise RuntimeError("This is a test.")
+
+    async def m2_reset_force_offsets_callback(self, data):
+        await asyncio.sleep(1.0)
 
     async def m2_apply_forces_callbck(self, data):
         self.m2_corrections.append(data)
