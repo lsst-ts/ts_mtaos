@@ -2,6 +2,13 @@
 Version History
 ===============
 
+v0.16.1
+-------
+
+* Publish mirror stresses when using `runOFC` command.
+
+* Publish corrections when using `offsetDOF` command.
+
 v0.16.0
 -------
 
