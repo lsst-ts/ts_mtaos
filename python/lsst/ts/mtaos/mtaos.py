@@ -584,6 +584,7 @@ class MTAOS(salobj.ConfigurableCsc):
             self.log.debug("Calculate the subsystem correction successfully.")
 
             await self.pubEvent_degreeOfFreedom()
+            await self.pubEvent_mirrorStresses()
             await self.pubEvent_m2HexapodCorrection()
             await self.pubEvent_cameraHexapodCorrection()
             await self.pubEvent_m1m3Correction()
@@ -678,6 +679,10 @@ class MTAOS(salobj.ConfigurableCsc):
             await self.handle_corrections()
             await self.pubEvent_degreeOfFreedom()
             await self.pubEvent_mirrorStresses()
+            await self.pubEvent_m2HexapodCorrection()
+            await self.pubEvent_cameraHexapodCorrection()
+            await self.pubEvent_m1m3Correction()
+            await self.pubEvent_m2Correction()
 
     async def do_resetOffsetDOF(self, data: salobj.type_hints.BaseDdsDataType) -> None:
         """Implement command reset offset dof.
