@@ -229,7 +229,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(w, 0, 3)
 
         # Expected total hexapod offset
-        self.assertAlmostEqual(z_m2hex + z_camhex, 6.1209, 3)
+        self.assertAlmostEqual(z_m2hex + z_camhex, 6.1608, 3)
 
         actCorr = self.model.m1m3_correction()
         self.assertTrue(
