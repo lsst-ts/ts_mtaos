@@ -106,6 +106,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(data), 2)
 
         zk_tuple = self.model.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
+        print(zk_tuple)
         zk_indices = zk_tuple[0]
         zk_avg = zk_tuple[1]
 

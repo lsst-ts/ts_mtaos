@@ -103,11 +103,8 @@ class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
         # sensor.
         self.assertEqual(len(data), 4)
 
-        (
-            zk_indices,
-            zk_avg,
-        ) = self.model.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
-
+        zk_avg = self.model.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
+        print(zk_avg)
         # The sensors with data are 191, 195, 199 and 203
         self.assertTrue(191 in zk_avg)
         self.assertTrue(195 in zk_avg)
