@@ -21,7 +21,9 @@
 
 import unittest
 
+import astropy.units as u
 import numpy as np
+from astropy.table import QTable
 from lsst.ts.mtaos import WavefrontCollection
 
 
@@ -44,9 +46,22 @@ class TestWavefrontCollection(unittest.TestCase):
         self.assertEqual(self.wavefront_collection.getNumOfData(), 1)
 
     def _prepareListOfWfErr(self):
+        dtype = [("label", "<U12")]
+        for j in range(4, 22):
+            dtype.append((f"Z{j}", "<f4"))
+
+        table = QTable(dtype=dtype)
+        table.add_row(
+            {
+                "label": "average",
+                **{f"Z{j}": np.random.rand(1) * u.micron for j in range(4, 22)},
+            }
+        )
+
         listSensorId = [1, 2]
-        listSensorZk = [np.random.rand(19)] * 2
-        return self._getListOfWfErr(listSensorId, listSensorZk)
+        tables_list = [table] * 2
+
+        return self._getListOfWfErr(listSensorId, tables_list)
 
     def _getListOfWfErr(self, listSensorId, listSensorZk):
         listOfWfErr = list(zip(listSensorId, listSensorZk))
@@ -99,7 +114,7 @@ class TestWavefrontCollection(unittest.TestCase):
 
         self.assertEqual(len(listOfWfErrAvg), 3)
         for sensor_id in listOfWfErrAvg:
-            self.assertTrue(np.all(listOfWfErrAvg[sensor_id] == 1.0))
+            self.assertTrue(np.all(listOfWfErrAvg[sensor_id][1] == 1.0))
 
     def _collectListOfWfErrForAvgTest(self):
         self._collectListOfWfErrForAvgTestSgl([1, 2, 3], [np.ones(19)] * 3)
@@ -121,8 +136,8 @@ class TestWavefrontCollection(unittest.TestCase):
 
         self.assertEqual(len(listOfWfErrAvg), 3)
         for sensor_id in listOfWfErrAvg:
-            self.assertEqual(len(listOfWfErrAvg[sensor_id]), 19)
-            self.assertTrue(np.all(listOfWfErrAvg[sensor_id] == 2.0))
+            self.assertEqual(len(listOfWfErrAvg[sensor_id][1]), 19)
+            self.assertTrue(np.all(listOfWfErrAvg[sensor_id][1] == 2.0))
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithMultiDataAndMissData(self):
         # There are 3 sensor data hera

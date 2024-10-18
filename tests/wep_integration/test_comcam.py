@@ -105,7 +105,9 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         # There is one element for each sensor, 2 sensors have data.
         self.assertEqual(len(data), 2)
 
-        zk_avg = self.model.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
+        zk_tuple = self.model.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
+        zk_indices = zk_tuple[0]
+        zk_avg = zk_tuple[1]
 
         # The sensors with data are 93 and 94
         self.assertTrue(93 in zk_avg)
@@ -132,6 +134,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             np.argmax(np.abs(zk_avg[94])) in self.zernike_coefficient_maximum_expected
         )
+        self.assertTrue(len(zk_indices) == len(zk_avg))
 
     async def test_interrupt_wep_process(self):
         task = asyncio.create_task(
