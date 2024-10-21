@@ -24,6 +24,7 @@ __all__ = ["WavefrontCollection"]
 from collections import deque
 
 import numpy as np
+from astropy.table import Table
 
 
 class WavefrontCollection(object):
@@ -69,18 +70,20 @@ class WavefrontCollection(object):
 
         return self._numDataTaken
 
-    def append(self, listOfWfErr):
+    def append(self, zernikes_data):
         """Add the list of wavefront error data to collection.
 
         Parameters
         ----------
-        listOfWfErr : `list` of `tuple` with [`int`, `np.ndarray`]
+        zernikes_data : `list` of `tuple` with [`int`, `astropy.table.QTable`]
+        or `list` of `tuple` with [`int`, `np.ndarray`]
             List of wavefront error data. Each element contains tuple which the
-            first elements specify the sensor id and the second is an array
-            with the zernike coeffients.
+            first elements specify the sensor id and the second is an astropy
+            table with the zernike coeffients or an array with zernike
+            coefficients.
         """
 
-        self._collectionData.append(listOfWfErr)
+        self._collectionData.append(zernikes_data)
 
     def pop(self):
         """Pop the list of wavefront error data from collection.
@@ -93,13 +96,33 @@ class WavefrontCollection(object):
 
         try:
             data = self._collectionData.popleft()
-            for sensor_id, zk in data:
-                if sensor_id in self._collectionDataTaken:
-                    self._collectionDataTaken[sensor_id] = np.vstack(
-                        (self._collectionDataTaken[sensor_id], zk)
+            for sensor_id, zernikes_data in data:
+                if isinstance(zernikes_data, Table):
+                    zk_indices = np.array(
+                        [
+                            int(col[1:])
+                            for col in zernikes_data.colnames
+                            if col.startswith("Z")
+                        ]
                     )
-                else:
-                    self._collectionDataTaken[sensor_id] = np.array(zk, ndmin=2)
+
+                    z_columns = [
+                        col for col in zernikes_data.colnames if col.startswith("Z")
+                    ]
+                    average_row = zernikes_data[zernikes_data["label"] == "average"][0]
+                    zk_values = np.array([average_row[col] for col in z_columns])
+
+                    self._collectionDataTaken[sensor_id] = (zk_indices, zk_values)
+
+                elif isinstance(zernikes_data, np.ndarray):
+                    if sensor_id in self._collectionDataTaken:
+                        self._collectionDataTaken[sensor_id] = np.vstack(
+                            (self._collectionDataTaken[sensor_id], zernikes_data)
+                        )
+                    else:
+                        self._collectionDataTaken[sensor_id] = np.array(
+                            zernikes_data, ndmin=2
+                        )
             self._numDataTaken += 1
         except IndexError:
             data = []
@@ -127,19 +150,29 @@ class WavefrontCollection(object):
             No data in the collection of taken data.
         """
 
-        # Check there is the wavefront error data in collection or not
         if len(self._collectionDataTaken) == 0:
             raise RuntimeError("No data in the collection of taken data.")
 
-        wfe_avg = dict(
-            [
-                (
-                    sensor_id,
-                    np.mean(np.array(self._collectionDataTaken[sensor_id]), axis=0),
-                )
-                for sensor_id in self._collectionDataTaken
-            ]
-        )
+        first_entry = next(iter(self._collectionDataTaken.values()))
+        if isinstance(first_entry, tuple):
+            wfe_avg = self._collectionDataTaken.copy()
+        else:
+            wfe_avg = dict(
+                [
+                    (
+                        sensor_id,
+                        (
+                            np.arange(
+                                4, len(self._collectionDataTaken[sensor_id][0]) + 4
+                            ),
+                            np.mean(
+                                np.array(self._collectionDataTaken[sensor_id]), axis=0
+                            ),
+                        ),
+                    )
+                    for sensor_id in self._collectionDataTaken
+                ]
+            )
 
         self._collectionDataTaken = dict()
         self._numDataTaken = 0

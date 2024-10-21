@@ -69,7 +69,7 @@ class Model:
         pipeline_n_processes=9,
         data_instrument_name=None,
         reference_detector=0,
-        zernike_table_name="zernikeEstimateRaw",
+        zernike_table_name="zernikes",
     ):
         """MTAOS model class.
 
@@ -110,7 +110,7 @@ class Model:
             Which detector to use as a referece to construct the WCS.
         zernike_table_name : `str`, optional
             Name of the table in the butler with zernike coeffients.
-            Default is "zernikeEstimateRaw".
+            Default is "zernikes".
 
         Attributes
         ----------
@@ -140,7 +140,7 @@ class Model:
             Which detector to use as a referece to construct the WCS.
         zernike_table_name : `str`, optional
             Name of the table in the butler with zernike coeffients.
-            Default is "zernikeEstimateRaw".
+            Default is "zernikes".
         wep_configuration_validation : `dict`
             Dictionary to store schema validations for wavefront estimation
             pipeline tasks.
@@ -1101,9 +1101,11 @@ class Model:
             No FWHM sensor data to use.
         """
         try:
-            sensor_ids, wfe = self.get_wavefront_errors()
+            sensor_ids, zk_indices, wfe = self.get_wavefront_errors()
 
-            self._calculate_corrections(wfe=wfe, sensor_ids=sensor_ids, **kwargs)
+            self._calculate_corrections(
+                wfe=wfe, zk_indices=zk_indices, sensor_ids=sensor_ids, **kwargs
+            )
 
         finally:
             # Clear the queue
@@ -1116,6 +1118,8 @@ class Model:
         -------
         sensor_ids : `np.ndarray [int]`
             Array with sensor ids.
+        zk_indices: `np.ndarray [int]`
+            Array with the zernike noll indices used.
         wfe : `np.ndarray`
             Array of arrays with the zernike coeficients for each field index.
         """
@@ -1143,7 +1147,7 @@ class Model:
 
         return self.get_sensor_ids_wfe_from_data_container(wfe_data_container)
 
-    def _calculate_corrections(self, wfe, sensor_ids, **kwargs):
+    def _calculate_corrections(self, wfe, zk_indices, sensor_ids, **kwargs):
         """Compute corrections from input wavefront errors.
 
         Parameters
@@ -1151,6 +1155,8 @@ class Model:
         wfe : `np.ndarray`
             2D array with wavefront errors (in microns). Each element contains
             the wavefront errors for a specific field index.
+        zk_indices : `np.ndarray [int]`
+            Array with the zernike noll indices used.
         sensor_ids : `np.ndarray [int]`
             Array with sensor ids.
         **kwargs : `dict`
@@ -1160,6 +1166,7 @@ class Model:
                 filter_name: `string`
                     Name of the filter used for the observations.
         """
+        self.ofc.ofc_data.zn_selected = zk_indices
         rotation_angle = kwargs.get("rotation_angle", 0.0)
         filter_name = kwargs.get("filter_name", "")
 
@@ -1226,6 +1233,7 @@ class Model:
 
         self._calculate_corrections(
             wfe=final_wfe,
+            zk_indices=np.arange(4, wfe.shape[0] + 4),
             **(config if config is not None else dict()),
         )
 
@@ -1370,14 +1378,20 @@ class Model:
         -------
         sensor_ids : `np.ndarray [int]`
             Array with sensor ids.
+        zk_indices : `np.ndarray`
+            Array of arrays with the zernike indices.
         wfe : `np.ndarray`
-            Array of arrays with the zernike coeficients for each field index.
+            Array of arrays with the zernike coeficients.
         """
         sensor_ids = np.array([sensor_id for sensor_id in data_container])
 
-        wfe = np.array([data_container[sensor_id] for sensor_id in data_container])
+        zk_indices = np.array(
+            [data_container[sensor_id][0] for sensor_id in data_container]
+        )
 
-        return sensor_ids, wfe
+        wfe = np.array([data_container[sensor_id][1] for sensor_id in data_container])
+
+        return sensor_ids, zk_indices, wfe
 
     async def _close_pending_task(self, task: asyncio.Task) -> None:
         """Close a pending task and log any exception.
