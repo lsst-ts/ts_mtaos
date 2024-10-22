@@ -684,6 +684,21 @@ class Model:
             )
         )
 
+    async def query_ocps_results(self, run_name, intra_id, instrument):
+        """Query the OCPS results."""
+
+        if extra_id is None:
+            raise NotImplementedError("OCPS is not implemented for Main Camera.")
+
+        else:
+            self.wavefront_errors.append(
+                self._gather_outputs(
+                    run_name=run_name,
+                    visit_id=intra_id,
+                    instrument="comcam",
+                )
+            )
+
     @contextlib.asynccontextmanager
     async def handle_wep_process(
         self,
