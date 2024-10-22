@@ -521,7 +521,9 @@ class MTAOS(salobj.ConfigurableCsc):
                     self.execution_times["RUN_WEP"] = []
                 self.execution_times["RUN_WEP"].append(time.time() - start_time)
 
-            self.model.query_ocps_results("LSSTComCam/quickLook", intra_visit_id, extra_visit_id)
+            self.model.query_ocps_results(
+                "LSSTComCam/quickLook", intra_visit_id, extra_visit_id
+            )
         else:
             # timestamp command was sent in ISO 8601 compliant date-time format
             # (YYYY-MM-DDTHH:MM:SS.sss), removing invalid characters.
