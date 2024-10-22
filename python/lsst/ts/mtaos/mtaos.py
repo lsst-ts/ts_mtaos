@@ -510,11 +510,9 @@ class MTAOS(salobj.ConfigurableCsc):
                 }
 
                 start_time = time.time()
-                await asyncio.create_task(
-                    self.ocps.cmd_execute.set_start(
-                        config=json.dumps(config),
-                        timeout=self.DEFAULT_TIMEOUT,
-                    )
+                await self.ocps.cmd_execute.set_start(
+                    config=json.dumps(config),
+                    timeout=self.DEFAULT_TIMEOUT,
                 )
 
                 if "RUN_WEP" not in self.execution_times:

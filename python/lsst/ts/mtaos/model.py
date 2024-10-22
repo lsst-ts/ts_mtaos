@@ -690,7 +690,7 @@ class Model:
             raise NotImplementedError("OCPS is not implemented for Main Camera.")
         else:
             self.wavefront_errors.append(
-                self._gather_outputs(
+                self._poll_butler_outputs(
                     run_name=run_name,
                     visit_id=intra_id,
                     instrument="comcam",
@@ -1022,6 +1022,87 @@ class Model:
 
         return run_pipetask_cmd
 
+    async def _poll_butler_outputs(
+        self,
+        run_name: str,
+        visit_id: int,
+        instrument: str,
+        timeout: int = 60,
+        poll_interval: int = 5
+    ) -> list:
+        """
+        Poll the Butler for the outputs of a given run and visit id, with a timeout.
+        
+        Parameters
+        ----------
+        run_name : `str`
+            Name of the run.
+        visit_id : `int`
+            Id of the visit.
+        instrument : `str`
+            Camera used to take the data.
+        timeout : `int`, optional
+            Maximum time to wait for the outputs (in seconds).
+        poll_interval : `int`, optional
+            How often to poll for the data (in seconds).
+        
+        Returns
+        -------
+        `list`
+            List of wavefront errors from the Butler.
+        
+        Raises
+        ------
+        TimeoutError
+            If the dataset is not available within the specified timeout.
+        """
+        self.log.debug("Polling butler for WEP outputs.")
+        
+        butler = Butler(self.data_path)
+        start_time = time.time()
+
+        while True:
+            elapsed_time = time.time() - start_time
+            
+            # Query the dataset references
+            datasetRefs = list(
+                butler.registry.queryDatasets(
+                    datasetType="postISRCCD", collections=[run_name]
+                )
+            )
+            
+            if datasetRefs:
+                self.log.debug(f"Found dataset references: {datasetRefs}")
+                break
+
+            # Get output
+            data_ids = butler.registry.queryDatasets(
+                self.zernike_table_name,
+                collections=[run_name],
+            )
+            
+            # Check if timeout is exceeded
+            if elapsed_time > timeout:
+                raise TimeoutError(f"Timeout: Could not find outputs for run '{run_name}' and visit id '{visit_id}' within {timeout} seconds.")
+            
+            self.log.debug(f"Dataset not available yet. Waiting {poll_interval} seconds before retrying...")
+            time.sleep(poll_interval)  # Wait before next poll
+        
+        self.log.debug(f"run_name: {run_name}, visit_id: {visit_id} yielded: {data_ids}")
+        
+        # Return the gathered outputs
+        return [
+            (
+                data_id.dataId["detector"],
+                butler.get(
+                    self.zernike_table_name,
+                    dataId=data_id.dataId,
+                    collections=[run_name],
+                ),
+            )
+            for data_id in data_ids
+        ]
+        
     def _gather_outputs(
         self,
         run_name: str,
