@@ -684,12 +684,10 @@ class Model:
             )
         )
 
-    async def query_ocps_results(self, run_name, intra_id, instrument):
+    async def query_ocps_results(self, run_name, intra_id, extra_id):
         """Query the OCPS results."""
-
         if extra_id is None:
             raise NotImplementedError("OCPS is not implemented for Main Camera.")
-
         else:
             self.wavefront_errors.append(
                 self._gather_outputs(
