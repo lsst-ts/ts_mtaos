@@ -344,7 +344,6 @@ class Model:
         list[lsst.ts.wep.ctrlIntf.SensorWavefrontData]
             List of rejected wavefront error data.
         """
-
         return self.rejected_wavefront_errors.pop()
 
     def get_dof_aggr(self):
@@ -1100,6 +1099,7 @@ class Model:
         RuntimeError
             No FWHM sensor data to use.
         """
+
         try:
             sensor_ids, zk_indices, wfe = self.get_wavefront_errors()
 
@@ -1388,7 +1388,6 @@ class Model:
         zk_indices = np.array(
             [data_container[sensor_id][0] for sensor_id in data_container]
         )
-
         wfe = np.array([data_container[sensor_id][1] for sensor_id in data_container])
 
         return sensor_ids, zk_indices, wfe

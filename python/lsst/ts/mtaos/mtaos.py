@@ -1019,17 +1019,26 @@ class MTAOS(salobj.ConfigurableCsc):
         """
 
         self._logExecFunc()
+        self.model.get_wfe()
 
-        for sensor_id, (zernike_indices, zernike_values) in self.model.get_wavefront_errors():
+        for sensor_id, zernike_indices, zernike_values in zip(
+            *self.model.get_wavefront_errors()
+        ):
             annular_zernike_coeffs = np.zeros(19)
             for zernike_index, zernike_value in zip(zernike_indices, zernike_values):
                 position = zernike_index - 4
                 if 0 <= position < 19:
                     annular_zernike_coeffs[position] = zernike_value
+
+            zernike_indices_extended = np.zeros(100, dtype=int)
+            zernike_values_extended = np.full(100, np.nan)
+            zernike_indices_extended[: zernike_indices.size] = zernike_indices
+            zernike_values_extended[: zernike_values.size] = zernike_values
+
             await self.evt_wavefrontError.set_write(
                 sensorId=sensor_id,
-                nollZernikeIndices=zernike_indices,
-                nollZernikeValues=zernike_values,
+                nollZernikeIndices=zernike_indices_extended,
+                nollZernikeValues=zernike_values_extended,
                 annularZernikeCoeff=annular_zernike_coeffs,
                 force_output=True,
             )
@@ -1042,17 +1051,26 @@ class MTAOS(salobj.ConfigurableCsc):
         """
 
         self._logExecFunc()
+        self.model.get_rejected_wfe()
 
-        for sensor_id, (zernike_indices, zernike_values) in self.model.get_wavefront_errors():
+        for sensor_id, zernike_indices, zernike_values in zip(
+            *self.model.get_rejected_wavefront_errors()
+        ):
             annular_zernike_coeffs = np.zeros(19)
             for zernike_index, zernike_value in zip(zernike_indices, zernike_values):
                 position = zernike_index - 4
                 if 0 <= position < 19:
                     annular_zernike_coeffs[position] = zernike_value
+
+            zernike_indices_extended = np.zeros(100, dtype=int)
+            zernike_values_extended = np.full(100, np.nan)
+            zernike_indices_extended[: zernike_indices.size] = zernike_indices
+            zernike_values_extended[: zernike_values.size] = zernike_values
+
             await self.evt_rejectedWavefrontError.set_write(
                 sensorId=sensor_id,
-                nollZernikeIndices=zernike_indices,
-                nollZernikeValues=zernike_values,
+                nollZernikeIndices=zernike_indices_extended,
+                nollZernikeValues=zernike_values_extended,
                 annularZernikeCoeff=annular_zernike_coeffs,
                 force_output=True,
             )

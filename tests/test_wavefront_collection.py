@@ -51,10 +51,12 @@ class TestWavefrontCollection(unittest.TestCase):
             dtype.append((f"Z{j}", "<f4"))
 
         table = QTable(dtype=dtype)
+        for j in range(4, 22):
+            table[f"Z{j}"].unit = u.nm
         table.add_row(
             {
                 "label": "average",
-                **{f"Z{j}": np.random.rand(1) * u.micron for j in range(4, 22)},
+                **{f"Z{j}": np.random.rand(1) * u.nm for j in range(4, 22)},
             }
         )
 
@@ -99,10 +101,8 @@ class TestWavefrontCollection(unittest.TestCase):
         self.assertEqual(self.wavefront_collection.getNumOfDataTaken(), 0)
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithoutData(self):
-        self.assertRaises(
-            RuntimeError,
-            self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData,
-        )
+        with self.assertWarns(UserWarning):
+            self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData()
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithSglData(self):
         self._collectListOfWfErrForAvgTest()

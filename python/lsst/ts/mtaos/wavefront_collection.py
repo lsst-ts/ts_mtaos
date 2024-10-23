@@ -21,10 +21,12 @@
 
 __all__ = ["WavefrontCollection"]
 
+import warnings
 from collections import deque
 
+import astropy.units as u
 import numpy as np
-from astropy.table import Table
+from astropy.table import QTable
 
 
 class WavefrontCollection(object):
@@ -93,11 +95,10 @@ class WavefrontCollection(object):
         listOfWfErr : `tuple` with [`int`, `np.ndarray`]
             List of wavefront error data.
         """
-
         try:
             data = self._collectionData.popleft()
             for sensor_id, zernikes_data in data:
-                if isinstance(zernikes_data, Table):
+                if isinstance(zernikes_data, QTable):
                     zk_indices = np.array(
                         [
                             int(col[1:])
@@ -110,7 +111,9 @@ class WavefrontCollection(object):
                         col for col in zernikes_data.colnames if col.startswith("Z")
                     ]
                     average_row = zernikes_data[zernikes_data["label"] == "average"][0]
-                    zk_values = np.array([average_row[col] for col in z_columns])
+                    zk_values = np.array(
+                        [average_row[col].to(u.um).value for col in z_columns]
+                    )
 
                     self._collectionDataTaken[sensor_id] = (zk_indices, zk_values)
 
@@ -149,9 +152,12 @@ class WavefrontCollection(object):
         RuntimeError
             No data in the collection of taken data.
         """
-
-        if len(self._collectionDataTaken) == 0:
-            raise RuntimeError("No data in the collection of taken data.")
+        if not self._collectionDataTaken:
+            warnings.warn(
+                "No data in the collection of taken data. Returning empty wfe_avg.",
+                UserWarning,
+            )
+            return dict()
 
         first_entry = next(iter(self._collectionDataTaken.values()))
         if isinstance(first_entry, tuple):
