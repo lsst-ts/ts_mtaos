@@ -1081,7 +1081,8 @@ class Model:
 
             if elapsed_time > timeout:
                 raise TimeoutError(
-                    f"Timeout: Could not find outputs for run '{run_name}' and visit id '{visit_id}' within {timeout} seconds."
+                    f"Timeout: Could not find outputs for run '{run_name}' and "
+                    f"visit id {visit_id} within {timeout} seconds."
                 )
 
             self.log.debug(
