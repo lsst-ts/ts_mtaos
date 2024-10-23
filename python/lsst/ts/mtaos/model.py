@@ -1032,7 +1032,8 @@ class Model:
         poll_interval: int = 5,
     ) -> list:
         """
-        Poll the Butler for the outputs of a given run and visit id, with a timeout.
+        Poll the Butler for the outputs of a given run
+        and visit id, with a timeout.
 
         Parameters
         ----------
