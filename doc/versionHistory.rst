@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.17.0
+-------
+
+* Add OCPS option for running WEP.
+  
 v0.16.1
 -------
 
