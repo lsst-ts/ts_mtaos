@@ -29,8 +29,8 @@ import functools
 import logging
 import os
 import shutil
-import time
 import tempfile
+import time
 from typing import Optional
 
 import numpy as np
@@ -1059,7 +1059,7 @@ class Model:
         """
         self.log.debug("Polling butler for WEP outputs.")
 
-        butler = Butler(self.data_path)
+        butler = dafButler.Butler(self.data_path)
         start_time = time.time()
 
         while True:
@@ -1070,7 +1070,6 @@ class Model:
                     datasetType="postISRCCD", collections=[run_name]
                 )
             )
-
             if datasetRefs:
                 self.log.debug(f"Found dataset references: {datasetRefs}")
                 break
