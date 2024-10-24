@@ -2,6 +2,13 @@
 Version History
 ===============
 
+v0.17.0
+-------
+
+* Update to use version 11.5.0 of ts_wep.
+
+* Publish and use sparse zernikes.
+
 v0.16.1
 -------
 
