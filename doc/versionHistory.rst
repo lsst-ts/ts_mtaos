@@ -9,6 +9,8 @@ v0.17.0
 
 * Publish and use sparse zernikes.
 
+* Add OCPS option for running WEP.
+  
 v0.16.1
 -------
 

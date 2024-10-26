@@ -23,7 +23,9 @@ __all__ = ["MTAOS"]
 
 import asyncio
 import inspect
+import json
 import logging
+import time
 import typing
 import warnings
 
@@ -190,6 +192,8 @@ class MTAOS(salobj.ConfigurableCsc):
             "m1m3",
             "m2",
         }
+
+        self.ocps = salobj.Remote(self.domain, "OCPS", 101)
 
         # Model class to do the real data processing
         self.model = None
@@ -492,8 +496,32 @@ class MTAOS(salobj.ConfigurableCsc):
             result="runWEP started.",
         )
 
+        intra_visit_id = self.visit_id_offset + data.visitId
+        extra_visit_id = (
+            self.visit_id_offset + data.extraId if data.extraId > 0 else None
+        )
+
         if data.useOCPS:
-            raise NotImplementedError("Use OCPS not implemented.")
+            if extra_visit_id is None:
+                raise NotImplementedError("Use OCPS not implemented for LSSTCam.")
+            else:
+                config = {
+                    "LSSTComCam-FROM-OCS_DONUTPAIR": f"{intra_visit_id},{extra_visit_id}"
+                }
+
+                start_time = time.time()
+                await self.ocps.cmd_execute.set_start(
+                    config=json.dumps(config),
+                    timeout=self.DEFAULT_TIMEOUT,
+                )
+
+                if "RUN_WEP" not in self.execution_times:
+                    self.execution_times["RUN_WEP"] = []
+                self.execution_times["RUN_WEP"].append(time.time() - start_time)
+
+            self.model.query_ocps_results(
+                "LSSTComCam/quickLook", intra_visit_id, extra_visit_id
+            )
         else:
             # timestamp command was sent in ISO 8601 compliant date-time format
             # (YYYY-MM-DDTHH:MM:SS.sss), removing invalid characters.
@@ -510,10 +538,8 @@ class MTAOS(salobj.ConfigurableCsc):
             # TODO (DM-31365): Remove workaround to visitId being of type long
             # in MTAOS runWEP command.
             await self.model.run_wep(
-                visit_id=self.visit_id_offset + data.visitId,
-                extra_id=(
-                    self.visit_id_offset + data.extraId if data.extraId > 0 else None
-                ),
+                visit_id=intra_visit_id,
+                extra_id=extra_visit_id,
                 config=(
                     yaml.safe_load(data.config)
                     if len(data.config) > 0
@@ -523,12 +549,12 @@ class MTAOS(salobj.ConfigurableCsc):
                 log_time=self.execution_times,
             )
 
-            await self.pubEvent_wavefrontError()
-            await self.pubEvent_rejectedWavefrontError()
-            await self.pubEvent_wepDuration()
-
             while len(self.execution_times["RUN_WEP"]) > self.MAX_TIME_SAMPLE:
                 self.execution_times["RUN_WEP"].pop(0)
+
+        await self.pubEvent_wavefrontError()
+        await self.pubEvent_rejectedWavefrontError()
+        await self.pubEvent_wepDuration()
 
     async def do_runOFC(self, data):
         """Run OFC on the latest wavefront errors data. Before running this
