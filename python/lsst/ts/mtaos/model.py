@@ -1069,20 +1069,27 @@ class Model:
 
         while elapsed_time < timeout:
             try:
+                self.log.info(
+                    f"Querying datasets: zernike_table_name={self.zernike_table_name}, "
+                    f"{run_name=} {extra_id=}."
+                )
                 data_ids = butler.registry.queryDatasets(
                     self.zernike_table_name,
                     collections=[run_name],
-                    where=f"visit in ({intra_id, extra_id})",
+                    where=f"visit in ({extra_id})",
                 )
-                if data_ids:
+                if data_ids.any():
+                    self.log.debug(f"Query returned {data_ids.count()} results.")
                     break
+                else:
+                    self.log.debug("Query returned empty. Continuing.")
             except Exception:
                 self.log.exception(
                     f"Collection '{run_name}' not found. Waiting {poll_interval}s."
                 )
-                await asyncio.sleep(poll_interval)
                 continue
             finally:
+                await asyncio.sleep(poll_interval)
                 elapsed_time = time.time() - start_time
         else:
             self.log.error(f"Polling loop timed out {timeout=}s, {elapsed_time=}s.")
