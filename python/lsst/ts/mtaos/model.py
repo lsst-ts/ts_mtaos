@@ -1063,12 +1063,11 @@ class Model:
         """
         self.log.debug("Polling butler for WEP outputs.")
 
-        butler = dafButler.Butler(self.data_path)
+        butler = dafButler.Butler(self.data_path, collections=[run_name])
         start_time = time.time()
         elapsed_time = 0.0
 
         while elapsed_time < timeout:
-
             try:
                 data_ids = butler.registry.queryDatasets(
                     self.zernike_table_name,
@@ -1078,7 +1077,7 @@ class Model:
                 if data_ids:
                     break
             except Exception:
-                self.log.debug(
+                self.log.exception(
                     f"Collection '{run_name}' not found. Waiting {poll_interval}s."
                 )
                 await asyncio.sleep(poll_interval)
@@ -1086,6 +1085,7 @@ class Model:
             finally:
                 elapsed_time = time.time() - start_time
         else:
+            self.log.error(f"Polling loop timed out {timeout=}s, {elapsed_time=}s.")
             raise TimeoutError(
                 f"Timeout: Could not find outputs for run '{run_name}' "
                 f"and visit id {extra_id} within {timeout} seconds."
