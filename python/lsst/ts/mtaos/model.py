@@ -1075,6 +1075,7 @@ class Model:
                 data_ids = butler.registry.queryDatasets(
                     self.zernike_table_name,
                     collections=[run_name],
+                    where=f"visit in ({visit_id})"
                 )
             except Exception:
                 self.log.debug(f"Collection '{run_name}' not found")
