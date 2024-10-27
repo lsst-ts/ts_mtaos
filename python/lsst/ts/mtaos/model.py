@@ -1065,42 +1065,31 @@ class Model:
 
         butler = dafButler.Butler(self.data_path)
         start_time = time.time()
+        elapsed_time = 0.0
 
-        while True:
-            elapsed_time = time.time() - start_time
+        while elapsed_time > timeout:
 
             try:
-                datasetRefs = list(
-                    butler.registry.queryDatasets(
-                        datasetType="postISRCCD", collections=[run_name]
-                    )
-                )
-
                 data_ids = butler.registry.queryDatasets(
                     self.zernike_table_name,
                     collections=[run_name],
-                    where=f"visit in ({intra_id, extra_id})"
+                    where=f"visit in ({intra_id, extra_id})",
                 )
+                if data_ids:
+                    break
             except Exception:
-                self.log.debug(f"Collection '{run_name}' not found")
-                continue
-
-            if data_ids:
-                self.log.debug(f"Found dataset for zernike estimates: {data_ids}")
-                for ref in datasetRefs:
-                    self.log.debug(ref.dataId)
-                break
-
-            if elapsed_time > timeout:
-                raise TimeoutError(
-                    f"Timeout: Could not find outputs for run '{run_name}'"
-                    f" and visit id {extra_id} within {timeout} seconds."
+                self.log.debug(
+                    f"Collection '{run_name}' not found. Waiting {poll_interval}s."
                 )
-
-            self.log.debug(
-                f"Dataset not available yet. Waiting {poll_interval} seconds before retrying..."
+                await asyncio.sleep(poll_interval)
+                continue
+            finally:
+                elapsed_time = time.time() - start_time
+        else:
+            raise TimeoutError(
+                f"Timeout: Could not find outputs for run '{run_name}' "
+                f"and visit id {extra_id} within {timeout} seconds."
             )
-            await asyncio.sleep(poll_interval)
 
         self.log.debug(
             f"run_name: {run_name}, visit_id: {extra_id} yielded: {data_ids}"
@@ -1113,7 +1102,7 @@ class Model:
                     self.zernike_table_name,
                     dataId=data_id.dataId,
                     collections=[run_name],
-                    where=f"visit in ({intra_id, extra_id})"
+                    where=f"visit in ({intra_id, extra_id})",
                 ),
             )
             for data_id in data_ids
