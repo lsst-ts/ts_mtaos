@@ -1210,7 +1210,6 @@ class Model:
         """
 
         try:
-            self.wavefront_errors.pop()
             sensor_ids, zk_indices, wfe = self.get_wavefront_errors()
 
             self._calculate_corrections(
