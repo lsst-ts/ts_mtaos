@@ -1029,7 +1029,7 @@ class Model:
         intra_id: int,
         extra_id: int,
         instrument: str,
-        timeout: int = 60,
+        timeout: int = 300,
         poll_interval: int = 5,
     ) -> list:
         """
@@ -1063,44 +1063,43 @@ class Model:
         """
         self.log.debug("Polling butler for WEP outputs.")
 
-        butler = dafButler.Butler(self.data_path)
+        butler = dafButler.Butler(self.data_path, collections=[run_name])
         start_time = time.time()
+        elapsed_time = 0.0
+        n_tables = 9
 
-        while True:
-            elapsed_time = time.time() - start_time
-
+        while elapsed_time < timeout:
             try:
-                datasetRefs = list(
-                    butler.registry.queryDatasets(
-                        datasetType="postISRCCD", collections=[run_name]
-                    )
+                self.log.info(
+                    f"Querying datasets: zernike_table_name={self.zernike_table_name}, "
+                    f"{run_name=} {extra_id=}."
                 )
-
                 data_ids = butler.registry.queryDatasets(
                     self.zernike_table_name,
                     collections=[run_name],
-                    where=f"visit in ({intra_id, extra_id})"
+                    where=f"visit in ({extra_id})",
                 )
+                if data_ids.count() >= n_tables:
+                    self.log.debug(f"Query returned {data_ids.count()} results.")
+                    break
+                else:
+                    self.log.debug(
+                        f"Query returned {data_ids.count()} entries, waiting for {n_tables}. Continuing."
+                    )
             except Exception:
-                self.log.debug(f"Collection '{run_name}' not found")
-                continue
-
-            if data_ids:
-                self.log.debug(f"Found dataset for zernike estimates: {data_ids}")
-                for ref in datasetRefs:
-                    self.log.debug(ref.dataId)
-                break
-
-            if elapsed_time > timeout:
-                raise TimeoutError(
-                    f"Timeout: Could not find outputs for run '{run_name}'"
-                    f" and visit id {extra_id} within {timeout} seconds."
+                self.log.exception(
+                    f"Collection '{run_name}' not found. Waiting {poll_interval}s."
                 )
-
-            self.log.debug(
-                f"Dataset not available yet. Waiting {poll_interval} seconds before retrying..."
+                continue
+            finally:
+                await asyncio.sleep(poll_interval)
+                elapsed_time = time.time() - start_time
+        else:
+            self.log.error(f"Polling loop timed out {timeout=}s, {elapsed_time=}s.")
+            raise TimeoutError(
+                f"Timeout: Could not find outputs for run '{run_name}' "
+                f"and visit id {extra_id} within {timeout} seconds."
             )
-            await asyncio.sleep(poll_interval)
 
         self.log.debug(
             f"run_name: {run_name}, visit_id: {extra_id} yielded: {data_ids}"
@@ -1113,7 +1112,6 @@ class Model:
                     self.zernike_table_name,
                     dataId=data_id.dataId,
                     collections=[run_name],
-                    where=f"visit in ({intra_id, extra_id})"
                 ),
             )
             for data_id in data_ids
@@ -1212,6 +1210,7 @@ class Model:
         """
 
         try:
+            self.wavefront_errors.pop()
             sensor_ids, zk_indices, wfe = self.get_wavefront_errors()
 
             self._calculate_corrections(
