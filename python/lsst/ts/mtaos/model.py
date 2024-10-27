@@ -1029,7 +1029,7 @@ class Model:
         intra_id: int,
         extra_id: int,
         instrument: str,
-        timeout: int = 60,
+        timeout: int = 300,
         poll_interval: int = 5,
     ) -> list:
         """
@@ -1066,6 +1066,7 @@ class Model:
         butler = dafButler.Butler(self.data_path, collections=[run_name])
         start_time = time.time()
         elapsed_time = 0.0
+        n_tables = 9
 
         while elapsed_time < timeout:
             try:
@@ -1078,11 +1079,13 @@ class Model:
                     collections=[run_name],
                     where=f"visit in ({extra_id})",
                 )
-                if data_ids.any():
+                if data_ids.count() >= n_tables:
                     self.log.debug(f"Query returned {data_ids.count()} results.")
                     break
                 else:
-                    self.log.debug("Query returned empty. Continuing.")
+                    self.log.debug(
+                        f"Query returned {data_ids.count()} entries, waiting for {n_tables}. Continuing."
+                    )
             except Exception:
                 self.log.exception(
                     f"Collection '{run_name}' not found. Waiting {poll_interval}s."
@@ -1207,6 +1210,7 @@ class Model:
         """
 
         try:
+            self.wavefront_errors.pop()
             sensor_ids, zk_indices, wfe = self.get_wavefront_errors()
 
             self._calculate_corrections(
