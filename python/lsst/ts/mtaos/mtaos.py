@@ -600,6 +600,7 @@ class MTAOS(salobj.ConfigurableCsc):
             # This is not a coroutine so it will block the event loop. Need
             # to think about how to fix it, maybe run in executor?
             self.model.calculate_corrections(log_time=self.execution_times, **config)
+            self.model.wavefront_errors.clear()
 
             while (
                 len(self.execution_times["CALCULATE_CORRECTIONS"])
