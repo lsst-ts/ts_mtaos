@@ -1067,7 +1067,7 @@ class Model:
         start_time = time.time()
         elapsed_time = 0.0
 
-        while elapsed_time > timeout:
+        while elapsed_time < timeout:
 
             try:
                 data_ids = butler.registry.queryDatasets(
