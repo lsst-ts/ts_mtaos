@@ -1109,7 +1109,6 @@ class Model:
                     self.zernike_table_name,
                     dataId=data_id.dataId,
                     collections=[run_name],
-                    where=f"visit in ({intra_id, extra_id})",
                 ),
             )
             for data_id in data_ids
