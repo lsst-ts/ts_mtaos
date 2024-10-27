@@ -692,7 +692,8 @@ class Model:
             self.wavefront_errors.append(
                 await self._poll_butler_outputs(
                     run_name=run_name,
-                    visit_id=intra_id,
+                    intra_id=intra_id,
+                    extra_id=extra_id,
                     instrument="comcam",
                 )
             )
@@ -1025,21 +1026,24 @@ class Model:
     async def _poll_butler_outputs(
         self,
         run_name: str,
-        visit_id: int,
+        intra_id: int,
+        extra_id: int,
         instrument: str,
         timeout: int = 60,
         poll_interval: int = 5,
     ) -> list:
         """
         Poll the Butler for the outputs of a given run
-        and visit id, with a timeout.
+        and intra/extra image id, with a timeout.
 
         Parameters
         ----------
         run_name : `str`
             Name of the run.
-        visit_id : `int`
-            Id of the visit.
+        intra_id : `int`
+            Id of the intra-focal image.
+        extra_id : `int`
+            Id of the extra-focal image.
         instrument : `str`
             Camera used to take the data.
         timeout : `int`, optional
@@ -1075,7 +1079,7 @@ class Model:
                 data_ids = butler.registry.queryDatasets(
                     self.zernike_table_name,
                     collections=[run_name],
-                    where=f"visit in ({visit_id})"
+                    where=f"visit in ({intra_id, extra_id})"
                 )
             except Exception:
                 self.log.debug(f"Collection '{run_name}' not found")
@@ -1090,7 +1094,7 @@ class Model:
             if elapsed_time > timeout:
                 raise TimeoutError(
                     f"Timeout: Could not find outputs for run '{run_name}'"
-                    f" and visit id {visit_id} within {timeout} seconds."
+                    f" and visit id {extra_id} within {timeout} seconds."
                 )
 
             self.log.debug(
@@ -1099,7 +1103,7 @@ class Model:
             await asyncio.sleep(poll_interval)
 
         self.log.debug(
-            f"run_name: {run_name}, visit_id: {visit_id} yielded: {data_ids}"
+            f"run_name: {run_name}, visit_id: {extra_id} yielded: {data_ids}"
         )
 
         return [
@@ -1109,6 +1113,7 @@ class Model:
                     self.zernike_table_name,
                     dataId=data_id.dataId,
                     collections=[run_name],
+                    where=f"visit in ({intra_id, extra_id})"
                 ),
             )
             for data_id in data_ids
