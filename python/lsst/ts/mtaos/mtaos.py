@@ -519,8 +519,8 @@ class MTAOS(salobj.ConfigurableCsc):
                     self.execution_times["RUN_WEP"] = []
                 self.execution_times["RUN_WEP"].append(time.time() - start_time)
 
-            self.model.query_ocps_results(
-                "LSSTComCam/quickLook", intra_visit_id, extra_visit_id
+            await self.model.query_ocps_results(
+                "u/saluser/ra_wep_testing4", intra_visit_id, extra_visit_id
             )
         else:
             # timestamp command was sent in ISO 8601 compliant date-time format
