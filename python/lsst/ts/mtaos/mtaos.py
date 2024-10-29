@@ -177,7 +177,9 @@ class MTAOS(salobj.ConfigurableCsc):
                 index=utility.MTHexapodIndex.Camera.value,
                 include=[],
             ),
-            "m1m3": salobj.Remote(self.domain, "MTM1M3", include=[]),
+            "m1m3": salobj.Remote(
+                self.domain, "MTM1M3", include=["appliedActiveOpticForces"]
+            ),
             "m2": salobj.Remote(self.domain, "MTM2", include=[]),
         }
 
