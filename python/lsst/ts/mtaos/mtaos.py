@@ -177,7 +177,9 @@ class MTAOS(salobj.ConfigurableCsc):
                 index=utility.MTHexapodIndex.Camera.value,
                 include=[],
             ),
-            "m1m3": salobj.Remote(self.domain, "MTM1M3", include=[]),
+            "m1m3": salobj.Remote(
+                self.domain, "MTM1M3", include=["appliedActiveOpticForces"]
+            ),
             "m2": salobj.Remote(self.domain, "MTM2", include=[]),
         }
 
@@ -192,6 +194,10 @@ class MTAOS(salobj.ConfigurableCsc):
             "m1m3",
             "m2",
         }
+        # Minimum forces to apply for m1m3.
+        # If no force is larger than this value, in the
+        # figure, forces won't be applied.
+        self.m1m3_min_forces_to_apply = 1e-3
 
         self.ocps = salobj.Remote(self.domain, "OCPS", 101)
 
@@ -1001,15 +1007,31 @@ class MTAOS(salobj.ConfigurableCsc):
             z_forces = np.negative(z_forces)
 
         try:
-            await self.remotes["m1m3"].cmd_clearActiveOpticForces.start(
-                timeout=self.DEFAULT_TIMEOUT
-            )
-            await asyncio.sleep(self.DEFAULT_TIMEOUT / 2.0)
-            await self.remotes["m1m3"].cmd_applyActiveOpticForces.set_start(
-                timeout=self.DEFAULT_TIMEOUT, zForces=z_forces
-            )
-
-            self.log.debug("Issue the M1M3 correction successfully.")
+            should_apply = True
+            try:
+                applied_active_optics_forces = await self.remotes[
+                    "m1m3"
+                ].evt_appliedActiveOpticForces.aget(timeout=self.DEFAULT_TIMEOUT)
+                delta_z_forces = z_forces - applied_active_optics_forces.zForces
+                should_apply = np.any(
+                    np.abs(delta_z_forces) > self.m1m3_min_forces_to_apply
+                )
+            except asyncio.TimeoutError:
+                self.log.warning(
+                    "Could not determine currently applied AOS forces for M1M3. "
+                    "Applying full figure."
+                )
+                should_apply = True
+            if should_apply:
+                await self.remotes["m1m3"].cmd_applyActiveOpticForces.set_start(
+                    timeout=self.DEFAULT_TIMEOUT, zForces=z_forces
+                )
+                self.log.debug("Issue the M1M3 correction successfully.")
+            else:
+                self.log.info(
+                    "Skipping applying m1m3 forces. "
+                    f"No values above threshold of {self.m1m3_min_forces_to_apply}N."
+                )
 
         except Exception:
             self.log.exception("M1M3 correction command failed.")
