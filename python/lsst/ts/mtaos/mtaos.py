@@ -196,6 +196,10 @@ class MTAOS(salobj.ConfigurableCsc):
         # If no force is larger than this value, in the
         # figure, forces won't be applied.
         self.m1m3_min_forces_to_apply = 1e-3
+        # Minimum forces to apply for m2.
+        # If no force is larger than this value, in the
+        # figure, forces won't be applied.
+        self.m2_min_forces_to_apply = 1e-3
 
         self.ocps = salobj.Remote(self.domain, "OCPS", 101)
 
@@ -1051,9 +1055,21 @@ class MTAOS(salobj.ConfigurableCsc):
             z_forces = np.negative(z_forces)
 
         try:
-            await self.remotes["m2"].cmd_resetForceOffsets.start(
-                timeout=self.DEFAULT_TIMEOUT
-            )
+            try:
+                axial_forces = await self.remotes["m2"].tel_axialForce.aget(
+                    timeout=self.DEFAULT_TIMEOUT
+                )
+                delta_forces = z_forces - axial_forces.axial
+                if np.all(np.abs(delta_forces) < self.m2_min_forces_to_apply):
+                    self.log.info(
+                        f"Delta forces for M2 all below threshold ({self.m2_min_forces_to_apply}N). Skipping."
+                    )
+                    return
+            except asyncio.TimeoutError:
+                self.log.info(
+                    "Could not determine the current M2 axial forces. Applying full figure."
+                )
+
             await self.remotes["m2"].cmd_applyForces.set_start(
                 timeout=self.DEFAULT_TIMEOUT, axial=z_forces
             )
