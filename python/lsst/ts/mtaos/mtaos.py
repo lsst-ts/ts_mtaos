@@ -180,7 +180,7 @@ class MTAOS(salobj.ConfigurableCsc):
             "m1m3": salobj.Remote(
                 self.domain, "MTM1M3", include=["appliedActiveOpticForces"]
             ),
-            "m2": salobj.Remote(self.domain, "MTM2", include=[]),
+            "m2": salobj.Remote(self.domain, "MTM2", include=["axialForce"]),
         }
 
         self.execution_times = {}
