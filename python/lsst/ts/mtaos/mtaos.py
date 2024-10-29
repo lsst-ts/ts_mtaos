@@ -1061,7 +1061,7 @@ class MTAOS(salobj.ConfigurableCsc):
                 axial_forces = await self.remotes["m2"].tel_axialForce.aget(
                     timeout=self.DEFAULT_TIMEOUT
                 )
-                delta_forces = z_forces - axial_forces.axial
+                delta_forces = z_forces - axial_forces.applied
                 if np.all(np.abs(delta_forces) < self.m2_min_forces_to_apply):
                     self.log.info(
                         f"Delta forces for M2 all below threshold ({self.m2_min_forces_to_apply}N). Skipping."
