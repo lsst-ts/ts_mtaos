@@ -603,14 +603,20 @@ class MTAOS(salobj.ConfigurableCsc):
             # This is needed to set what degrees of freedom will be used,
             # how many zernikes, etc.
             self.log.debug("Customizing OFC parameters.")
-            await self.model.set_ofc_data_values(**config)
+            original_ofc_data_values = await self.model.set_ofc_data_values(**config)
 
-            # If this call fails (raise an exeception), command will be
-            # rejected.
-            # This is not a coroutine so it will block the event loop. Need
-            # to think about how to fix it, maybe run in executor?
-            self.model.calculate_corrections(log_time=self.execution_times, **config)
-            self.model.wavefront_errors.clear()
+            try:
+                # If this call fails (raise an exeception), command will be
+                # rejected.
+                # This is not a coroutine so it will block the event loop. Need
+                # to think about how to fix it, maybe run in executor?
+                self.model.calculate_corrections(
+                    log_time=self.execution_times, **config
+                )
+                self.model.wavefront_errors.clear()
+            finally:
+                self.log.info("Restore ofc data values.")
+                self.model.set_ofc_data_values(**original_ofc_data_values)
 
             while (
                 len(self.execution_times["CALCULATE_CORRECTIONS"])
