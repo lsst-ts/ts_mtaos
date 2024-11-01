@@ -1415,6 +1415,7 @@ class Model:
                                 new_comp_dof_idx[comp_dof_idx_key], dtype=bool
                             )
                         self.ofc.ofc_data.comp_dof_idx = new_comp_dof_idx
+                        self.ofc.controller.reset_history()
 
                     elif key == "xref":
                         self.ofc.ofc_data.xref = kwargs[key]
