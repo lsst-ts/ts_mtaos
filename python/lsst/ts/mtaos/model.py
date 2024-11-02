@@ -460,11 +460,11 @@ class Model:
             Offset to apply to the degrees of freedom.
         """
 
-        self.ofc.controller.aggregate_state(offset, self.ofc.ofc_data.dof_idx)
+        self.ofc.controller.aggregate_state(-offset, self.ofc.ofc_data.dof_idx)
 
         # Update last visit DOF which is the last
         # applied dof not the aggregated one.
-        self.ofc.lv_dof = offset
+        self.ofc.lv_dof = -offset
 
         (
             self.m2_hexapod_correction,
