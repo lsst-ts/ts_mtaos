@@ -1410,9 +1410,9 @@ class Model:
                                 f"comp_dof_idx must be a dictionary. Got {type(kwargs[key])}."
                             )
 
-                        new_comp_dof_idx = copy.deepcopy(self.ofc.ofc_data.comp_dof_idx)
+                        new_comp_dof_idx = kwargs[key]
 
-                        for comp_dof_idx_key in kwargs[key]:
+                        for comp_dof_idx_key in new_comp_dof_idx:
                             new_comp_dof_idx[comp_dof_idx_key] = np.array(
                                 kwargs[key][comp_dof_idx_key], dtype=bool
                             )
@@ -1421,6 +1421,9 @@ class Model:
                         )
                         self.ofc.ofc_data.comp_dof_idx = new_comp_dof_idx
                         self.ofc.controller.reset_history()
+                        original_ofc_data_values[key] = (
+                            self.ofc.ofc_data.default_comp_dof_idx
+                        )
 
                     elif key == "xref":
                         self.ofc.ofc_data.xref = kwargs[key]
