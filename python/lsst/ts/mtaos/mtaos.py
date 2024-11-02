@@ -616,7 +616,7 @@ class MTAOS(salobj.ConfigurableCsc):
                 self.model.wavefront_errors.clear()
             finally:
                 self.log.info("Restore ofc data values.")
-                self.model.set_ofc_data_values(**original_ofc_data_values)
+                await self.model.set_ofc_data_values(**original_ofc_data_values)
 
             while (
                 len(self.execution_times["CALCULATE_CORRECTIONS"])
