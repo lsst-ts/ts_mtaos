@@ -1017,21 +1017,22 @@ class MTAOS(salobj.ConfigurableCsc):
             z_forces = np.negative(z_forces)
 
         try:
+            should_apply = True
             try:
                 applied_active_optics_forces = await self.remotes[
                     "m1m3"
                 ].evt_appliedActiveOpticForces.aget(timeout=self.DEFAULT_TIMEOUT)
-                z_forces -= applied_active_optics_forces.zForces
+                delta_z_forces = z_forces - applied_active_optics_forces.zForces
+                should_apply = np.any(
+                    np.abs(delta_z_forces) > self.m1m3_min_forces_to_apply
+                )
             except asyncio.TimeoutError:
                 self.log.warning(
                     "Could not determine currently applied AOS forces for M1M3. "
-                    "Clearing and applying full figure."
+                    "Applying full figure."
                 )
-                await self.remotes["m1m3"].cmd_clearActiveOpticForces.start(
-                    timeout=self.DEFAULT_TIMEOUT
-                )
-                await asyncio.sleep(self.DEFAULT_TIMEOUT / 2.0)
-            if np.any(np.abs(z_forces) > self.m1m3_min_forces_to_apply):
+                should_apply = True
+            if should_apply:
                 await self.remotes["m1m3"].cmd_applyActiveOpticForces.set_start(
                     timeout=self.DEFAULT_TIMEOUT, zForces=z_forces
                 )
