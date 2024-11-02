@@ -1380,7 +1380,9 @@ class Model:
                     await self.ofc.ofc_data.configure_instrument(kwargs[key])
                 elif hasattr(self.ofc.ofc_data, key):
                     self.log.debug(f"Overriding ofc_data parameter {key}.")
-                    original_ofc_data_values[key] = getattr(self.ofc.ofc_data, key)
+                    original_ofc_data_values[key] = copy.copy(
+                        getattr(self.ofc.ofc_data, key)
+                    )
 
                     # Check if there is a type annotation and try to cast the
                     # values as such.
