@@ -515,23 +515,31 @@ class MTAOS(salobj.ConfigurableCsc):
             if extra_visit_id is None:
                 raise NotImplementedError("Use OCPS not implemented for LSSTCam.")
             else:
-                config = {
-                    "LSSTComCam-FROM-OCS_DONUTPAIR": f"{intra_visit_id},{extra_visit_id}"
-                }
+                try:
+                    self.log.debug("Check if visit was already processed.")
+                    await self.model.query_ocps_results(
+                        intra_visit_id,
+                        extra_visit_id,
+                        timeout=1,
+                    )
+                except asyncio.TimeoutError:
+                    self.log.debug("Pair not processed yet.")
 
-                start_time = time.time()
-                await self.ocps.cmd_execute.set_start(
-                    config=json.dumps(config),
-                    timeout=self.DEFAULT_TIMEOUT,
-                )
+                    config = {
+                        "LSSTComCam-FROM-OCS_DONUTPAIR": f"{intra_visit_id},{extra_visit_id}"
+                    }
 
-                if "RUN_WEP" not in self.execution_times:
-                    self.execution_times["RUN_WEP"] = []
-                self.execution_times["RUN_WEP"].append(time.time() - start_time)
+                    start_time = time.time()
+                    await self.ocps.cmd_execute.set_start(
+                        config=json.dumps(config),
+                        timeout=self.DEFAULT_TIMEOUT,
+                    )
 
-            await self.model.query_ocps_results(
-                "u/saluser/ra_wep_testing4", intra_visit_id, extra_visit_id
-            )
+                    if "RUN_WEP" not in self.execution_times:
+                        self.execution_times["RUN_WEP"] = []
+                    self.execution_times["RUN_WEP"].append(time.time() - start_time)
+
+                    await self.model.query_ocps_results(intra_visit_id, extra_visit_id)
         else:
             # timestamp command was sent in ISO 8601 compliant date-time format
             # (YYYY-MM-DDTHH:MM:SS.sss), removing invalid characters.
