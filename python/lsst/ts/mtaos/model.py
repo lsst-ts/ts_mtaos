@@ -684,17 +684,17 @@ class Model:
             )
         )
 
-    async def query_ocps_results(self, run_name, intra_id, extra_id):
+    async def query_ocps_results(self, intra_id, extra_id, timeout=300):
         """Query the OCPS results."""
         if extra_id is None:
             raise NotImplementedError("OCPS is not implemented for Main Camera.")
         else:
             self.wavefront_errors.append(
                 await self._poll_butler_outputs(
-                    run_name=run_name,
                     intra_id=intra_id,
                     extra_id=extra_id,
                     instrument="comcam",
+                    timeout=timeout,
                 )
             )
 
@@ -1025,11 +1025,10 @@ class Model:
 
     async def _poll_butler_outputs(
         self,
-        run_name: str,
         intra_id: int,
         extra_id: int,
         instrument: str,
-        timeout: int = 300,
+        timeout: int,
         poll_interval: int = 5,
     ) -> list:
         """
@@ -1038,8 +1037,6 @@ class Model:
 
         Parameters
         ----------
-        run_name : `str`
-            Name of the run.
         intra_id : `int`
             Id of the intra-focal image.
         extra_id : `int`
@@ -1063,7 +1060,7 @@ class Model:
         """
         self.log.debug("Polling butler for WEP outputs.")
 
-        butler = dafButler.Butler(self.data_path, collections=[run_name])
+        butler = dafButler.Butler(self.data_path, collections=[self.run_name])
         start_time = time.time()
         elapsed_time = 0.0
         n_tables = 9
@@ -1072,11 +1069,11 @@ class Model:
             try:
                 self.log.info(
                     f"Querying datasets: zernike_table_name={self.zernike_table_name}, "
-                    f"{run_name=} {extra_id=}."
+                    f"{self.run_name=} {extra_id=}."
                 )
                 data_ids = butler.registry.queryDatasets(
                     self.zernike_table_name,
-                    collections=[run_name],
+                    collections=[self.run_name],
                     where=f"visit in ({extra_id})",
                 )
                 if data_ids.count() >= n_tables:
@@ -1088,7 +1085,7 @@ class Model:
                     )
             except Exception:
                 self.log.exception(
-                    f"Collection '{run_name}' not found. Waiting {poll_interval}s."
+                    f"Collection '{self.run_name}' not found. Waiting {poll_interval}s."
                 )
                 continue
             finally:
@@ -1097,12 +1094,12 @@ class Model:
         else:
             self.log.error(f"Polling loop timed out {timeout=}s, {elapsed_time=}s.")
             raise TimeoutError(
-                f"Timeout: Could not find outputs for run '{run_name}' "
+                f"Timeout: Could not find outputs for run '{self.run_name}' "
                 f"and visit id {extra_id} within {timeout} seconds."
             )
 
         self.log.debug(
-            f"run_name: {run_name}, visit_id: {extra_id} yielded: {data_ids}"
+            f"run_name: {self.run_name}, visit_id: {extra_id} yielded: {data_ids}"
         )
 
         return [
@@ -1111,7 +1108,7 @@ class Model:
                 butler.get(
                     self.zernike_table_name,
                     dataId=data_id.dataId,
-                    collections=[run_name],
+                    collections=[self.run_name],
                 ),
             )
             for data_id in data_ids
