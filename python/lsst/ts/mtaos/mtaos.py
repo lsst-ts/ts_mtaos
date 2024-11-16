@@ -27,7 +27,6 @@ import json
 import logging
 import time
 import typing
-import warnings
 
 import eups
 import numpy as np
@@ -599,11 +598,9 @@ class MTAOS(salobj.ConfigurableCsc):
         )
 
         async with self.issue_correction_lock:
+            kp = self.model.ofc.controller.kp
             if data.userGain != 0.0:
-                warnings.warn(
-                    "Using userGain parameter is deprecated. Use the config yaml string instead.",
-                    DeprecationWarning,
-                )
+                self.model.ofc.controller.kp = data.userGain
 
             config = yaml.safe_load(data.config) if len(data.config) > 0 else dict()
 
@@ -625,6 +622,7 @@ class MTAOS(salobj.ConfigurableCsc):
             finally:
                 self.log.info("Restore ofc data values.")
                 await self.model.set_ofc_data_values(**original_ofc_data_values)
+                self.model.ofc.controller.kp = kp
 
             while (
                 len(self.execution_times["CALCULATE_CORRECTIONS"])
