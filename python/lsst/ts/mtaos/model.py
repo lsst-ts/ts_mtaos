@@ -1273,6 +1273,8 @@ class Model:
                     Name of the filter used for the observations.
         """
         self.ofc.ofc_data.zn_selected = zk_indices
+        wavefront_error = np.zeros((len(sensor_ids), np.max(zk_indices) - 4))
+        wavefront_error[:, zk_indices - 4] = wfe
         rotation_angle = kwargs.get("rotation_angle", 0.0)
         filter_name = kwargs.get("filter_name", "")
 
@@ -1282,7 +1284,7 @@ class Model:
             self.m1m3_correction,
             self.m2_correction,
         ) = self.ofc.calculate_corrections(
-            wfe=wfe,
+            wfe=wavefront_error,
             sensor_ids=sensor_ids,
             filter_name=filter_name,
             rotation_angle=rotation_angle,
@@ -1421,6 +1423,9 @@ class Model:
                         original_ofc_data_values[key] = (
                             self.ofc.ofc_data.default_comp_dof_idx
                         )
+
+                    elif key == "controller_filename":
+                        self.ofc.ofc_data.controller_filename = kwargs[key]
 
                     elif key == "xref":
                         self.ofc.ofc_data.xref = kwargs[key]
