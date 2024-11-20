@@ -1273,7 +1273,7 @@ class Model:
                     Name of the filter used for the observations.
         """
         self.ofc.ofc_data.zn_selected = zk_indices
-        wavefront_error = np.zeros((len(sensor_ids), np.max(zk_indices) - 4))
+        wavefront_error = np.zeros((len(sensor_ids), np.max(zk_indices) - 4 + 1))
         wavefront_error[:, zk_indices - 4] = wfe
         rotation_angle = kwargs.get("rotation_angle", 0.0)
         filter_name = kwargs.get("filter_name", "")
