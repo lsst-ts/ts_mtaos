@@ -1278,6 +1278,14 @@ class Model:
         rotation_angle = kwargs.get("rotation_angle", 0.0)
         filter_name = kwargs.get("filter_name", "")
 
+        self.log.debug(
+            "_calculate_corrections: "
+            f"{wavefront_error=}, "
+            f"{sensor_ids=}, "
+            f"{filter_name=}, "
+            f"{rotation_angle=}."
+        )
+
         (
             self.m2_hexapod_correction,
             self.cam_hexapod_correction,
@@ -1288,6 +1296,13 @@ class Model:
             sensor_ids=sensor_ids,
             filter_name=filter_name,
             rotation_angle=rotation_angle,
+        )
+
+        self.log.debug(
+            f"{self.m2_hexapod_correction=}, "
+            f"{self.cam_hexapod_correction=}, "
+            f"{self.m1m3_correction=}, "
+            f"{self.m2_correction=}."
         )
 
     def add_correction(self, wavefront_errors, config=None):
