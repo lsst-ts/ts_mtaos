@@ -1274,12 +1274,20 @@ class Model:
         """
         self.ofc.ofc_data.zn_selected = zk_indices
         wavefront_error = np.zeros((len(sensor_ids), np.max(zk_indices) - 4 + 1))
-        wavefront_error[:, zk_indices - 4] = wfe
+
+        try:
+            for i in range(len(sensor_ids)):
+                wavefront_error[i][zk_indices - 4] += wfe[i]
+        except Exception:
+            self.log.exception(f"{wfe=}")
+            raise
+
         rotation_angle = kwargs.get("rotation_angle", 0.0)
         filter_name = kwargs.get("filter_name", "")
 
         self.log.debug(
             "_calculate_corrections: "
+            f"{wfe=}, "
             f"{wavefront_error=}, "
             f"{sensor_ids=}, "
             f"{filter_name=}, "
