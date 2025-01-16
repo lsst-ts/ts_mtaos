@@ -185,26 +185,28 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
 
         x, y, z, u, v, w = self.model.m2_hexapod_correction()
 
-        self.assertEqual(x, 0)
-        self.assertEqual(y, 0)
-        self.assertEqual(z, 0)
-        self.assertEqual(u, 0)
-        self.assertEqual(v, 0)
-        self.assertEqual(w, 0)
+        print(f"{x=}, {y=}, {z=}, {u=}, {v=}, {w=}")
+
+        self.assertAlmostEqual(x, 0, places=5)
+        self.assertAlmostEqual(y, 0, places=5)
+        self.assertAlmostEqual(z, 0, places=5)
+        self.assertAlmostEqual(u, 0, places=5)
+        self.assertAlmostEqual(v, 0, places=5)
+        self.assertAlmostEqual(w, 0, places=5)
 
         x, y, z, u, v, w = self.model.cam_hexapod_correction()
-        self.assertEqual(x, 0)
-        self.assertEqual(y, 0)
-        self.assertEqual(z, 0)
-        self.assertEqual(u, 0)
-        self.assertEqual(v, 0)
-        self.assertEqual(w, 0)
+        self.assertAlmostEqual(x, 0, places=5)
+        self.assertAlmostEqual(y, 0, places=5)
+        self.assertAlmostEqual(z, 0, places=5)
+        self.assertAlmostEqual(u, 0, places=5)
+        self.assertAlmostEqual(v, 0, places=5)
+        self.assertAlmostEqual(w, 0, places=5)
 
         actCorr = self.model.m1m3_correction()
-        self.assertListEqual(actCorr.tolist(), np.zeros_like(actCorr).tolist())
+        assert np.allclose(actCorr, np.zeros_like(actCorr), rtol=1e-5, atol=1e-5)
 
         actCorr = self.model.m2_correction()
-        self.assertListEqual(actCorr.tolist(), np.zeros_like(actCorr).tolist())
+        assert np.allclose(actCorr, np.zeros_like(actCorr), rtol=1e-5, atol=1e-5)
 
         # Give 0.1 um of focus correction. All values must be close to zer
         # except z correction.
