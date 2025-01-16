@@ -1353,7 +1353,10 @@ class Model:
 
         final_wfe = np.copy(
             get_intrinsic_zernikes(
-                self.ofc.ofc_data, filter_name, sensor_names, rotation_angle
+                self.ofc.ofc_data,
+                filter_name,
+                sensor_names,
+                rotation_angle + 2 * self.ofc.ofc_data.rotation_offset,
             )[:, self.ofc.ofc_data.zn_idx]
         )
 
