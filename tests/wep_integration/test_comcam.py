@@ -52,7 +52,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
             .read()
         )
         ofc_data.dof_state0 = dof_state0
-        ofc_data.zn_selected = np.arange(4, 23)  # Use only from zk4-zk22
+        ofc_data.zn_selected = np.arange(4, 29)  # Use only from zk4-zk22
 
         data_path = os.path.join(
             getModulePathWep(), "tests", "testData", "gen3TestRepo"
@@ -117,21 +117,24 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         # dimensions and that the maximum absolute value of all zernike
         # coefficients is always the same.
         self.assertEqual(
-            len(zk_avg[93]),
+            len(zk_avg[93][1]),
             len(self.model.ofc.ofc_data.zn_idx),
             msg="Wrong size of zernike coefficients in sensor 93.",
         )
         self.assertTrue(
-            np.argmax(np.abs(zk_avg[93])) in self.zernike_coefficient_maximum_expected
+            np.argmax(np.abs(zk_avg[93][1]))
+            in self.zernike_coefficient_maximum_expected
         )
         self.assertEqual(
-            len(zk_avg[94]),
+            len(zk_avg[94][1]),
             len(self.model.ofc.ofc_data.zn_idx),
             msg="Wrong size of zernike coefficients in sensor 94.",
         )
         self.assertTrue(
-            np.argmax(np.abs(zk_avg[94])) in self.zernike_coefficient_maximum_expected
+            np.argmax(np.abs(zk_avg[94][1]))
+            in self.zernike_coefficient_maximum_expected
         )
+        self.assertTrue(len(zk_avg[94][0]) == len(zk_avg[94][1]))
 
     async def test_interrupt_wep_process(self):
         task = asyncio.create_task(

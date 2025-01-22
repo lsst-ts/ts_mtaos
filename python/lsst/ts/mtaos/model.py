@@ -30,13 +30,14 @@ import logging
 import os
 import shutil
 import tempfile
+import time
 from typing import Optional
 
 import numpy as np
 import yaml
 from lsst.afw.image import VisitInfo
 from lsst.daf import butler as dafButler
-from lsst.ts.ofc import OFC
+from lsst.ts.ofc import OFC, BendModeToForce
 from lsst.ts.ofc.utils.ofc_data_helpers import get_intrinsic_zernikes, get_sensor_names
 from lsst.ts.salobj import DefaultingValidator
 from lsst.ts.utils import make_done_future
@@ -69,7 +70,7 @@ class Model:
         pipeline_n_processes=9,
         data_instrument_name=None,
         reference_detector=0,
-        zernike_table_name="zernikeEstimateRaw",
+        zernike_table_name="zernikes",
     ):
         """MTAOS model class.
 
@@ -110,7 +111,7 @@ class Model:
             Which detector to use as a referece to construct the WCS.
         zernike_table_name : `str`, optional
             Name of the table in the butler with zernike coeffients.
-            Default is "zernikeEstimateRaw".
+            Default is "zernikes".
 
         Attributes
         ----------
@@ -140,7 +141,7 @@ class Model:
             Which detector to use as a referece to construct the WCS.
         zernike_table_name : `str`, optional
             Name of the table in the butler with zernike coeffients.
-            Default is "zernikeEstimateRaw".
+            Default is "zernikes".
         wep_configuration_validation : `dict`
             Dictionary to store schema validations for wavefront estimation
             pipeline tasks.
@@ -344,7 +345,6 @@ class Model:
         list[lsst.ts.wep.ctrlIntf.SensorWavefrontData]
             List of rejected wavefront error data.
         """
-
         return self.rejected_wavefront_errors.pop()
 
     def get_dof_aggr(self):
@@ -360,6 +360,19 @@ class Model:
 
         return self.ofc.controller.aggregated_state
 
+    def set_dof_aggr(self, dof_aggr):
+        """Set the aggregated DOF.
+
+        DOF: Degree of freedom.
+
+        Parameters
+        ----------
+        dof_aggr : `numpy.ndarray`
+            Aggregated DOF.
+        """
+
+        self.ofc.controller.set_aggregated_state(dof_aggr)
+
     def get_dof_lv(self):
         """Get the DOF correction from the last visit.
 
@@ -373,14 +386,46 @@ class Model:
 
         return self.ofc.lv_dof
 
+    def get_m1m3_bending_mode_stresses(self) -> np.ndarray:
+        """Get the total M1M3 mirror stresses per bending mode.
+
+        Returns
+        -------
+        np.ndarray
+            Bending mode stresses for M1M3.
+        """
+        m1m3_bending_mode = BendModeToForce("M1M3", self.ofc.ofc_data)
+        indices = self.ofc.ofc_data.dof_indices["M1M3_bending"]
+
+        m1m3_stresses = m1m3_bending_mode.get_stresses_from_dof(
+            self.ofc.controller.aggregated_state[indices[0] : indices[1]]
+        )
+
+        return m1m3_stresses
+
+    def get_m2_bending_mode_stresses(self) -> np.ndarray:
+        """Get the total M2 mirror stresses per bending mode.
+
+        Returns
+        -------
+        np.ndarray
+            Bending mode stresses for M2.
+        """
+        m2_bending_mode = BendModeToForce("M2", self.ofc.ofc_data)
+        indices = self.ofc.ofc_data.dof_indices["M2_bending"]
+
+        m2_stresses = m2_bending_mode.get_stresses_from_dof(
+            self.ofc.controller.aggregated_state[indices[0] : indices[1]]
+        )
+
+        return m2_stresses
+
     def reject_correction(self):
         """Reject the correction of subsystems."""
 
         lv_dof = self.get_dof_lv()
 
         self.ofc.controller.aggregate_state(-lv_dof, self.ofc.ofc_data.dof_idx)
-
-        self.ofc.lv_dof = self.ofc.controller.dof_state.copy()
 
         (
             self.m2_hexapod_correction,
@@ -419,6 +464,15 @@ class Model:
         # applied dof not the aggregated one.
         self.ofc.lv_dof = offset
 
+        (
+            self.m2_hexapod_correction,
+            self.cam_hexapod_correction,
+            self.m1m3_correction,
+            self.m2_correction,
+        ) = self.ofc.get_all_corrections()
+
+    def get_updated_corrections(self):
+        """Get the updated corrections."""
         (
             self.m2_hexapod_correction,
             self.cam_hexapod_correction,
@@ -627,6 +681,20 @@ class Model:
                 instrument="comcam",
             )
         )
+
+    async def query_ocps_results(self, intra_id, extra_id, timeout=300):
+        """Query the OCPS results."""
+        if extra_id is None:
+            raise NotImplementedError("OCPS is not implemented for Main Camera.")
+        else:
+            self.wavefront_errors.append(
+                await self._poll_butler_outputs(
+                    intra_id=intra_id,
+                    extra_id=extra_id,
+                    instrument="comcam",
+                    timeout=timeout,
+                )
+            )
 
     @contextlib.asynccontextmanager
     async def handle_wep_process(
@@ -953,6 +1021,97 @@ class Model:
 
         return run_pipetask_cmd
 
+    async def _poll_butler_outputs(
+        self,
+        intra_id: int,
+        extra_id: int,
+        instrument: str,
+        timeout: int,
+        poll_interval: int = 5,
+    ) -> list:
+        """
+        Poll the Butler for the outputs of a given run
+        and intra/extra image id, with a timeout.
+
+        Parameters
+        ----------
+        intra_id : `int`
+            Id of the intra-focal image.
+        extra_id : `int`
+            Id of the extra-focal image.
+        instrument : `str`
+            Camera used to take the data.
+        timeout : `int`, optional
+            Maximum time to wait for the outputs (in seconds).
+        poll_interval : `int`, optional
+            How often to poll for the data (in seconds).
+
+        Returns
+        -------
+        `list`
+            List of wavefront errors from the Butler.
+
+        Raises
+        ------
+        TimeoutError
+            If the dataset is not available within the specified timeout.
+        """
+        self.log.debug("Polling butler for WEP outputs.")
+
+        butler = dafButler.Butler(self.data_path, collections=[self.run_name])
+        start_time = time.time()
+        elapsed_time = 0.0
+        n_tables = 9
+
+        while elapsed_time < timeout:
+            try:
+                self.log.info(
+                    f"Querying datasets: zernike_table_name={self.zernike_table_name}, "
+                    f"{self.run_name=} {extra_id=}."
+                )
+                data_ids = butler.registry.queryDatasets(
+                    self.zernike_table_name,
+                    collections=[self.run_name],
+                    where=f"visit in ({extra_id})",
+                )
+                if data_ids.count() >= n_tables:
+                    self.log.debug(f"Query returned {data_ids.count()} results.")
+                    break
+                else:
+                    self.log.debug(
+                        f"Query returned {data_ids.count()} entries, waiting for {n_tables}. Continuing."
+                    )
+            except Exception:
+                self.log.exception(
+                    f"Collection '{self.run_name}' not found. Waiting {poll_interval}s."
+                )
+                continue
+            finally:
+                await asyncio.sleep(poll_interval)
+                elapsed_time = time.time() - start_time
+        else:
+            self.log.error(f"Polling loop timed out {timeout=}s, {elapsed_time=}s.")
+            raise TimeoutError(
+                f"Timeout: Could not find outputs for run '{self.run_name}' "
+                f"and visit id {extra_id} within {timeout} seconds."
+            )
+
+        self.log.debug(
+            f"run_name: {self.run_name}, visit_id: {extra_id} yielded: {data_ids}"
+        )
+
+        return [
+            (
+                data_id.dataId["detector"],
+                butler.get(
+                    self.zernike_table_name,
+                    dataId=data_id.dataId,
+                    collections=[self.run_name],
+                ),
+            )
+            for data_id in data_ids
+        ]
+
     def _gather_outputs(
         self,
         run_name: str,
@@ -1044,10 +1203,13 @@ class Model:
         RuntimeError
             No FWHM sensor data to use.
         """
-        try:
-            sensor_ids, wfe = self.get_wavefront_errors()
 
-            self._calculate_corrections(wfe=wfe, sensor_ids=sensor_ids, **kwargs)
+        try:
+            sensor_ids, zk_indices, wfe = self.get_wavefront_errors()
+
+            self._calculate_corrections(
+                wfe=wfe, zk_indices=zk_indices, sensor_ids=sensor_ids, **kwargs
+            )
 
         finally:
             # Clear the queue
@@ -1060,6 +1222,8 @@ class Model:
         -------
         sensor_ids : `np.ndarray [int]`
             Array with sensor ids.
+        zk_indices: `np.ndarray [int]`
+            Array with the zernike noll indices used.
         wfe : `np.ndarray`
             Array of arrays with the zernike coeficients for each field index.
         """
@@ -1087,7 +1251,7 @@ class Model:
 
         return self.get_sensor_ids_wfe_from_data_container(wfe_data_container)
 
-    def _calculate_corrections(self, wfe, sensor_ids, **kwargs):
+    def _calculate_corrections(self, wfe, zk_indices, sensor_ids, **kwargs):
         """Compute corrections from input wavefront errors.
 
         Parameters
@@ -1095,6 +1259,8 @@ class Model:
         wfe : `np.ndarray`
             2D array with wavefront errors (in microns). Each element contains
             the wavefront errors for a specific field index.
+        zk_indices : `np.ndarray [int]`
+            Array with the zernike noll indices used.
         sensor_ids : `np.ndarray [int]`
             Array with sensor ids.
         **kwargs : `dict`
@@ -1104,8 +1270,27 @@ class Model:
                 filter_name: `string`
                     Name of the filter used for the observations.
         """
+        self.ofc.ofc_data.zn_selected = zk_indices
+        wavefront_error = np.zeros((len(sensor_ids), np.max(zk_indices) - 4 + 1))
+
+        try:
+            for i in range(len(sensor_ids)):
+                wavefront_error[i][zk_indices - 4] += wfe[i]
+        except Exception:
+            self.log.exception(f"{wfe=}")
+            raise
+
         rotation_angle = kwargs.get("rotation_angle", 0.0)
         filter_name = kwargs.get("filter_name", "")
+
+        self.log.debug(
+            "_calculate_corrections: "
+            f"{wfe=}, "
+            f"{wavefront_error=}, "
+            f"{sensor_ids=}, "
+            f"{filter_name=}, "
+            f"{rotation_angle=}."
+        )
 
         (
             self.m2_hexapod_correction,
@@ -1113,10 +1298,17 @@ class Model:
             self.m1m3_correction,
             self.m2_correction,
         ) = self.ofc.calculate_corrections(
-            wfe=wfe,
+            wfe=wavefront_error,
             sensor_ids=sensor_ids,
             filter_name=filter_name,
             rotation_angle=rotation_angle,
+        )
+
+        self.log.debug(
+            f"{self.m2_hexapod_correction=}, "
+            f"{self.cam_hexapod_correction=}, "
+            f"{self.m1m3_correction=}, "
+            f"{self.m2_correction=}."
         )
 
     def add_correction(self, wavefront_errors, config=None):
@@ -1161,7 +1353,10 @@ class Model:
 
         final_wfe = np.copy(
             get_intrinsic_zernikes(
-                self.ofc.ofc_data, filter_name, sensor_names, rotation_angle
+                self.ofc.ofc_data,
+                filter_name,
+                sensor_names,
+                rotation_angle + 2 * self.ofc.ofc_data.rotation_offset,
             )[:, self.ofc.ofc_data.zn_idx]
         )
 
@@ -1170,6 +1365,7 @@ class Model:
 
         self._calculate_corrections(
             wfe=final_wfe,
+            zk_indices=np.arange(4, wfe.shape[0] + 4),
             **(config if config is not None else dict()),
         )
 
@@ -1207,7 +1403,9 @@ class Model:
                     await self.ofc.ofc_data.configure_instrument(kwargs[key])
                 elif hasattr(self.ofc.ofc_data, key):
                     self.log.debug(f"Overriding ofc_data parameter {key}.")
-                    original_ofc_data_values[key] = getattr(self.ofc.ofc_data, key)
+                    original_ofc_data_values[key] = copy.copy(
+                        getattr(self.ofc.ofc_data, key)
+                    )
 
                     # Check if there is a type annotation and try to cast the
                     # values as such.
@@ -1235,12 +1433,23 @@ class Model:
                                 f"comp_dof_idx must be a dictionary. Got {type(kwargs[key])}."
                             )
 
-                        new_comp_dof_idx = kwargs[key].copy()
+                        new_comp_dof_idx = kwargs[key]
 
                         for comp_dof_idx_key in new_comp_dof_idx:
                             new_comp_dof_idx[comp_dof_idx_key] = np.array(
-                                new_comp_dof_idx[comp_dof_idx_key], dtype=bool
+                                kwargs[key][comp_dof_idx_key], dtype=bool
                             )
+                        self.log.info(
+                            f"{self.ofc.ofc_data.comp_dof_idx=}\n{new_comp_dof_idx=}"
+                        )
+                        self.ofc.ofc_data.comp_dof_idx = new_comp_dof_idx
+                        self.ofc.controller.reset_history()
+                        original_ofc_data_values[key] = (
+                            self.ofc.ofc_data.default_comp_dof_idx
+                        )
+
+                    elif key == "controller_filename":
+                        self.ofc.ofc_data.controller_filename = kwargs[key]
 
                     elif key == "xref":
                         self.ofc.ofc_data.xref = kwargs[key]
@@ -1314,14 +1523,19 @@ class Model:
         -------
         sensor_ids : `np.ndarray [int]`
             Array with sensor ids.
+        zk_indices : `np.ndarray`
+            Array of arrays with the zernike indices.
         wfe : `np.ndarray`
-            Array of arrays with the zernike coeficients for each field index.
+            Array of arrays with the zernike coeficients.
         """
         sensor_ids = np.array([sensor_id for sensor_id in data_container])
 
-        wfe = np.array([data_container[sensor_id] for sensor_id in data_container])
+        zk_indices = np.array(
+            [data_container[sensor_id][0] for sensor_id in data_container]
+        )
+        wfe = np.array([data_container[sensor_id][1] for sensor_id in data_container])
 
-        return sensor_ids, wfe
+        return sensor_ids, zk_indices, wfe
 
     async def _close_pending_task(self, task: asyncio.Task) -> None:
         """Close a pending task and log any exception.

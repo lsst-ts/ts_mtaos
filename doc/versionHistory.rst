@@ -2,6 +2,68 @@
 Version History
 ===============
 
+v0.16.0
+-------
+
+* Introduced a minimum threshold for applying active optics corrections.
+  Forces are now only applied if they exceed a defined threshold in both `issue_m2_correction` and `issue_m1m3_correction` methods.
+
+* Updated `do_runWEP` and `do_runOFC` methods in `mtaos.py` to improve handling of wavefront error collections, preventing reprocessing of already processed data and clearing wavefront error collections after calculating corrections.
+
+* Added support for OCPS (Operational Corrections Processing System) in the `do_runWEP` method.
+
+* Updated the CSC and unit tests to use the new WEP 11.50 Zernikes Astropy table outputs.
+
+* Added functionality to publish corrections and stresses via `offsetDOF` and `runOFC` commands.
+
+* Introduced `userGain` as an optional parameter in MTAOS for fine-tuning adjustments.
+
+* Enhanced logging throughout `model.py` to improve debugging and traceability of corrections.
+
+* Updated `model.py` to allow sparse Zernike coefficients, increasing compatibility and flexibility.
+
+* Added functions and unit tests to enforce safety limits for bending modes.
+
+* Fixed several issues in `model.py`, including:
+
+  - Correcting the calculation of offsets and forces in `_calculate_corrections`.
+  - Fixing the `set_ofc_data_values` method to handle `comp_dof_idx` and data value copies correctly.
+  - Resolved a bug in `_poll_butler_outputs` that caused an infinite loop, blocking the async event loop.
+
+* Corrected index handling in `calculate_corrections` and addressed residue handling in `add_correction` unit tests.
+
+* Ensured the `offset_dof` calculations conform to the proper correction definitions by reversing the sign of the offset.
+
+* Fixed visit ID and extra ID handling in Butler queries.
+
+* Updated unit tests for MTAOS CSC to align with changes in the CSC, OFC, and WEP updates.
+
+* Added callback methods for simulator tests to emulate reset offset commands for M1M3 and M2 mirrors.
+
+* Improved unit tests for new bending mode safety limits and the latest `ts_ofc` v4.0 values.
+
+* Reset history when updating `comp_dof_idx` in OFC to ensure consistency.
+
+* Improved the pooling loop in `_poll_butler_outputs` for better async behavior.
+
+* Adjusted integration tests in the CI script for optimization and focus on critical testing paths.
+
+* Update to use version 11.5.0 of ts_wep.
+
+* Publish and use sparse zernikes.
+
+* Add OCPS option for running WEP.
+  
+* Publish mirror stresses when using `runOFC` command.
+
+* Publish corrections when using `offsetDOF` command.
+
+* Add bending mode safety limits to prevent corrections from exceeding the mirror stress limits.
+
+* Add unit tests for the new safety limits.
+
+* Add `pubEvent_mirrorStresses` method to publish mirror stresses.
+
 v0.15.0
 -------
 

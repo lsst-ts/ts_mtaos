@@ -23,9 +23,10 @@ __all__ = ["MTAOS"]
 
 import asyncio
 import inspect
+import json
 import logging
+import time
 import typing
-import warnings
 
 import eups
 import numpy as np
@@ -175,8 +176,10 @@ class MTAOS(salobj.ConfigurableCsc):
                 index=utility.MTHexapodIndex.Camera.value,
                 include=[],
             ),
-            "m1m3": salobj.Remote(self.domain, "MTM1M3", include=[]),
-            "m2": salobj.Remote(self.domain, "MTM2", include=[]),
+            "m1m3": salobj.Remote(
+                self.domain, "MTM1M3", include=["appliedActiveOpticForces"]
+            ),
+            "m2": salobj.Remote(self.domain, "MTM2", include=["axialForce"]),
         }
 
         self.execution_times = {}
@@ -190,6 +193,16 @@ class MTAOS(salobj.ConfigurableCsc):
             "m1m3",
             "m2",
         }
+        # Minimum forces to apply for m1m3.
+        # If no force is larger than this value, in the
+        # figure, forces won't be applied.
+        self.m1m3_min_forces_to_apply = 1e-3
+        # Minimum forces to apply for m2.
+        # If no force is larger than this value, in the
+        # figure, forces won't be applied.
+        self.m2_min_forces_to_apply = 1e-3
+
+        self.ocps = salobj.Remote(self.domain, "OCPS", 101)
 
         # Model class to do the real data processing
         self.model = None
@@ -292,6 +305,12 @@ class MTAOS(salobj.ConfigurableCsc):
         else:
             self.wep_config = dict()
 
+        # Set the stress scale approach, factor, and limits
+        self.stress_scale_approach = config.stress_scale_approach
+        self.stress_scale_factor = config.stress_scale_factor
+        self.m1m3_stress_limit = config.m1m3_stress_limit
+        self.m2_stress_limit = config.m2_stress_limit
+
         self.log.debug("MTAOS configuration completed.")
 
     async def end_enable(self, data):
@@ -389,6 +408,7 @@ class MTAOS(salobj.ConfigurableCsc):
             # succedded and generate a report at the end. Also, if it fails,
             # it raises an exception and the command is rejected.
             await self.handle_corrections()
+            await self.pubEvent_mirrorStresses()
 
     async def do_rejectCorrection(self, data):
         """Reject the most recent wavefront correction.
@@ -485,8 +505,40 @@ class MTAOS(salobj.ConfigurableCsc):
             result="runWEP started.",
         )
 
+        intra_visit_id = self.visit_id_offset + data.visitId
+        extra_visit_id = (
+            self.visit_id_offset + data.extraId if data.extraId > 0 else None
+        )
+
         if data.useOCPS:
-            raise NotImplementedError("Use OCPS not implemented.")
+            if extra_visit_id is None:
+                raise NotImplementedError("Use OCPS not implemented for LSSTCam.")
+            else:
+                try:
+                    self.log.debug("Check if visit was already processed.")
+                    await self.model.query_ocps_results(
+                        intra_visit_id,
+                        extra_visit_id,
+                        timeout=1,
+                    )
+                except asyncio.TimeoutError:
+                    self.log.debug("Pair not processed yet.")
+
+                    config = {
+                        "LSSTComCam-FROM-OCS_DONUTPAIR": f"{intra_visit_id},{extra_visit_id}"
+                    }
+
+                    start_time = time.time()
+                    await self.ocps.cmd_execute.set_start(
+                        config=json.dumps(config),
+                        timeout=self.DEFAULT_TIMEOUT,
+                    )
+
+                    if "RUN_WEP" not in self.execution_times:
+                        self.execution_times["RUN_WEP"] = []
+                    self.execution_times["RUN_WEP"].append(time.time() - start_time)
+
+                    await self.model.query_ocps_results(intra_visit_id, extra_visit_id)
         else:
             # timestamp command was sent in ISO 8601 compliant date-time format
             # (YYYY-MM-DDTHH:MM:SS.sss), removing invalid characters.
@@ -503,10 +555,8 @@ class MTAOS(salobj.ConfigurableCsc):
             # TODO (DM-31365): Remove workaround to visitId being of type long
             # in MTAOS runWEP command.
             await self.model.run_wep(
-                visit_id=self.visit_id_offset + data.visitId,
-                extra_id=(
-                    self.visit_id_offset + data.extraId if data.extraId > 0 else None
-                ),
+                visit_id=intra_visit_id,
+                extra_id=extra_visit_id,
                 config=(
                     yaml.safe_load(data.config)
                     if len(data.config) > 0
@@ -516,12 +566,12 @@ class MTAOS(salobj.ConfigurableCsc):
                 log_time=self.execution_times,
             )
 
-            await self.pubEvent_wavefrontError()
-            await self.pubEvent_rejectedWavefrontError()
-            await self.pubEvent_wepDuration()
-
             while len(self.execution_times["RUN_WEP"]) > self.MAX_TIME_SAMPLE:
                 self.execution_times["RUN_WEP"].pop(0)
+
+        await self.pubEvent_wavefrontError()
+        await self.pubEvent_rejectedWavefrontError()
+        await self.pubEvent_wepDuration()
 
     async def do_runOFC(self, data):
         """Run OFC on the latest wavefront errors data. Before running this
@@ -548,11 +598,9 @@ class MTAOS(salobj.ConfigurableCsc):
         )
 
         async with self.issue_correction_lock:
+            kp = self.model.ofc.controller.kp
             if data.userGain != 0.0:
-                warnings.warn(
-                    "Using userGain parameter is deprecated. Use the config yaml string instead.",
-                    DeprecationWarning,
-                )
+                self.model.ofc.controller.kp = data.userGain
 
             config = yaml.safe_load(data.config) if len(data.config) > 0 else dict()
 
@@ -560,13 +608,21 @@ class MTAOS(salobj.ConfigurableCsc):
             # This is needed to set what degrees of freedom will be used,
             # how many zernikes, etc.
             self.log.debug("Customizing OFC parameters.")
-            await self.model.set_ofc_data_values(**config)
+            original_ofc_data_values = await self.model.set_ofc_data_values(**config)
 
-            # If this call fails (raise an exeception), command will be
-            # rejected.
-            # This is not a coroutine so it will block the event loop. Need
-            # to think about how to fix it, maybe run in executor?
-            self.model.calculate_corrections(log_time=self.execution_times, **config)
+            try:
+                # If this call fails (raise an exeception), command will be
+                # rejected.
+                # This is not a coroutine so it will block the event loop. Need
+                # to think about how to fix it, maybe run in executor?
+                self.model.calculate_corrections(
+                    log_time=self.execution_times, **config
+                )
+                self.model.wavefront_errors.clear()
+            finally:
+                self.log.info("Restore ofc data values.")
+                await self.model.set_ofc_data_values(**original_ofc_data_values)
+                self.model.ofc.controller.kp = kp
 
             while (
                 len(self.execution_times["CALCULATE_CORRECTIONS"])
@@ -577,6 +633,7 @@ class MTAOS(salobj.ConfigurableCsc):
             self.log.debug("Calculate the subsystem correction successfully.")
 
             await self.pubEvent_degreeOfFreedom()
+            await self.pubEvent_mirrorStresses()
             await self.pubEvent_m2HexapodCorrection()
             await self.pubEvent_cameraHexapodCorrection()
             await self.pubEvent_m1m3Correction()
@@ -663,13 +720,17 @@ class MTAOS(salobj.ConfigurableCsc):
         )
 
         async with self.issue_correction_lock:
-
             self.model.offset_dof(offset=np.array(data.value))
 
-            await self.pubEvent_degreeOfFreedom()
             # if the corrections fails it will republish the dof event
             # after undoing the offsets.
             await self.handle_corrections()
+            await self.pubEvent_degreeOfFreedom()
+            await self.pubEvent_mirrorStresses()
+            await self.pubEvent_m2HexapodCorrection()
+            await self.pubEvent_cameraHexapodCorrection()
+            await self.pubEvent_m1m3Correction()
+            await self.pubEvent_m2Correction()
 
     async def do_resetOffsetDOF(self, data: salobj.type_hints.BaseDdsDataType) -> None:
         """Implement command reset offset dof.
@@ -693,13 +754,96 @@ class MTAOS(salobj.ConfigurableCsc):
         )
 
         async with self.issue_correction_lock:
-
             self.model.reset_wfe_correction()
 
-            await self.pubEvent_degreeOfFreedom()
             # if the corrections fails it will republish the dof event
             # after undoing the offsets.
             await self.handle_corrections()
+            await self.pubEvent_degreeOfFreedom()
+            await self.pubEvent_mirrorStresses()
+
+    def apply_stress_correction(
+        self,
+        stresses: np.ndarray[float],
+        stress_limit: float,
+        dof_aggr: np.ndarray[float],
+        start_idx: int,
+        end_idx: int,
+    ) -> np.ndarray[float]:
+        """
+        Apply the stress correction by either scaling or
+        truncating bending modes to keep the total stress within limits.
+
+        Parameters
+        ----------
+        stresses : np.ndarray
+            The individual bending mode stresses on the mirror.
+        stress_limit : float
+            The maximum allowable stress on the mirror.
+        dof_aggr : np.ndarray
+            The aggregated degrees of freedom.
+        start_idx : int
+            The starting index of the bending modes.
+        end_idx : int
+            The ending index of the bending modes.
+
+        Returns
+        -------
+        np.ndarray
+            The updated degrees of freedom with the stress correction applied.
+        """
+
+        # Get the bending modes within the specified range
+        bending_modes = dof_aggr[start_idx:end_idx].copy()
+        stress = self.stress_scale_factor * np.sqrt(np.sum(np.square(stresses)))
+
+        # Check if the stress is over the limit
+        if stress > stress_limit:
+            self.log.warning(
+                f"Stress {stress:.2f} psi is above the limit {stress_limit:.2f} psi. Applying correction."
+            )
+
+            if self.stress_scale_approach == "scale":
+                self.log.warning(
+                    "Using scale approach. Applying the same correction but with a lower amplitude."
+                )
+
+                scale = stress_limit / stress
+                bending_modes *= scale
+
+            elif self.stress_scale_approach == "truncate":
+                self.log.warning(
+                    "Using truncate approach. Truncating the correction"
+                    " to only apply lower-order bending modes."
+                )
+
+                for i in reversed(range(len(bending_modes))):
+                    if stress <= stress_limit:
+                        break  # RSS is within limits, stop truncating
+
+                    # Set the highest remaining bending mode to zero
+                    stresses[i] = 0
+                    bending_modes[i] = 0
+
+                    # Recalculate RSS with the truncated modes
+                    stress = self.stress_scale_factor * np.sqrt(
+                        np.sum(np.square(stresses))
+                    )
+
+                self.log.warning(
+                    f"After truncating, the new total stress is {stress:.2f} psi, "
+                    f"which is {'within' if stress <= stress_limit else 'above'} the limit."
+                )
+
+            # Update the dof_aggr with the modified bending modes
+            dof_aggr[start_idx:end_idx] = bending_modes.copy()
+
+        else:
+            self.log.info(
+                f"Stress {stress:.2f} psi is within the limit {stress_limit:.2f} psi. Applying correction."
+            )
+
+        return dof_aggr
 
     async def handle_corrections(self):
         """Handle applying the corrections to all components.
@@ -713,6 +857,27 @@ class MTAOS(salobj.ConfigurableCsc):
         RuntimeError:
             If one or more correction failed.
         """
+
+        aggr_dof = self.model.get_dof_aggr()
+
+        # Ensure the bending modes are within stress limits,
+        # otherwise modify them to be within the limits.
+        m1m3_stresses = self.model.get_m1m3_bending_mode_stresses()
+        m2_stresses = self.model.get_m2_bending_mode_stresses()
+
+        # Apply the stress correction to the M1M3 mirror
+        dof_aggr_m1m3_stress_corrected = self.apply_stress_correction(
+            m1m3_stresses, self.m1m3_stress_limit, aggr_dof, 10, 30
+        )
+
+        # Apply the stress correction to the M2 mirror
+        dof_aggr_stress_corrected = self.apply_stress_correction(
+            m2_stresses, self.m2_stress_limit, dof_aggr_m1m3_stress_corrected, 30, 50
+        )
+
+        # Update the model with the corrected degrees of freedom
+        self.model.set_dof_aggr(dof_aggr_stress_corrected)
+        self.model.get_updated_corrections()
 
         # Issue all corrections concurrently. If any of them fails, undo
         # corrections and reject command.
@@ -852,18 +1017,37 @@ class MTAOS(salobj.ConfigurableCsc):
             If `True` apply the negative value of each correction.
 
         """
-
         z_forces = self.model.m1m3_correction()
 
         if undo:
             z_forces = np.negative(z_forces)
 
         try:
-            await self.remotes["m1m3"].cmd_applyActiveOpticForces.set_start(
-                timeout=self.DEFAULT_TIMEOUT, zForces=z_forces
-            )
-
-            self.log.debug("Issue the M1M3 correction successfully.")
+            should_apply = True
+            try:
+                applied_active_optics_forces = await self.remotes[
+                    "m1m3"
+                ].evt_appliedActiveOpticForces.aget(timeout=self.DEFAULT_TIMEOUT)
+                delta_z_forces = z_forces - applied_active_optics_forces.zForces
+                should_apply = np.any(
+                    np.abs(delta_z_forces) > self.m1m3_min_forces_to_apply
+                )
+            except asyncio.TimeoutError:
+                self.log.warning(
+                    "Could not determine currently applied AOS forces for M1M3. "
+                    "Applying full figure."
+                )
+                should_apply = True
+            if should_apply:
+                await self.remotes["m1m3"].cmd_applyActiveOpticForces.set_start(
+                    timeout=self.DEFAULT_TIMEOUT, zForces=z_forces
+                )
+                self.log.debug("Issue the M1M3 correction successfully.")
+            else:
+                self.log.info(
+                    "Skipping applying m1m3 forces. "
+                    f"No values above threshold of {self.m1m3_min_forces_to_apply}N."
+                )
 
         except Exception:
             self.log.exception("M1M3 correction command failed.")
@@ -886,6 +1070,21 @@ class MTAOS(salobj.ConfigurableCsc):
             z_forces = np.negative(z_forces)
 
         try:
+            try:
+                axial_forces = await self.remotes["m2"].tel_axialForce.aget(
+                    timeout=self.DEFAULT_TIMEOUT
+                )
+                delta_forces = z_forces - axial_forces.applied
+                if np.all(np.abs(delta_forces) < self.m2_min_forces_to_apply):
+                    self.log.info(
+                        f"Delta forces for M2 all below threshold ({self.m2_min_forces_to_apply}N). Skipping."
+                    )
+                    return
+            except asyncio.TimeoutError:
+                self.log.info(
+                    "Could not determine the current M2 axial forces. Applying full figure."
+                )
+
             await self.remotes["m2"].cmd_applyForces.set_start(
                 timeout=self.DEFAULT_TIMEOUT, axial=z_forces
             )
@@ -904,14 +1103,30 @@ class MTAOS(salobj.ConfigurableCsc):
         """
 
         self._logExecFunc()
+        self.model.get_wfe()
 
-        for sensor_id, zernike_coefficients in self.model.get_wfe():
-            for zernike_coefficient in zernike_coefficients:
-                await self.evt_wavefrontError.set_write(
-                    sensorId=sensor_id,
-                    annularZernikeCoeff=zernike_coefficient,
-                    force_output=True,
-                )
+        for sensor_id, zernike_indices, zernike_values in zip(
+            *self.model.get_wavefront_errors()
+        ):
+            annular_zernike_coeffs = np.zeros(19)
+            for zernike_index, zernike_value in zip(zernike_indices, zernike_values):
+                position = zernike_index - 4
+                if 0 <= position < 19:
+                    annular_zernike_coeffs[position] = zernike_value
+
+            zernike_indices_extended = np.zeros(100, dtype=int)
+            zernike_values_extended = np.full(100, np.nan)
+            zernike_indices_extended[: zernike_indices.size] = zernike_indices
+            zernike_values_extended[: zernike_values.size] = zernike_values
+
+            await self.evt_wavefrontError.set_write(
+                sensorId=sensor_id,
+                nollZernikeIndices=zernike_indices_extended,
+                nollZernikeValues=zernike_values_extended,
+                annularZernikeCoeff=annular_zernike_coeffs,
+                force_output=True,
+            )
+            await asyncio.sleep(0.1)
 
     async def pubEvent_rejectedWavefrontError(self):
         """Publish the rejected calculated wavefront error calculated by WEP.
@@ -920,17 +1135,30 @@ class MTAOS(salobj.ConfigurableCsc):
         """
 
         self._logExecFunc()
+        self.model.get_rejected_wfe()
 
-        for (
-            sensor_id,
-            zernike_coefficients,
-        ) in self.model.get_rejected_wfe():
-            for zernike_coefficient in zernike_coefficients:
-                await self.evt_rejectedWavefrontError.set_write(
-                    sensorId=sensor_id,
-                    annularZernikeCoeff=zernike_coefficient,
-                    force_output=True,
-                )
+        for sensor_id, zernike_indices, zernike_values in zip(
+            *self.model.get_rejected_wavefront_errors()
+        ):
+            annular_zernike_coeffs = np.zeros(19)
+            for zernike_index, zernike_value in zip(zernike_indices, zernike_values):
+                position = zernike_index - 4
+                if 0 <= position < 19:
+                    annular_zernike_coeffs[position] = zernike_value
+
+            zernike_indices_extended = np.zeros(100, dtype=int)
+            zernike_values_extended = np.full(100, np.nan)
+            zernike_indices_extended[: zernike_indices.size] = zernike_indices
+            zernike_values_extended[: zernike_values.size] = zernike_values
+
+            await self.evt_rejectedWavefrontError.set_write(
+                sensorId=sensor_id,
+                nollZernikeIndices=zernike_indices_extended,
+                nollZernikeValues=zernike_values_extended,
+                annularZernikeCoeff=annular_zernike_coeffs,
+                force_output=True,
+            )
+            await asyncio.sleep(0.1)
 
     async def pubEvent_degreeOfFreedom(self):
         """Publish the degree of freedom generated by the OFC calculation.
@@ -946,6 +1174,31 @@ class MTAOS(salobj.ConfigurableCsc):
             aggregatedDoF=dofAggr,
             visitDoF=dofVisit,
             force_output=True,
+        )
+
+    async def pubEvent_mirrorStresses(self):
+        """Publish the calculated mirror stresses
+        from the applied degrees of freedom.
+
+        OFC: Optical feedback control.
+        """
+
+        self._logExecFunc()
+
+        m1m3_stresses = self.model.get_m1m3_bending_mode_stresses()
+        m2_stresses = self.model.get_m2_bending_mode_stresses()
+
+        # Calculate the total stress on the mirror
+        m1m3_total_stress = self.stress_scale_factor * np.sqrt(
+            np.sum(np.square(m1m3_stresses))
+        )
+        m2_total_stress = self.stress_scale_factor * np.sqrt(
+            np.sum(np.square(m2_stresses))
+        )
+
+        await self.evt_mirrorStresses.set_write(
+            stressM2=m2_total_stress,
+            stressM1M3=m1m3_total_stress,
         )
 
     async def pubEvent_rejectedDegreeOfFreedom(self):

@@ -163,8 +163,18 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
     def test_get_dof_aggr(self):
         self.assertEqual(len(self.model.get_dof_aggr()), 50)
 
+    def test_set_dof_aggr(self):
+        new_dof_aggr = np.zeros(50)
+        self.model.set_dof_aggr(new_dof_aggr)
+
+        self.assertTrue(np.all(self.model.get_dof_aggr() == new_dof_aggr))
+
     def test_get_dof(self):
         self.assertEqual(len(self.model.get_dof_lv()), 50)
+
+    def test_get_bending_mode_stresses(self):
+        result = self.model.get_m1m3_bending_mode_stresses()
+        self.assertEqual(len(result), 20)
 
     def test_add_correction(self):
         wavefront_erros = np.zeros(19)
@@ -175,26 +185,28 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
 
         x, y, z, u, v, w = self.model.m2_hexapod_correction()
 
-        self.assertEqual(x, 0)
-        self.assertEqual(y, 0)
-        self.assertEqual(z, 0)
-        self.assertEqual(u, 0)
-        self.assertEqual(v, 0)
-        self.assertEqual(w, 0)
+        print(f"{x=}, {y=}, {z=}, {u=}, {v=}, {w=}")
+
+        self.assertAlmostEqual(x, 0, places=5)
+        self.assertAlmostEqual(y, 0, places=5)
+        self.assertAlmostEqual(z, 0, places=5)
+        self.assertAlmostEqual(u, 0, places=5)
+        self.assertAlmostEqual(v, 0, places=5)
+        self.assertAlmostEqual(w, 0, places=5)
 
         x, y, z, u, v, w = self.model.cam_hexapod_correction()
-        self.assertEqual(x, 0)
-        self.assertEqual(y, 0)
-        self.assertEqual(z, 0)
-        self.assertEqual(u, 0)
-        self.assertEqual(v, 0)
-        self.assertEqual(w, 0)
+        self.assertAlmostEqual(x, 0, places=5)
+        self.assertAlmostEqual(y, 0, places=5)
+        self.assertAlmostEqual(z, 0, places=5)
+        self.assertAlmostEqual(u, 0, places=5)
+        self.assertAlmostEqual(v, 0, places=5)
+        self.assertAlmostEqual(w, 0, places=5)
 
         actCorr = self.model.m1m3_correction()
-        self.assertListEqual(actCorr.tolist(), np.zeros_like(actCorr).tolist())
+        assert np.allclose(actCorr, np.zeros_like(actCorr), rtol=1e-5, atol=1e-5)
 
         actCorr = self.model.m2_correction()
-        self.assertListEqual(actCorr.tolist(), np.zeros_like(actCorr).tolist())
+        assert np.allclose(actCorr, np.zeros_like(actCorr), rtol=1e-5, atol=1e-5)
 
         # Give 0.1 um of focus correction. All values must be close to zer
         # except z correction.
@@ -219,7 +231,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(w, 0, 3)
 
         # Expected total hexapod offset
-        self.assertAlmostEqual(z_m2hex + z_camhex, 6.1209, 3)
+        self.assertAlmostEqual(z_m2hex + z_camhex, 6.1608, 3)
 
         actCorr = self.model.m1m3_correction()
         self.assertTrue(

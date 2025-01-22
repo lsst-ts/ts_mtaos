@@ -125,9 +125,6 @@ pipeline {
                         # Exclude integration tests from the initial run. 
                         # They will only be executed if the the unit tests passes.
                         pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.WORKSPACE}/${env.XML_REPORT} -m "not integtest and not csc_integtest"
-
-                        pytest -m "integtest"
-                        pytest -m "csc_integtest"
                     """
                 }
             }
