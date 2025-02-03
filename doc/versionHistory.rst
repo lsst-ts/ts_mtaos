@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.16.1
+-------
+
+* Deprecate `annularZernikeCoeff` topic from WavefrontError events.
+
 v0.16.0
 -------
 
