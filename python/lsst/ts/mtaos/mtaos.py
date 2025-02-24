@@ -822,6 +822,7 @@ class MTAOS(salobj.ConfigurableCsc):
         """Closed loop operation."""
         self._logExecFunc()
 
+        prev_elevation = None
         while self.summary_state == salobj.State.ENABLED:
             try:
                 await self.evt_closedLoopState.set_write(
@@ -848,13 +849,20 @@ class MTAOS(salobj.ConfigurableCsc):
                     timeout=self.CMD_TIMEOUT,
                 )
 
-                # here we add the logic to retrieve the band and rotation
-                # angle of this image as well as the elevation at which it
-                # was taken, because if the elevation delta > 9 deg
-                # we don't apply the corrections
+                filter, rotation_angle, elevation = await self.model.get_image_info(
+                    image_in_oods.obsid
+                )
+
+                if prev_elevation is not None and abs(elevation - prev_elevation) > 9:
+                    self.log.warning(
+                        "Elevation delta is greater than 9 deg. Not applying corrections."
+                    )
+                    prev_elevation = elevation
+                    continue
+
                 config = {
-                    "filter_name": image_in_oods.band,
-                    "rotation_angle": image_in_oods.rotation_angle,
+                    "filter_name": filter,
+                    "rotation_angle": rotation_angle,
                     "comp_dof_idx": {
                         "m2HexPos": [float(val) for val in self.used_dofs[:5]],
                         "camHexPos": [float(val) for val in self.used_dofs[5:10]],
