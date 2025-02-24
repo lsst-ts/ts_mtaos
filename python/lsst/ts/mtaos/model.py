@@ -682,19 +682,16 @@ class Model:
             )
         )
 
-    async def query_ocps_results(self, intra_id, extra_id, timeout=300):
+    async def query_ocps_results(self, instrument, intra_id, extra_id, timeout=300):
         """Query the OCPS results."""
-        if extra_id is None:
-            raise NotImplementedError("OCPS is not implemented for Main Camera.")
-        else:
-            self.wavefront_errors.append(
-                await self._poll_butler_outputs(
-                    intra_id=intra_id,
-                    extra_id=extra_id,
-                    instrument="comcam",
-                    timeout=timeout,
-                )
+        self.wavefront_errors.append(
+            await self._poll_butler_outputs(
+                intra_id=intra_id,
+                extra_id=extra_id,
+                instrument=instrument,
+                timeout=timeout,
             )
+        )
 
     @contextlib.asynccontextmanager
     async def handle_wep_process(
@@ -1063,16 +1060,17 @@ class Model:
         elapsed_time = 0.0
         n_tables = 9
 
+        pair_id = extra_id if extra_id is not None else intra_id
         while elapsed_time < timeout:
             try:
                 self.log.info(
                     f"Querying datasets: zernike_table_name={self.zernike_table_name}, "
-                    f"{self.run_name=} {extra_id=}."
+                    f"{self.run_name=} {pair_id=}."
                 )
                 data_ids = butler.registry.queryDatasets(
                     self.zernike_table_name,
                     collections=[self.run_name],
-                    where=f"visit in ({extra_id})",
+                    where=f"visit in ({pair_id})",
                 )
                 if data_ids.count() >= n_tables:
                     self.log.debug(f"Query returned {data_ids.count()} results.")
@@ -1093,11 +1091,11 @@ class Model:
             self.log.error(f"Polling loop timed out {timeout=}s, {elapsed_time=}s.")
             raise TimeoutError(
                 f"Timeout: Could not find outputs for run '{self.run_name}' "
-                f"and visit id {extra_id} within {timeout} seconds."
+                f"and visit id {pair_id} within {timeout} seconds."
             )
 
         self.log.debug(
-            f"run_name: {self.run_name}, visit_id: {extra_id} yielded: {data_ids}"
+            f"run_name: {self.run_name}, visit_id: {pair_id} yielded: {data_ids}"
         )
 
         return [
