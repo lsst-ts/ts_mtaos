@@ -26,6 +26,7 @@ import inspect
 import json
 import logging
 import time
+import traceback
 import typing
 
 import eups
@@ -34,8 +35,8 @@ import yaml
 from astropy import units as u
 from lsst.ts import salobj
 from lsst.ts.idl.enums.MTAOS import ClosedLoopState, FilterType
-from lsst.ts.observatory.control.maintel.comcam import ComCam
-from lsst.ts.observatory.control.maintel.lsstcam import LsstCam
+from lsst.ts.observatory.control.maintel.comcam import ComCam, ComCamUsages
+from lsst.ts.observatory.control.maintel.lsstcam import LSSTCam, LSSTCamUsages
 from lsst.ts.ofc import OFCData
 from lsst.ts.utils import astropy_time_from_tai_unix, make_done_future
 
@@ -62,6 +63,7 @@ class MTAOS(salobj.ConfigurableCsc):
     LOG_FILE_NAME = "MTAOS.log"
     MAX_TIME_SAMPLE = 100
     CMD_TIMEOUT = 60.0
+    CLOSED_LOOP_FAILED = 1
 
     def __init__(
         self, config_dir=None, log_to_file=False, log_level=None, simulation_mode=0
@@ -116,8 +118,6 @@ class MTAOS(salobj.ConfigurableCsc):
             Dictionary to store critical execution times.
         ocps: `salobj.Remote`
             Remote for the OCPS component.
-        mtcs: `lsst.ts.mtaos.MTCS`
-            MTCS CSC.
         camera: `lsst.ts.observatory.control.maintel.lsstcam.LsstCam` or
             `lsst.ts.observatory.control.maintel.comcam.ComCam`
             Camera object.
@@ -225,7 +225,6 @@ class MTAOS(salobj.ConfigurableCsc):
         self.m2_min_forces_to_apply = 1e-3
 
         self.ocps = salobj.Remote(self.domain, "OCPS", 101)
-        self.mtcs = salobj.Remote(self.domain, "MTCS", 101)
 
         self._camera = None
         self.closed_loop_task = make_done_future()
@@ -335,17 +334,18 @@ class MTAOS(salobj.ConfigurableCsc):
             self.camera = ComCam(
                 self.domain,
                 log=self.log,
-                tcs_ready_to_take_data=self.mtcs.ready_to_take_data,
+                intended_usage=ComCamUsages.MonitorState,
             )
         elif config.camera == "lsstCam":
-            self.camera = LsstCam(
+            self.camera = LSSTCam(
                 self.domain,
                 log=self.log,
-                tcs_ready_to_take_data=self.mtcs.ready_to_take_data,
+                intended_usage=LSSTCamUsages.MonitorState,
             )
         self.oods = self.camera.rem.ccoods
         self.use_ocps = config.use_ocps
         self.used_dofs = config.used_dofs
+        self.elevation_delta_limit = config.elevation_delta_limit
 
         # Set the stress scale approach, factor, and limits
         self.stress_scale_approach = config.stress_scale_approach
@@ -441,6 +441,10 @@ class MTAOS(salobj.ConfigurableCsc):
             result="issueCorrection started.",
         )
 
+        await self._execute_issue_correction()
+
+    async def _execute_issue_correction(self):
+        """Handles the core logic of issuing corrections to the components."""
         # We don't want multiple commands to be executed at the same time.
         # This lock will block any subsequent command from being executed until
         # this one is done.
@@ -547,6 +551,17 @@ class MTAOS(salobj.ConfigurableCsc):
             result="runWEP started.",
         )
 
+        await self._execute_wavefront_estimation(data)
+
+    async def _execute_wavefront_estimation(self, data):
+        """Handles the core logic of processing wavefront data, sending calls
+        to OCPS or executing WEP from model.
+
+        Parameters
+        ----------
+        data : object
+            Data for the command being executed.
+        """
         intra_visit_id = self.visit_id_offset + data.visitId
         extra_visit_id = (
             self.visit_id_offset + data.extraId if data.extraId > 0 else None
@@ -641,6 +656,18 @@ class MTAOS(salobj.ConfigurableCsc):
             timeout=self.LONG_TIMEOUT,
             result="runOFC started.",
         )
+
+        await self._execute_ofc(data)
+
+    async def _execute_ofc(self, data):
+        """Handles the core logic of running the OFC,
+        sending calls to the model to compute corrections.
+
+        Parameters
+        ----------
+        data : object
+            Data for the command being executed.
+        """
 
         async with self.issue_correction_lock:
             kp = self.model.ofc.controller.kp
@@ -809,30 +836,41 @@ class MTAOS(salobj.ConfigurableCsc):
 
     def do_stopClosedLoop(self):
         """Stop the closed loop operation."""
+        self.assert_enabled()
         self._logExecFunc()
+
+        if self.close_loop_task.done():
+            self.log.warning("Closed loop already stopped.")
+            return
 
         self.closed_loop_task.cancel()
         await self.evt_closedLoopState.set_write(state=ClosedLoopState.IDLE)
+        try:
+            await self.closed_loop_task
+        except asyncio.CancelledError:
+            pass
 
     def do_startClosedLoop(self):
         """Start the closed loop operation."""
-        self.closed_loop_task = asyncio.create_task(self.closed_loop())
+        self.assert_enabled()
+        if self.closed_loop_task.done():
+            self.closed_loop_task = asyncio.create_task(self.run_closed_loop())
+        else:
+            self.log.info("Closed loop already running, nothing to do.")
 
-    async def closed_loop(self):
+    async def run_closed_loop(self):
         """Closed loop operation."""
         self._logExecFunc()
 
         prev_elevation = None
+        self.oods.evt_imageInOODS.flush()
         while self.summary_state == salobj.State.ENABLED:
             try:
                 await self.evt_closedLoopState.set_write(
                     state=ClosedLoopState.WAITING_IMAGE
                 )
 
-                self.oods.evt_imageInOODS.flush()
-                image_in_oods = await self.oods.evt_imageInOODS.next(
-                    flush=False, timeout=self.exposure_time
-                )
+                image_in_oods = await self.oods.evt_imageInOODS.next(flush=False)
                 self.log.info(
                     f"Image {image_in_oods.obsid} {image_in_oods.raft} {image_in_oods.sensor} ingested."
                 )
@@ -841,19 +879,23 @@ class MTAOS(salobj.ConfigurableCsc):
                     state=ClosedLoopState.PROCESSING
                 )
 
-                await self.do_runWEP.set_start(
-                    visitId=image_in_oods.obsid,
-                    extraId=None,
-                    useOCPS=self.use_ocps,
-                    config=self.wep_config,
-                    timeout=self.CMD_TIMEOUT,
+                self._execute_wavefront_estimation(
+                    data=salobj.cmd_runWEP.DataType(
+                        visitId=image_in_oods.obsid,
+                        extraId=None,
+                        useOCPS=self.use_ocps,
+                        config=self.wep_config,
+                    )
                 )
 
                 filter, rotation_angle, elevation = await self.model.get_image_info(
                     image_in_oods.obsid
                 )
 
-                if prev_elevation is not None and abs(elevation - prev_elevation) > 9:
+                if (
+                    prev_elevation is not None
+                    and abs(elevation - prev_elevation) > self.elevation_delta_limit
+                ):
                     self.log.warning(
                         "Elevation delta is greater than 9 deg. Not applying corrections."
                     )
@@ -872,21 +914,28 @@ class MTAOS(salobj.ConfigurableCsc):
                 }
                 config_yaml = yaml.safe_dump(config)
 
-                await self.do_runOFC.set_start(
-                    userGain=0.0,
-                    config=config_yaml,
-                    timeout=self.CMD_TIMEOUT,
+                await self._execute_ofc(
+                    data=salobj.cmd_runOFC.DataType(
+                        userGain=0.0,
+                        config=config_yaml,
+                        timeout=self.CMD_TIMEOUT,
+                    )
                 )
 
                 await self.evt_closedLoopState.set_write(
                     state=ClosedLoopState.WAITING_APPLY
                 )
-                await self.do_issueCorrection.set_start(timeout=self.CMD_TIMEOUT)
+                await self._execute_issue_correction()
 
             except Exception:
+                await self.fault(
+                    code=self.CLOSED_LOOP_FAILED,
+                    report="Error in closed loop.",
+                    traceback=traceback.format_exc(),
+                )
                 self.log.exception("Closed loop failed; turning off closed loop mode")
                 await self.evt_closedLoopState.set_write(state=ClosedLoopState.ERROR)
-                return
+                raise
 
     def apply_stress_correction(
         self,
