@@ -71,6 +71,8 @@ class Model:
         data_instrument_name=None,
         reference_detector=0,
         zernike_table_name="zernikes",
+        elevation_delta_limit_max=9.0,
+        elevation_delta_limit_min=4.0,
     ):
         """MTAOS model class.
 
@@ -142,6 +144,10 @@ class Model:
         zernike_table_name : `str`, optional
             Name of the table in the butler with zernike coeffients.
             Default is "zernikes".
+        elevation_delta_limit_max : `float`
+            Maximum elevation change allowed before rejecting corrections.
+        elevation_delta_limit_min : `float`
+            Minimum elevation change allowed before scaling corrections.
         wep_configuration_validation : `dict`
             Dictionary to store schema validations for wavefront estimation
             pipeline tasks.
@@ -201,6 +207,8 @@ class Model:
         )
         self.zernike_table_name = zernike_table_name
         self.reference_detector = reference_detector
+        self.elevation_delta_limit_max = elevation_delta_limit_max
+        self.elevation_delta_limit_min = elevation_delta_limit_min
 
         science_sensor_config_schema = copy.deepcopy(WEP_HEADER_CONFIG)
         science_sensor_config_schema["properties"]["tasks"]["properties"] = dict()
@@ -1056,6 +1064,46 @@ class Model:
         ) / 2
 
         return filter, rotation_angle, elevation
+
+    async def should_apply_corrections(self, visit_id: int) -> float:
+        """Check if corrections are supposed to be applied.
+
+        Parameters
+        ----------
+        visit_id : `int`
+            Visit id of the image.
+
+        Returns
+        -------
+        gain : `float`
+            Gain to apply to the corrections.
+        """
+        _, _, elevation = await self.get_image_info(visit_id)
+        _, _, prev_elevation = await self.get_image_info(visit_id - 1)
+
+        elevation_diff = np.abs(elevation - prev_elevation)
+        if elevation_diff >= self.elevation_delta_limit_max:
+            self.log.info(
+                f"Large elevation change detected: {elevation} - {prev_elevation} = {elevation_diff}. "
+                "Rejecting corrections."
+            )
+            return 0.0  # No corrections applied
+
+        if elevation_diff <= self.elevation_delta_limit_min:
+            return self.ofc.controller.kp
+
+        # Linearly decreasing gain from kp at 4.0 to 0.0 at 9.0
+        gain = (
+            self.ofc.controller.kp
+            * (self.elevation_delta_limit_max - elevation_diff)
+            / (self.elevation_delta_limit_max - self.elevation_delta_limit_min)
+        )
+
+        self.log.info(
+            f"Applying partial corrections with gain {gain:.2f} "
+            f"for elevation difference {elevation_diff:.2f}."
+        )
+        return gain
 
     async def _poll_butler_outputs(
         self,
