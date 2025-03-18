@@ -135,13 +135,21 @@ properties:
     maxItems: 50
     default: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
-  elevation_delta_limit:
+  elevation_delta_limit_max:
     description: >-
       Elevation delta limit in degrees. If the delta between
       consecutive exposures is greater than this value, the
       closed loop will not apply the computed corrections.
     type: number
     default: 9.0
+
+  elevation_delta_limit_min:
+    description: >-
+      Elevation delta limit in degrees. If the delta between
+      consecutive exposures is less than this value, the
+      closed loop corrections will be applied fully.
+    type: number
+    default: 4.0
 
   m1m3_stress_limit:
     description: >-
