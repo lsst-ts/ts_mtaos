@@ -1066,7 +1066,7 @@ class Model:
         return filter, rotation_angle, elevation
 
     async def get_correction_gain(
-        self, visit_id: int, prev_elevation: float | None
+        self, visit_id: int, previous_elevation: float | None
     ) -> float:
         """Check if corrections are supposed to be applied.
 
@@ -1074,8 +1074,8 @@ class Model:
         ----------
         visit_id : `int`
             Visit id of the image.
-        prev_elevation : `float` or `None`
-            Elevation of the previous image.
+        previous_elevation : `float` or `None`
+            Elevation of the previous image in deg.
 
         Returns
         -------
@@ -1084,10 +1084,14 @@ class Model:
         """
         _, _, elevation = await self.get_image_info(visit_id)
 
-        elevation_diff = np.abs(elevation - prev_elevation) if prev_elevation else 0.0
+        elevation_diff = (
+            np.abs(elevation - previous_elevation)
+            if previous_elevation is not None
+            else 0.0
+        )
         if elevation_diff >= self.elevation_delta_limit_max:
-            self.log.info(
-                f"Large elevation change detected: {elevation} - {prev_elevation} = {elevation_diff}. "
+            self.log.warning(
+                f"Large elevation change detected: {elevation} - {previous_elevation} = {elevation_diff}. "
                 "Rejecting corrections."
             )
             return 0.0  # No corrections applied
