@@ -827,7 +827,7 @@ class MTAOS(salobj.ConfigurableCsc):
             await self.pubEvent_degreeOfFreedom()
             await self.pubEvent_mirrorStresses()
 
-    def do_stopClosedLoop(self):
+    async def do_stopClosedLoop(self):
         """Stop the closed loop operation."""
         self.assert_enabled()
         self._logExecFunc()
