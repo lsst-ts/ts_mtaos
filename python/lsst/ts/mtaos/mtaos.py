@@ -35,8 +35,6 @@ import yaml
 from astropy import units as u
 from lsst.ts import salobj
 from lsst.ts.idl.enums.MTAOS import ClosedLoopState, FilterType
-from lsst.ts.observatory.control.maintel.comcam import ComCam, ComCamUsages
-from lsst.ts.observatory.control.maintel.lsstcam import LSSTCam, LSSTCamUsages
 from lsst.ts.ofc import OFCData
 from lsst.ts.utils import astropy_time_from_tai_unix, make_done_future
 
@@ -118,9 +116,6 @@ class MTAOS(salobj.ConfigurableCsc):
             Dictionary to store critical execution times.
         ocps: `salobj.Remote`
             Remote for the OCPS component.
-        camera: `lsst.ts.observatory.control.maintel.lsstcam.LsstCam` or
-            `lsst.ts.observatory.control.maintel.comcam.ComCam`
-            Camera object.
         camera_name: `str`
             Name of the camera.
         stress_scale_approach: `str`
@@ -335,20 +330,9 @@ class MTAOS(salobj.ConfigurableCsc):
             self.wep_config = dict()
 
         if config.camera == "comcam":
-            self.camera = ComCam(
-                self.domain,
-                log=self.log,
-                intended_usage=ComCamUsages.MonitorState,
-            )
             self.camera_name = "LSSTComCam"
         elif config.camera == "lsstCam":
-            self.camera = LSSTCam(
-                self.domain,
-                log=self.log,
-                intended_usage=LSSTCamUsages.MonitorState,
-            )
             self.camera_name = "LSSTCam"
-        self.oods = self.camera.rem.ccoods
         self.use_ocps = config.use_ocps
         self.used_dofs = config.used_dofs
 
@@ -872,74 +856,89 @@ class MTAOS(salobj.ConfigurableCsc):
         """Closed loop operation."""
         self._logExecFunc()
 
-        self.oods.evt_imageInOODS.flush()
-        while self.summary_state == salobj.State.ENABLED:
-            try:
-                await self.evt_closedLoopState.set_write(
-                    state=ClosedLoopState.WAITING_IMAGE
-                )
-
-                image_in_oods = await self.oods.evt_imageInOODS.next(flush=False)
-                self.log.info(
-                    f"Image {image_in_oods.obsid} {image_in_oods.raft} {image_in_oods.sensor} ingested."
-                )
-
-                await self.evt_closedLoopState.set_write(
-                    state=ClosedLoopState.PROCESSING
-                )
-
-                self._execute_wavefront_estimation(
-                    data=salobj.cmd_runWEP.DataType(
-                        visitId=image_in_oods.obsid,
-                        extraId=None,
-                        useOCPS=self.use_ocps,
-                        config=self.wep_config,
+        prev_elevation = None
+        async with salobj.Remote(
+            "MTOODS" if self.camera_name == "LSSTCam" else "CCOODS"
+        ) as oods:
+            oods.evt_imageInOODS.flush()
+            while self.summary_state == salobj.State.ENABLED:
+                try:
+                    await self.evt_closedLoopState.set_write(
+                        state=ClosedLoopState.WAITING_IMAGE
                     )
-                )
 
-                filter, rotation_angle, _ = await self.model.get_image_info(
-                    image_in_oods.obsid
-                )
-                gain = await self.model.should_apply_corrections(image_in_oods.obsid)
-                if gain > 0.0:
-                    config = {
-                        "filter_name": filter,
-                        "rotation_angle": rotation_angle,
-                        "comp_dof_idx": {
-                            "m2HexPos": [float(val) for val in self.used_dofs[:5]],
-                            "camHexPos": [float(val) for val in self.used_dofs[5:10]],
-                            "M1M3Bend": [float(val) for val in self.used_dofs[10:30]],
-                            "M2Bend": [float(val) for val in self.used_dofs[30:]],
-                        },
-                    }
-                    config_yaml = yaml.safe_dump(config)
-
-                    await self._execute_ofc(
-                        data=salobj.cmd_runOFC.DataType(
-                            userGain=gain,
-                            config=config_yaml,
-                            timeout=self.CMD_TIMEOUT,
-                        )
+                    image_in_oods = await oods.evt_imageInOODS.next(flush=False)
+                    self.log.info(
+                        f"Image {image_in_oods.obsid} {image_in_oods.raft} {image_in_oods.sensor} ingested."
                     )
 
                     await self.evt_closedLoopState.set_write(
-                        state=ClosedLoopState.WAITING_APPLY
-                    )
-                    await self._execute_issue_correction()
-                else:
-                    self.log.info(
-                        "Skipping correction but proceeding with closed-loop execution."
+                        state=ClosedLoopState.PROCESSING
                     )
 
-            except Exception:
-                await self.fault(
-                    code=self.CLOSED_LOOP_FAILED,
-                    report="Error in closed loop.",
-                    traceback=traceback.format_exc(),
-                )
-                self.log.exception("Closed loop failed; turning off closed loop mode")
-                await self.evt_closedLoopState.set_write(state=ClosedLoopState.ERROR)
-                raise
+                    self._execute_wavefront_estimation(
+                        data=salobj.cmd_runWEP.DataType(
+                            visitId=image_in_oods.obsid,
+                            extraId=None,
+                            useOCPS=self.use_ocps,
+                            config=self.wep_config,
+                        )
+                    )
+
+                    filter, rotation_angle, elevation = await self.model.get_image_info(
+                        image_in_oods.obsid
+                    )
+                    gain = await self.model.get_correction_gain(
+                        image_in_oods.obsid, prev_elevation
+                    )
+                    prev_elevation = elevation
+                    if gain > 0.0:
+                        config = {
+                            "filter_name": filter,
+                            "rotation_angle": rotation_angle,
+                            "comp_dof_idx": {
+                                "m2HexPos": [float(val) for val in self.used_dofs[:5]],
+                                "camHexPos": [
+                                    float(val) for val in self.used_dofs[5:10]
+                                ],
+                                "M1M3Bend": [
+                                    float(val) for val in self.used_dofs[10:30]
+                                ],
+                                "M2Bend": [float(val) for val in self.used_dofs[30:]],
+                            },
+                        }
+                        config_yaml = yaml.safe_dump(config)
+
+                        await self._execute_ofc(
+                            data=salobj.cmd_runOFC.DataType(
+                                userGain=gain,
+                                config=config_yaml,
+                                timeout=self.CMD_TIMEOUT,
+                            )
+                        )
+
+                        await self.evt_closedLoopState.set_write(
+                            state=ClosedLoopState.WAITING_APPLY
+                        )
+                        await self._execute_issue_correction()
+                    else:
+                        self.log.info(
+                            "Skipping correction but proceeding with closed-loop execution."
+                        )
+
+                except Exception:
+                    await self.fault(
+                        code=self.CLOSED_LOOP_FAILED,
+                        report="Error in closed loop.",
+                        traceback=traceback.format_exc(),
+                    )
+                    self.log.exception(
+                        "Closed loop failed; turning off closed loop mode"
+                    )
+                    await self.evt_closedLoopState.set_write(
+                        state=ClosedLoopState.ERROR
+                    )
+                    raise
 
     def apply_stress_correction(
         self,
