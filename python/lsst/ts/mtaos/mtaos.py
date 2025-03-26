@@ -223,7 +223,6 @@ class MTAOS(salobj.ConfigurableCsc):
 
         self.ocps = salobj.Remote(self.domain, "OCPS", 101)
 
-        self.camera = None
         self.closed_loop_task = make_done_future()
 
         # Model class to do the real data processing
