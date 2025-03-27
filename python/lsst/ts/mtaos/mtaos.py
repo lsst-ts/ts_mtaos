@@ -34,9 +34,9 @@ import numpy as np
 import yaml
 from astropy import units as u
 from lsst.ts import salobj
-from lsst.ts.idl.enums.MTAOS import ClosedLoopState, FilterType
 from lsst.ts.ofc import OFCData
 from lsst.ts.utils import astropy_time_from_tai_unix, make_done_future
+from lsst.ts.xml.enums.MTAOS import ClosedLoopState, FilterType
 
 from . import CONFIG_SCHEMA, TELESCOPE_DOF_SCHEMA, Config, Model, __version__, utility
 
