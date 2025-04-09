@@ -1552,6 +1552,9 @@ class Model:
                     elif key == "controller_filename":
                         self.ofc.ofc_data.controller_filename = kwargs[key]
 
+                    elif key == "truncation_index":
+                        self.ofc.ofc_data.truncation_index = kwargs[key]
+
                     elif key == "xref":
                         self.ofc.ofc_data.xref = kwargs[key]
 
@@ -1566,6 +1569,7 @@ class Model:
                 setattr(self.ofc.ofc_data, key, original_ofc_data_values[key])
             raise
         else:
+            self.ofc = OFC(self.ofc.ofc_data)
             return original_ofc_data_values
 
     async def log_stream(self, stream: asyncio.subprocess.PIPE) -> None:
