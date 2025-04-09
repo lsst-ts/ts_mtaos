@@ -2,6 +2,15 @@
 Version History
 ===============
 
+v0.17.0
+-------
+
+* Added new closed loop task commands `do_startClosedLoop` and `do_stopClosedLoop` in `mtaos.py``.
+
+* Updated Jenkinsfile to use shared library
+
+* Update configurations to run with ts_wep 14.1 version
+
 v0.16.1
 -------
 
