@@ -1,4 +1,4 @@
 tasks:
   generateDonutCatalogWcsTask:
     config:
-      filterName: phot_g_mean
+      anyFilterMapsToThis: phot_g_mean

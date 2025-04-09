@@ -18,3 +18,7 @@ m1m3_stress_limit: 137900.0 # Pascals (approx. 20 psi)
 m2_stress_limit: 344737.0 # Pascals (approx. 50 psi)
 stress_scale_approach: "truncate"
 stress_scale_factor: 1.25
+elevation_delta_limit_max: 9.0
+elevation_delta_limit_min: 4.0
+use_ocps: False
+used_dofs: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
