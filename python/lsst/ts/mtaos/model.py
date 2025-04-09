@@ -44,6 +44,7 @@ from lsst.ts.utils import make_done_future
 from lsst.ts.wep.utils import writePipetaskCmd
 
 from .config_schema import (
+    COMCAM_PIPELINE_CONFIG,
     CWFS_PIPELINE_CONFIG,
     GENERATE_DONUT_CATALOG_CONFIG,
     ISR_CONFIG,
@@ -71,6 +72,8 @@ class Model:
         data_instrument_name=None,
         reference_detector=0,
         zernike_table_name="zernikes",
+        elevation_delta_limit_max=9.0,
+        elevation_delta_limit_min=4.0,
     ):
         """MTAOS model class.
 
@@ -142,6 +145,10 @@ class Model:
         zernike_table_name : `str`, optional
             Name of the table in the butler with zernike coeffients.
             Default is "zernikes".
+        elevation_delta_limit_max : `float`
+            Maximum elevation change allowed before rejecting corrections.
+        elevation_delta_limit_min : `float`
+            Minimum elevation change allowed before scaling corrections.
         wep_configuration_validation : `dict`
             Dictionary to store schema validations for wavefront estimation
             pipeline tasks.
@@ -201,6 +208,8 @@ class Model:
         )
         self.zernike_table_name = zernike_table_name
         self.reference_detector = reference_detector
+        self.elevation_delta_limit_max = elevation_delta_limit_max
+        self.elevation_delta_limit_min = elevation_delta_limit_min
 
         science_sensor_config_schema = copy.deepcopy(WEP_HEADER_CONFIG)
         science_sensor_config_schema["properties"]["tasks"]["properties"] = dict()
@@ -220,9 +229,14 @@ class Model:
         cwfs_config_schema["properties"]["tasks"]["properties"].update(
             GENERATE_DONUT_CATALOG_CONFIG
         )
-        cwfs_config_schema["properties"]["tasks"]["properties"].update(
-            CWFS_PIPELINE_CONFIG
-        )
+        if instrument == "comcam":
+            cwfs_config_schema["properties"]["tasks"]["properties"].update(
+                COMCAM_PIPELINE_CONFIG
+            )
+        else:
+            cwfs_config_schema["properties"]["tasks"]["properties"].update(
+                CWFS_PIPELINE_CONFIG
+            )
 
         self.wep_configuration_validation = dict(
             comcam=DefaultingValidator(science_sensor_config_schema),
@@ -618,7 +632,8 @@ class Model:
         async with self.handle_wep_process(
             instrument="lsstCam",
             exposures_str=f"exposure IN ({visit_id}) "
-            f"AND detector IN ({get_formatted_corner_wavefront_sensors_ids()})",
+            f"AND detector IN ({get_formatted_corner_wavefront_sensors_ids()})"
+            " AND instrument = 'LSSTCam'",
             run_name=run_name,
             config=config,
         ):
@@ -682,19 +697,16 @@ class Model:
             )
         )
 
-    async def query_ocps_results(self, intra_id, extra_id, timeout=300):
+    async def query_ocps_results(self, instrument, intra_id, extra_id, timeout=300):
         """Query the OCPS results."""
-        if extra_id is None:
-            raise NotImplementedError("OCPS is not implemented for Main Camera.")
-        else:
-            self.wavefront_errors.append(
-                await self._poll_butler_outputs(
-                    intra_id=intra_id,
-                    extra_id=extra_id,
-                    instrument="comcam",
-                    timeout=timeout,
-                )
+        self.wavefront_errors.append(
+            await self._poll_butler_outputs(
+                intra_id=intra_id,
+                extra_id=extra_id,
+                instrument=instrument,
+                timeout=timeout,
             )
+        )
 
     @contextlib.asynccontextmanager
     async def handle_wep_process(
@@ -803,7 +815,7 @@ class Model:
             )
 
             self.log.debug(
-                f"Run name: {run_name}. Pipeline configuration in {config_file}."
+                f"Run name: {run_name}. Pipeline configuration in {config_file.name}."
             )
 
             run_pipetask_cmd = self._generate_pipetask_command(
@@ -1021,6 +1033,96 @@ class Model:
 
         return run_pipetask_cmd
 
+    async def get_image_info(self, visit_id, instrument):
+        """Get image information from the butler.
+
+        Parameters
+        ----------
+        visit_id : `int`
+            Visit id of the image.
+        instrument : `str`
+            Name of the instrument.
+
+        Returns
+        -------
+        filter : `str`
+            Filter of the image.
+        rotation_angle : `float`
+            Rotation angle of the image.
+        elevation : `float`
+            Elevation of the image.
+
+        Raises
+        ------
+        ValueError
+            If the visit id is not found in the butler.
+        """
+        butler = dafButler.Butler(self.data_path)
+        refs = butler.query_datasets(
+            "raw", where=f"visit={visit_id} and instrument={instrument}"
+        )
+
+        if len(refs) == 0:
+            raise ValueError(
+                f"Visit {visit_id} has no associated images in the butler."
+            )
+
+        image = butler.get(refs[0])
+        filter = image.getFilter().bandLabel
+        rotation_angle = image.getMetadata().get("ROTPA")
+        elevation = (
+            image.getMetadata().get("ELSTART") + image.getMetadata().get("ELEND")
+        ) / 2
+
+        return filter, rotation_angle, elevation
+
+    async def get_correction_gain(
+        self, visit_id: int, previous_elevation: float | None
+    ) -> float:
+        """Check if corrections are supposed to be applied.
+
+        Parameters
+        ----------
+        visit_id : `int`
+            Visit id of the image.
+        previous_elevation : `float` or `None`
+            Elevation of the previous image in deg.
+
+        Returns
+        -------
+        gain : `float`
+            Gain to apply to the corrections.
+        """
+        _, _, elevation = await self.get_image_info(visit_id)
+
+        elevation_diff = (
+            np.abs(elevation - previous_elevation)
+            if previous_elevation is not None
+            else 0.0
+        )
+        if elevation_diff >= self.elevation_delta_limit_max:
+            self.log.warning(
+                f"Large elevation change detected: {elevation} - {previous_elevation} = {elevation_diff}. "
+                "Rejecting corrections."
+            )
+            return 0.0  # No corrections applied
+
+        if elevation_diff <= self.elevation_delta_limit_min:
+            return self.ofc.controller.kp
+
+        # Linearly decreasing gain from kp at 4.0 to 0.0 at 9.0
+        gain = (
+            self.ofc.controller.kp
+            * (self.elevation_delta_limit_max - elevation_diff)
+            / (self.elevation_delta_limit_max - self.elevation_delta_limit_min)
+        )
+
+        self.log.info(
+            f"Applying partial corrections with gain {gain:.2f} "
+            f"for elevation difference {elevation_diff:.2f}."
+        )
+        return gain
+
     async def _poll_butler_outputs(
         self,
         intra_id: int,
@@ -1063,23 +1165,24 @@ class Model:
         elapsed_time = 0.0
         n_tables = 9
 
+        pair_id = extra_id if extra_id is not None else intra_id
         while elapsed_time < timeout:
             try:
                 self.log.info(
                     f"Querying datasets: zernike_table_name={self.zernike_table_name}, "
-                    f"{self.run_name=} {extra_id=}."
+                    f"{self.run_name=} {pair_id=}."
                 )
-                data_ids = butler.registry.queryDatasets(
+                refs = butler.query_datasets(
                     self.zernike_table_name,
                     collections=[self.run_name],
-                    where=f"visit in ({extra_id})",
+                    where=f"visit in ({pair_id})",
                 )
-                if data_ids.count() >= n_tables:
-                    self.log.debug(f"Query returned {data_ids.count()} results.")
+                if refs.count() >= n_tables:
+                    self.log.debug(f"Query returned {refs.count()} results.")
                     break
                 else:
                     self.log.debug(
-                        f"Query returned {data_ids.count()} entries, waiting for {n_tables}. Continuing."
+                        f"Query returned {refs.count()} entries, waiting for {n_tables}. Continuing."
                     )
             except Exception:
                 self.log.exception(
@@ -1093,23 +1196,23 @@ class Model:
             self.log.error(f"Polling loop timed out {timeout=}s, {elapsed_time=}s.")
             raise TimeoutError(
                 f"Timeout: Could not find outputs for run '{self.run_name}' "
-                f"and visit id {extra_id} within {timeout} seconds."
+                f"and visit id {pair_id} within {timeout} seconds."
             )
 
         self.log.debug(
-            f"run_name: {self.run_name}, visit_id: {extra_id} yielded: {data_ids}"
+            f"run_name: {self.run_name}, visit_id: {pair_id} yielded: {refs}"
         )
 
         return [
             (
-                data_id.dataId["detector"],
+                ref.dataId["detector"],
                 butler.get(
                     self.zernike_table_name,
-                    dataId=data_id.dataId,
+                    dataId=ref.dataId,
                     collections=[self.run_name],
                 ),
             )
-            for data_id in data_ids
+            for ref in refs
         ]
 
     def _gather_outputs(
@@ -1150,25 +1253,23 @@ class Model:
             self.log.debug(ref.dataId)
 
         # Get output
-        data_ids = butler.registry.queryDatasets(
+        refs = butler.query_datasets(
             self.zernike_table_name,
             collections=[run_name],
         )
 
-        self.log.debug(
-            f"run_name: {run_name}, visit_id: {visit_id} yielded: {data_ids}"
-        )
+        self.log.debug(f"run_name: {run_name}, visit_id: {visit_id} yielded: {refs}")
 
         return [
             (
-                data_id.dataId["detector"],
+                ref.dataId["detector"],
                 butler.get(
                     self.zernike_table_name,
-                    dataId=data_id.dataId,
+                    dataId=ref.dataId,
                     collections=[run_name],
                 ),
             )
-            for data_id in data_ids
+            for ref in refs
         ]
 
     def reject_unreasonable_wfe(self, listOfWfErr):
