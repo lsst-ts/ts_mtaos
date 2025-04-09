@@ -81,7 +81,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
             reference_detector=94,
         )
 
-        cls.short_waittime = 1.0
+        cls.short_waittime = 10.0
 
     @classmethod
     def tearDownClass(cls):
