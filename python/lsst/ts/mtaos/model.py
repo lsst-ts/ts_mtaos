@@ -1569,7 +1569,6 @@ class Model:
                 setattr(self.ofc.ofc_data, key, original_ofc_data_values[key])
             raise
         else:
-            self.ofc = OFC(self.ofc.ofc_data)
             return original_ofc_data_values
 
     async def log_stream(self, stream: asyncio.subprocess.PIPE) -> None:
