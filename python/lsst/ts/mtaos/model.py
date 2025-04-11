@@ -1550,7 +1550,10 @@ class Model:
                         )
 
                     elif key == "controller_filename":
-                        self.ofc.ofc_data.controller_filename = kwargs[key]
+                        self.ofc.set_controller_filename(kwargs[key])
+
+                    elif key == "truncation_index":
+                        self.ofc.set_truncation_index(kwargs[key])
 
                     elif key == "xref":
                         self.ofc.ofc_data.xref = kwargs[key]
