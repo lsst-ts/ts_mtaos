@@ -10,6 +10,10 @@ v0.17.0
 * Updated Jenkinsfile to use shared library
 
 * Update configurations to run with ts_wep 14.1 version
+  
+* Reinitialize OFC after `model.set_ofc_data_values` are set.
+
+* Add `truncation_index` as a configurable field in `set_ofc_data_values`
 
 v0.16.1
 -------
