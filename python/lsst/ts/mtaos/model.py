@@ -35,8 +35,7 @@ from typing import Optional
 
 import numpy as np
 import yaml
-from lsst.afw.image import VisitInfo
-from lsst.daf import butler as dafButler
+from lsst.daf.butler import Butler, EmptyQueryResultError
 from lsst.ts.ofc import OFC, BendModeToForce
 from lsst.ts.ofc.utils.ofc_data_helpers import get_intrinsic_zernikes, get_sensor_names
 from lsst.ts.salobj import DefaultingValidator
@@ -254,7 +253,7 @@ class Model:
         self._fwhm_data = dict()
 
         # Optical feedback control
-        self.ofc = OFC(ofc_data)
+        self.ofc = OFC(ofc_data, log=self.log)
 
         # M2 hexapod correction
         self.m2_hexapod_correction = None
@@ -1057,27 +1056,26 @@ class Model:
         ValueError
             If the visit id is not found in the butler.
         """
-        butler = dafButler.Butler(self.data_path)
-        refs = butler.query_datasets(
-            "raw", where=f"visit={visit_id} and instrument={instrument}"
+        butler = Butler(
+            self.data_path,
+            instrument="LSSTCam",
+            collections=[self.run_name, "LSSTCam/raw/all"],
         )
-
-        if len(refs) == 0:
-            raise ValueError(
-                f"Visit {visit_id} has no associated images in the butler."
-            )
+        refs = butler.query_datasets("raw", where=f"visit={visit_id}")
 
         image = butler.get(refs[0])
-        filter = image.getFilter().bandLabel
-        rotation_angle = image.getMetadata().get("ROTPA")
+        filter_label = image.getFilter().bandLabel
         elevation = (
             image.getMetadata().get("ELSTART") + image.getMetadata().get("ELEND")
         ) / 2
 
-        return filter, rotation_angle, elevation
+        return filter_label, elevation
 
     async def get_correction_gain(
-        self, visit_id: int, previous_elevation: float | None
+        self,
+        visit_id: int,
+        previous_elevation: float | None,
+        camera_name: str,
     ) -> float:
         """Check if corrections are supposed to be applied.
 
@@ -1093,7 +1091,10 @@ class Model:
         gain : `float`
             Gain to apply to the corrections.
         """
-        _, _, elevation = await self.get_image_info(visit_id)
+        _, elevation = await self.get_image_info(
+            visit_id,
+            camera_name,
+        )
 
         elevation_diff = (
             np.abs(elevation - previous_elevation)
@@ -1160,12 +1161,16 @@ class Model:
         """
         self.log.debug("Polling butler for WEP outputs.")
 
-        butler = dafButler.Butler(self.data_path, collections=[self.run_name])
+        butler = Butler(
+            self.data_path, collections=[self.run_name], instrument="LSSTCam"
+        )
         start_time = time.time()
         elapsed_time = 0.0
-        n_tables = 9
+        n_tables = 4
+        n_tables_min = 3
 
         pair_id = extra_id if extra_id is not None else intra_id
+        refs = []
         while elapsed_time < timeout:
             try:
                 self.log.info(
@@ -1177,15 +1182,15 @@ class Model:
                     collections=[self.run_name],
                     where=f"visit in ({pair_id})",
                 )
-                if refs.count() >= n_tables:
-                    self.log.debug(f"Query returned {refs.count()} results.")
+                if len(refs) >= n_tables:
+                    self.log.debug(f"Query returned {len(refs)} results.")
                     break
                 else:
                     self.log.debug(
-                        f"Query returned {refs.count()} entries, waiting for {n_tables}. Continuing."
+                        f"Query returned {len(refs)} entries, waiting for {n_tables}. Continuing."
                     )
-            except Exception:
-                self.log.exception(
+            except EmptyQueryResultError:
+                self.log.debug(
                     f"Collection '{self.run_name}' not found. Waiting {poll_interval}s."
                 )
                 continue
@@ -1194,10 +1199,16 @@ class Model:
                 elapsed_time = time.time() - start_time
         else:
             self.log.error(f"Polling loop timed out {timeout=}s, {elapsed_time=}s.")
-            raise TimeoutError(
-                f"Timeout: Could not find outputs for run '{self.run_name}' "
-                f"and visit id {pair_id} within {timeout} seconds."
-            )
+            if len(refs) < n_tables_min:
+                raise TimeoutError(
+                    f"Timeout: Could not find outputs for run '{self.run_name}' "
+                    f"and visit id {pair_id} within {timeout} seconds."
+                )
+            else:
+                self.log.warning(
+                    f"Only {len(refs)} outputs found, but timeout reached."
+                    "Probably, not enough donut cutouts found."
+                )
 
         self.log.debug(
             f"run_name: {self.run_name}, visit_id: {pair_id} yielded: {refs}"
@@ -1239,20 +1250,10 @@ class Model:
         """
         self.log.debug("Data processing completed successfully. Gathering output.")
 
-        butler = dafButler.Butler(self.data_path)
+        butler = Butler(self.data_path)
 
         # We may need to run the following in an executor so we won't block the
         # event loop.
-
-        datasetRefs = list(
-            butler.registry.queryDatasets(
-                datasetType="postISRCCD", collections=[run_name]
-            )
-        )
-        for ref in datasetRefs:
-            self.log.debug(ref.dataId)
-
-        # Get output
         refs = butler.query_datasets(
             self.zernike_table_name,
             collections=[run_name],
@@ -1584,32 +1585,6 @@ class Model:
             new_line = await stream.readline()
             if len(new_line) > 0:
                 self.log.debug(new_line.decode().strip())
-
-    def _get_visit_info(self, instrument: str, exposure: int) -> VisitInfo:
-        """Get visit info from the butler.
-
-        Parameters
-        ----------
-        instrument : `str`
-            Name of the instrument.
-        exposure : `int`
-            exposure id of data to retrieve information from.
-
-        Returns
-        -------
-        `VisitInfo`
-            Object with information about a single exposure of an imaging
-            camera.
-        """
-        return dafButler.Butler(self.data_path).get(
-            "raw.visitInfo",
-            dataId={
-                "instrument": self.data_instrument_name[instrument],
-                "exposure": exposure,
-                "detector": self.reference_detector,
-            },
-            collections=self.collections.split(","),
-        )
 
     @staticmethod
     def get_sensor_ids_wfe_from_data_container(data_container):
