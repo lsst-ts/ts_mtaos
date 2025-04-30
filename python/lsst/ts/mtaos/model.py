@@ -698,14 +698,14 @@ class Model:
 
     async def query_ocps_results(self, instrument, intra_id, extra_id, timeout=300):
         """Query the OCPS results."""
-        self.wavefront_errors.append(
-            await self._poll_butler_outputs(
-                intra_id=intra_id,
-                extra_id=extra_id,
-                instrument=instrument,
-                timeout=timeout,
-            )
+        results = await self._poll_butler_outputs(
+            intra_id=intra_id,
+            extra_id=extra_id,
+            instrument=instrument,
+            timeout=timeout,
         )
+        self.log.debug(f"OCPS results: {results}")
+        self.wavefront_errors.append(results)
 
     @contextlib.asynccontextmanager
     async def handle_wep_process(
@@ -1166,10 +1166,20 @@ class Model:
         )
         start_time = time.time()
         elapsed_time = 0.0
-        n_tables = 4
-        n_tables_min = 3
 
         pair_id = extra_id if extra_id is not None else intra_id
+
+        if extra_id is not None:
+            n_tables = 189
+            n_tables_min = 100
+        else:
+            n_tables = 4
+            n_tables_min = 3
+
+        self.log.debug(
+            f"Polling for {n_tables} tables. Minimum number of tables: {n_tables_min}."
+        )
+
         refs = []
         while elapsed_time < timeout:
             try:
@@ -1503,6 +1513,12 @@ class Model:
                 if key == "name":
                     self.log.debug(f"Configuring ofc_data for new instrument: {key}.")
                     await self.ofc.ofc_data.configure_instrument(kwargs[key])
+                elif key == "controller_filename":
+                    self.ofc.set_controller_filename(kwargs[key])
+
+                elif key == "truncation_index":
+                    self.ofc.set_truncation_index(kwargs[key])
+
                 elif hasattr(self.ofc.ofc_data, key):
                     self.log.debug(f"Overriding ofc_data parameter {key}.")
                     original_ofc_data_values[key] = copy.copy(
@@ -1549,12 +1565,6 @@ class Model:
                         original_ofc_data_values[key] = (
                             self.ofc.ofc_data.default_comp_dof_idx
                         )
-
-                    elif key == "controller_filename":
-                        self.ofc.set_controller_filename(kwargs[key])
-
-                    elif key == "truncation_index":
-                        self.ofc.set_truncation_index(kwargs[key])
 
                     elif key == "xref":
                         self.ofc.ofc_data.xref = kwargs[key]
