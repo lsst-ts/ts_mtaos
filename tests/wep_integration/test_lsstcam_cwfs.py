@@ -44,7 +44,7 @@ class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
         # Let the mtaos to set WEP based on this path variable
         os.environ["ISRDIRPATH"] = cls.isrDir.as_posix()
 
-        ofc_data = OFCData("lsst")
+        ofc_data = OFCData("lsstfam")
 
         dof_state0 = yaml.safe_load(
             mtaos.getModulePath()
@@ -101,15 +101,12 @@ class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
 
         # There should be at 4 sets of data, one for each corner wavefront
         # sensor.
-        self.assertEqual(len(data), 4)
+        self.assertEqual(len(data), 1)
 
         zk_avg = self.model.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
 
         # The sensors with data are 191, 195, 199 and 203
         self.assertTrue(191 in zk_avg)
-        self.assertTrue(195 in zk_avg)
-        self.assertTrue(199 in zk_avg)
-        self.assertTrue(203 in zk_avg)
 
 
 if __name__ == "__main__":

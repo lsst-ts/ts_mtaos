@@ -174,6 +174,17 @@ properties:
       the individual bending mode stresses.
     type: number
 
+  closed_loop_ofc_configuration:
+    description: >
+      Configuration for the closed loop OFC.
+    type: object
+    properties:
+      truncation_index:
+        description: >-
+          Truncation index for the closed loop OFC.
+        type: integer
+
+
 required:
   - camera
   - instrument

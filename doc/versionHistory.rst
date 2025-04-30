@@ -2,6 +2,19 @@
 Version History
 ===============
 
+v0.18.0
+-------
+
+* Fixed unit tests to work with new ts_wep test data.
+
+* Make closed loop task run with closed_loop_ofc_configuration
+
+* Fixed butler queries to work with LSSTCam on-sky changes.
+
+* Added support for data from only three corner wavefront sensors.
+
+* Added rotator angle from telescope telemetry.
+
 v0.17.0
 -------
 
