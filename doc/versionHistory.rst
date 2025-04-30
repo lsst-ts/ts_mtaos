@@ -14,6 +14,14 @@ v0.18.0
 * Added support for data from only three corner wavefront sensors.
 
 * Added rotator angle from telescope telemetry.
+  
+* Allow for science sensors Full-Array Mode in runOFC.
+
+* Fix set configuration of truncation_index in ofc configuration.
+
+* Add summary state to cmera remote and runtime errors in M1M3 active optics forces.
+
+* Avoid empty zernikes daatasets to be stored in wavefrontError
 
 v0.17.0
 -------
