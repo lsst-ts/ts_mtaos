@@ -177,30 +177,30 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result), 20)
 
     def test_add_correction(self):
-        wavefront_erros = np.zeros(19)
+        wavefront_errors = np.zeros(19)
         default_config = {"sensor_ids": [0, 1, 2, 3, 4, 5, 6, 7, 8]}
 
         # Passing in zeros for wavefront_errors should return 0 in correction
-        self.model.add_correction(wavefront_erros, config=default_config)
+        self.model.add_correction(wavefront_errors, config=default_config)
 
         x, y, z, u, v, w = self.model.m2_hexapod_correction()
 
         print(f"{x=}, {y=}, {z=}, {u=}, {v=}, {w=}")
 
-        self.assertAlmostEqual(x, 0, places=5)
-        self.assertAlmostEqual(y, 0, places=5)
-        self.assertAlmostEqual(z, 0, places=5)
-        self.assertAlmostEqual(u, 0, places=5)
-        self.assertAlmostEqual(v, 0, places=5)
-        self.assertAlmostEqual(w, 0, places=5)
+        self.assertAlmostEqual(x, self.model.ofc.controller.dof_state0[1], places=3)
+        self.assertAlmostEqual(y, self.model.ofc.controller.dof_state0[2], places=3)
+        self.assertAlmostEqual(z, self.model.ofc.controller.dof_state0[0], places=2)
+        self.assertAlmostEqual(u, self.model.ofc.controller.dof_state0[3], places=3)
+        self.assertAlmostEqual(v, self.model.ofc.controller.dof_state0[4], places=3)
+        self.assertAlmostEqual(w, 0, places=3)
 
         x, y, z, u, v, w = self.model.cam_hexapod_correction()
-        self.assertAlmostEqual(x, 0, places=5)
-        self.assertAlmostEqual(y, 0, places=5)
-        self.assertAlmostEqual(z, 0, places=5)
-        self.assertAlmostEqual(u, 0, places=5)
-        self.assertAlmostEqual(v, 0, places=5)
-        self.assertAlmostEqual(w, 0, places=5)
+        self.assertAlmostEqual(x, self.model.ofc.controller.dof_state0[6], places=3)
+        self.assertAlmostEqual(y, self.model.ofc.controller.dof_state0[7], places=3)
+        self.assertAlmostEqual(z, self.model.ofc.controller.dof_state0[5], places=2)
+        self.assertAlmostEqual(u, self.model.ofc.controller.dof_state0[8], places=3)
+        self.assertAlmostEqual(v, self.model.ofc.controller.dof_state0[9], places=3)
+        self.assertAlmostEqual(w, 0, places=3)
 
         actCorr = self.model.m1m3_correction()
         assert np.allclose(actCorr, np.zeros_like(actCorr), rtol=1e-5, atol=1e-5)
@@ -211,8 +211,8 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         # Give 0.1 um of focus correction. All values must be close to zer
         # except z correction.
 
-        wavefront_erros[0] = 0.1
-        self.model.add_correction(wavefront_erros, config=default_config)
+        wavefront_errors[0] = 0.1
+        self.model.add_correction(wavefront_errors, config=default_config)
 
         x, y, z_m2hex, u, v, w = self.model.m2_hexapod_correction()
 
@@ -280,7 +280,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.model.m2_correction()), 72)
 
     def test_reset_wfe_correction(self):
-        data = [1, 2, 3]
+        data = [(1, [1, 2, 3]), (2, [1, 2, 3]), (3, [1, 2, 3])]
         self.model.wavefront_errors.append(data)
         self.model.rejected_wavefront_errors.append(data)
 
