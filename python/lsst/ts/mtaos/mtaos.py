@@ -277,8 +277,8 @@ class MTAOS(salobj.ConfigurableCsc):
                     utility.MTHexapodIndex.Camera.value,
                     [],
                 ),
-                "m1m3": ("MTM1M3", None, ["appliedActiveOpticForces"]),
-                "m2": ("MTM2", None, ["axialForce"]),
+                "m1m3": ("MTM1M3", None, ["summaryState", "appliedActiveOpticForces"]),
+                "m2": ("MTM2", None, ["summaryState", "axialForce"]),
             }
 
             for remote_name in remotes_parameters:
@@ -976,7 +976,10 @@ class MTAOS(salobj.ConfigurableCsc):
                 "endOfImageTelemetry",
             ],
         ) as camera, salobj.Remote(
-            self.domain, "MTRotator", readonly=True, include=["rotation"]
+            self.domain,
+            "MTRotator",
+            readonly=True,
+            include=["summaryState", "rotation"],
         ) as mtrotator:
 
             self.log.info("Closed loop task ready.")
@@ -994,7 +997,6 @@ class MTAOS(salobj.ConfigurableCsc):
 
                     image_in_oods = await oods.evt_imageInOODS.next(flush=False)
                     try:
-
                         _, _, day_obs, index = image_in_oods.obsid.split("_")
                     except ValueError:
                         continue
@@ -1406,11 +1408,14 @@ class MTAOS(salobj.ConfigurableCsc):
                                     "Failed to apply active optic forces on M1M3: "
                                     f"[ack_cmd={ack_cmd.ack!r}]: {ack_cmd.result}."
                                 )
-                            ack_cmd = await self.remotes[
-                                "m1m3"
-                            ].cmd_applyActiveOpticForces.next_ackcmd(
-                                ack_cmd, timeout=self.DEFAULT_TIMEOUT
-                            )
+                            try:
+                                ack_cmd = await self.remotes[
+                                    "m1m3"
+                                ].cmd_applyActiveOpticForces.next_ackcmd(
+                                    ack_cmd, timeout=self.DEFAULT_TIMEOUT
+                                )
+                            except RuntimeError:
+                                break
                             self.log.debug(f"Received {ack_cmd=}")
 
                     except (asyncio.TimeoutError, salobj.base.AckTimeoutError):
