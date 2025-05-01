@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.19.0
+-------
+
+* Add configuration option for `do_startClosedLoop` in mtaos.py.
+
 v0.18.0
 -------
 

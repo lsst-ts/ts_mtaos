@@ -946,6 +946,11 @@ class MTAOS(salobj.ConfigurableCsc):
     def do_startClosedLoop(self, data):
         """Start the closed loop operation."""
         self.assert_enabled()
+
+        # Set ofc configuration to be used in closed loop.
+        if data.config is not None:
+            self.last_run_ofc_configuration = data.config
+
         if self.closed_loop_task.done():
             self.closed_loop_task = asyncio.create_task(self.run_closed_loop())
         else:
