@@ -2,6 +2,27 @@
 Version History
 ===============
 
+v0.18.0
+-------
+
+* Fixed unit tests to work with new ts_wep test data.
+
+* Make closed loop task run with closed_loop_ofc_configuration
+
+* Fixed butler queries to work with LSSTCam on-sky changes.
+
+* Added support for data from only three corner wavefront sensors.
+
+* Added rotator angle from telescope telemetry.
+  
+* Allow for science sensors Full-Array Mode in runOFC.
+
+* Fix set configuration of truncation_index in ofc configuration.
+
+* Add summary state to cmera remote and runtime errors in M1M3 active optics forces.
+
+* Avoid empty zernikes daatasets to be stored in wavefrontError
+
 v0.17.0
 -------
 
@@ -10,6 +31,10 @@ v0.17.0
 * Updated Jenkinsfile to use shared library
 
 * Update configurations to run with ts_wep 14.1 version
+  
+* Reinitialize OFC after `model.set_ofc_data_values` are set.
+
+* Add `truncation_index` as a configurable field in `set_ofc_data_values`
 
 v0.16.1
 -------

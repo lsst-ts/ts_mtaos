@@ -1,5 +1,5 @@
 camera: comcam
-instrument: comcam
+instrument: lsstfam
 data_path: /repo/LSSTComCam
 run_name: mtaos_wep
 collections: "LSSTComCam/raw/all,LSSTComCam/calib"

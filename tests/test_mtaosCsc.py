@@ -120,6 +120,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 "runOFC",
                 "addAberration",
                 "interruptWEP",
+                "startClosedLoop",
+                "stopClosedLoop",
             }
 
             self.assert_software_versions(
@@ -295,7 +297,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             remote = self._getRemote()
 
             with self.assertRaises(salobj.AckError):
-                await remote.cmd_issueCorrection.set_start(timeout=10.0)
+                await remote.cmd_issueCorrection.set_start(timeout=30.0)
 
             dof = await self.assert_next_sample(
                 remote.evt_rejectedDegreeOfFreedom, flush=False, timeout=SHORT_TIMEOUT
@@ -466,7 +468,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
-            ofc_data = OFCData("comcam")
+            ofc_data = OFCData("lsstfam")
 
             dof_state0 = yaml.safe_load(
                 mtaos.getModulePath()
@@ -499,12 +501,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(
                 self.remote.evt_wavefrontError,
                 flush=False,
-                timeout=SHORT_TIMEOUT,
+                timeout=STD_TIMEOUT,
             )
             await self.assert_next_sample(
                 self.remote.evt_wepDuration,
                 flush=False,
-                timeout=SHORT_TIMEOUT,
+                timeout=STD_TIMEOUT,
             )
 
     @pytest.mark.csc_integtest
@@ -516,7 +518,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
-            ofc_data = OFCData("comcam")
+            ofc_data = OFCData("lsstfam")
 
             dof_state0 = yaml.safe_load(
                 mtaos.getModulePath()
@@ -558,7 +560,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
-            ofc_data = OFCData("lsst")
+            ofc_data = OFCData("lsstfam")
 
             dof_state0 = yaml.safe_load(
                 mtaos.getModulePath()
@@ -588,13 +590,52 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(
                 self.remote.evt_wavefrontError,
                 flush=False,
-                timeout=SHORT_TIMEOUT,
+                timeout=STD_TIMEOUT,
             )
             await self.assert_next_sample(
                 self.remote.evt_wepDuration,
                 flush=False,
-                timeout=SHORT_TIMEOUT,
+                timeout=STD_TIMEOUT,
             )
+
+    @pytest.mark.csc_integtest
+    async def test_run_wep_lsst_cwfs_ocps(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
+
+            ofc_data = OFCData("lsstfam")
+
+            dof_state0 = yaml.safe_load(
+                mtaos.getModulePath()
+                .joinpath("tests", "testData", "state0inDof.yaml")
+                .open()
+                .read()
+            )
+            ofc_data.dof_state0 = dof_state0
+
+            self.csc.model = mtaos.Model(
+                instrument=ofc_data.name,
+                data_path=self.data_path,
+                ofc_data=ofc_data,
+                run_name=self.run_name,
+                collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all",
+                reference_detector=94,
+            )
+
+            remote = self._getRemote()
+            self.remote.evt_wavefrontError.flush()
+            self.remote.evt_wepDuration.flush()
+
+            with self.assertRaises(salobj.AckError):
+                await remote.cmd_runWEP.set_start(
+                    visitId=4021123106000,
+                    extraId=None,
+                    useOCPS=True,
+                )
 
     @pytest.mark.csc_integtest
     async def test_interruptWEP(self):
@@ -603,7 +644,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
-            ofc_data = OFCData("comcam")
+            ofc_data = OFCData("lsstfam")
 
             dof_state0 = yaml.safe_load(
                 mtaos.getModulePath()

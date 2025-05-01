@@ -85,7 +85,13 @@ class WavefrontCollection(object):
             coefficients.
         """
 
-        self._collectionData.append(zernikes_data)
+        zernikes_array = [
+            (sensor_id, zernikes)
+            for sensor_id, zernikes in zernikes_data
+            if len(zernikes) > 0
+        ]
+
+        self._collectionData.append(zernikes_array)
 
     def pop(self):
         """Pop the list of wavefront error data from collection.
