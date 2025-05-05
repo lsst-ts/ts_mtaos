@@ -152,6 +152,13 @@ properties:
     type: number
     default: 4.0
 
+  rotation_delta_limit:
+    description: >-
+      Rotation delta limit in degrees. If the delta between
+      consecutive exposures is greater than this value, the
+      closed loop will not apply the computed corrections.
+    type: number
+
   m1m3_stress_limit:
     description: >-
       Stress limit for M1M3 in psi.

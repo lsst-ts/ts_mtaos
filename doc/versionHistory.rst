@@ -7,6 +7,8 @@ v0.19.0
 
 * Add configuration option for `do_startClosedLoop` in mtaos.py.
 
+* Add rotation angle limit above which corrections will not be applied between exposures.
+
 v0.18.0
 -------
 
