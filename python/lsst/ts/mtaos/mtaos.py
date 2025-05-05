@@ -239,6 +239,8 @@ class MTAOS(salobj.ConfigurableCsc):
         # loop.
         self.last_run_ofc_configuration = ""
         self.image_rotator = dict()
+        self.current_elevation_position = None
+        self.current_rotator_position = None
 
         self.log.info("MTAOS CSC is ready.")
 
@@ -381,6 +383,10 @@ class MTAOS(salobj.ConfigurableCsc):
         self.stress_scale_factor = config.stress_scale_factor
         self.m1m3_stress_limit = config.m1m3_stress_limit
         self.m2_stress_limit = config.m2_stress_limit
+
+        # Set elevation and rotation angle limits
+        self.elevation_angle_limit = config.elevation_delta_limit_max
+        self.rotator_angle_limit = config.rotation_delta_limit
 
         self.log.debug("MTAOS configuration completed.")
 
@@ -966,6 +972,8 @@ class MTAOS(salobj.ConfigurableCsc):
         self.log.info(f"Starting closed loop for {oods_name}.")
 
         processed_images = collections.deque(maxlen=100)
+        self.current_rotator_position = None
+        self.current_elevation_position = None
 
         async with salobj.Remote(
             self.domain,
@@ -985,13 +993,19 @@ class MTAOS(salobj.ConfigurableCsc):
             "MTRotator",
             readonly=True,
             include=["summaryState", "rotation"],
-        ) as mtrotator:
+        ) as mtrotator, salobj.Remote(
+            self.domain,
+            "MTMount",
+            readonly=True,
+            include=["summaryState", "elevation"],
+        ) as mtmount:
 
             self.log.info("Closed loop task ready.")
 
             camera.evt_startIntegration.callback = self.follow_start_integration
             camera.evt_endOfImageTelemetry.callback = self.follow_end_integration
             mtrotator.tel_rotation.callback = self.follow_rotator_position
+            mtmount.tel_elevation.callback = self.follow_elevation_position
 
             oods.evt_imageInOODS.flush()
             while self.summary_state == salobj.State.ENABLED:
@@ -1011,6 +1025,56 @@ class MTAOS(salobj.ConfigurableCsc):
                         self.log.info(f"Visit {visit_id} already processed, skipping.")
                         continue
 
+                    filter_label, elevation = await self.model.get_image_info(
+                        visit_id,
+                        self.camera_name,
+                    )
+
+                    rotation_angle = float(
+                        np.mean(np.array(self.image_rotator[image_in_oods.obsid]))
+                    )
+
+                    # Since the current rotator and elevation positions
+                    # are being updated in the background, we need to
+                    # create a local copy and assume it's static
+                    # in the following if statement.
+                    current_rotator_position = self.current_rotator_position
+                    current_elevation_position = self.current_elevation_position
+
+                    if (
+                        current_elevation_position is None
+                        or current_rotator_position is None
+                        or (
+                            (
+                                np.abs(rotation_angle - current_rotator_position)
+                                > self.rotation_angle_limit
+                            )
+                            or (
+                                np.abs(elevation - current_elevation_position)
+                                > self.elevation_angle_limit
+                            )
+                        )
+                    ):
+                        report_elevation = (
+                            f"{current_elevation_position:.1f}"
+                            if current_elevation_position is not None
+                            else "not set"
+                        )
+                        report_rotator = (
+                            f"{current_rotator_position:.1f}"
+                            if current_rotator_position is not None
+                            else "not set"
+                        )
+                        self.log.info(
+                            f"Current rotator position: {report_rotator:.1f}, "
+                            f"current elevation: {report_elevation:.1f}. "
+                            f"Image to process was taken at {rotation_angle=} and {elevation=}. "
+                            f"Difference above threshold rot_limit={self.rotation_angle_limit} "
+                            f"el_limit={self.elevation_angle_limit}. "
+                            "Skipping."
+                        )
+                        continue
+
                     processed_images.append(visit_id)
 
                     self.log.info(
@@ -1027,15 +1091,6 @@ class MTAOS(salobj.ConfigurableCsc):
                         extra_id=None,
                         use_ocps=self.use_ocps,
                         config=self.wep_config,
-                    )
-
-                    filter_label, elevation = await self.model.get_image_info(
-                        visit_id,
-                        self.camera_name,
-                    )
-
-                    rotation_angle = float(
-                        np.mean(np.array(self.image_rotator[image_in_oods.obsid]))
                     )
 
                     gain = await self.model.get_correction_gain(
@@ -1732,8 +1787,12 @@ class MTAOS(salobj.ConfigurableCsc):
                 self.image_rotator.pop(item)
 
     async def follow_rotator_position(self, data):
+        self.current_rotator_position = data.actualPosition
         if self.current_image is not None:
             self.image_rotator[self.current_image].append(data.actualPosition)
+
+    async def follow_elevation_position(self, data):
+        self.current_elevation_position = data.actualPosition
 
     def get_subsystems_versions(self) -> str:
         """Get subsystems versions string.
