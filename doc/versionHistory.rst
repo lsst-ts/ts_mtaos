@@ -9,6 +9,8 @@ v0.19.0
 
 * Add rotation angle limit above which corrections will not be applied between exposures.
 
+* Fix configuration of OFC when running with `runOFC` and no configuration provided.
+
 v0.18.0
 -------
 

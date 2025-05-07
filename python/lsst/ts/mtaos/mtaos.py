@@ -954,7 +954,7 @@ class MTAOS(salobj.ConfigurableCsc):
         self.assert_enabled()
 
         # Set ofc configuration to be used in closed loop.
-        if data.config is not None:
+        if data.config:
             self.last_run_ofc_configuration = data.config
 
         if self.closed_loop_task.done():
