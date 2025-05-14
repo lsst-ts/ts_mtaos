@@ -1400,10 +1400,10 @@ class Model:
 
                 if min_index_above:
                     if above_threshold_index is None:
-                        above_threshold_index = min_index_above
+                        above_threshold_index = min(min_index_above)
                     else:
-                        above_threshold_index = np.min(
-                            above_threshold_index, min_index_above
+                        above_threshold_index = min(
+                            [above_threshold_index, min_index_above]
                         )
         except Exception:
             self.log.exception(f"{wfe=}")
