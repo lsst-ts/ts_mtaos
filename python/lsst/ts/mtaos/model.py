@@ -1403,7 +1403,7 @@ class Model:
                         above_threshold_index = min(min_index_above)
                     else:
                         above_threshold_index = min(
-                            [above_threshold_index, min_index_above]
+                            [above_threshold_index, min(min_index_above)]
                         )
         except Exception:
             self.log.exception(f"{wfe=}")
