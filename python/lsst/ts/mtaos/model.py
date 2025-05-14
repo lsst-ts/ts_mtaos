@@ -1393,9 +1393,9 @@ class Model:
                 wavefront_error[i][zk_indices - 4] += wfe[i]
 
                 min_index_above = [
-                    z_idx
+                    z_idx - 4
                     for z_idx, value in self.zernike_thresholds.values()
-                    if wavefront_error[i][z_idx] >= value
+                    if wavefront_error[i][z_idx - 4] >= value
                 ]
 
                 if min_index_above:
