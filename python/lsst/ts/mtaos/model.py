@@ -73,6 +73,7 @@ class Model:
         zernike_table_name="zernikes",
         elevation_delta_limit_max=9.0,
         elevation_delta_limit_min=4.0,
+        zernike_thresholds={},
     ):
         """MTAOS model class.
 
@@ -209,6 +210,7 @@ class Model:
         self.reference_detector = reference_detector
         self.elevation_delta_limit_max = elevation_delta_limit_max
         self.elevation_delta_limit_min = elevation_delta_limit_min
+        self.zernike_thresholds = zernike_thresholds
 
         science_sensor_config_schema = copy.deepcopy(WEP_HEADER_CONFIG)
         science_sensor_config_schema["properties"]["tasks"]["properties"] = dict()
@@ -1385,12 +1387,34 @@ class Model:
         self.ofc.ofc_data.zn_selected = zk_indices
         wavefront_error = np.zeros((len(sensor_ids), np.max(zk_indices) - 4 + 1))
 
+        above_threshold_index = None
         try:
             for i in range(len(sensor_ids)):
                 wavefront_error[i][zk_indices - 4] += wfe[i]
+
+                min_index_above = [
+                    z_idx
+                    for z_idx, value in self.zernike_thresholds.values()
+                    if wavefront_error[i][z_idx] >= value
+                ]
+
+                if min_index_above:
+                    if above_threshold_index is None:
+                        above_threshold_index = min_index_above
+                    else:
+                        above_threshold_index = np.min(
+                            above_threshold_index, min_index_above
+                        )
         except Exception:
             self.log.exception(f"{wfe=}")
             raise
+
+        wavefront_error_clipped = wavefront_error.copy()
+        if above_threshold_index is not None:
+            wavefront_error_clipped = np.zeros_like(wavefront_error)
+            wavefront_error_clipped[:, above_threshold_index] = wavefront_error[
+                :, above_threshold_index
+            ]
 
         rotation_angle = kwargs.get("rotation_angle", 0.0)
         filter_name = kwargs.get("filter_name", "")
@@ -1410,7 +1434,7 @@ class Model:
             self.m1m3_correction,
             self.m2_correction,
         ) = self.ofc.calculate_corrections(
-            wfe=wavefront_error,
+            wfe=wavefront_error_clipped,
             sensor_ids=sensor_ids,
             filter_name=filter_name,
             rotation_angle=rotation_angle,
