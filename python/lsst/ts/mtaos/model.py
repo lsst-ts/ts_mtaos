@@ -1395,7 +1395,7 @@ class Model:
                 min_index_above = [
                     z_idx - 4
                     for z_idx, value in self.zernike_thresholds.items()
-                    if wavefront_error[i][z_idx - 4] >= value
+                    if np.abs(wavefront_error[i][z_idx - 4]) >= value
                 ]
 
                 if min_index_above:
@@ -1415,7 +1415,11 @@ class Model:
             wavefront_error_clipped[:, above_threshold_index] = wavefront_error[
                 :, above_threshold_index
             ]
-
+            self.log.debug(
+                f"Wavefront error clipped to {above_threshold_index=}"
+                f" for {self.zernike_thresholds=} "
+                f"and {wavefront_error_clipped}"
+            )
         rotation_angle = kwargs.get("rotation_angle", 0.0)
         filter_name = kwargs.get("filter_name", "")
 
