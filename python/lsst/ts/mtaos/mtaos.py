@@ -348,6 +348,7 @@ class MTAOS(salobj.ConfigurableCsc):
                 if hasattr(config, "data_instrument_name")
                 else None
             ),
+            zernike_thresholds=getattr(config, "zernike_thresholds", {}),
         )
 
         if dof_state0 is not None:

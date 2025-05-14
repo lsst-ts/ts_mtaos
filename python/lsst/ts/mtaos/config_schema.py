@@ -159,6 +159,14 @@ properties:
       closed loop will not apply the computed corrections.
     type: number
 
+  zernike_thresholds:
+    description: >-
+      Zernike threshold in um for chosen zernikes.
+    type: object
+    pattenProperties:
+    "^[0-9]+$":
+        type: number
+
   m1m3_stress_limit:
     description: >-
       Stress limit for M1M3 in psi.
