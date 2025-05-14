@@ -1418,7 +1418,8 @@ class Model:
             self.log.debug(
                 f"Wavefront error clipped to {above_threshold_index=}"
                 f" for {self.zernike_thresholds=} "
-                f"and {wavefront_error_clipped}"
+                f"and {wavefront_error_clipped=}."
+                f"{wavefront_error=}."
             )
         rotation_angle = kwargs.get("rotation_angle", 0.0)
         filter_name = kwargs.get("filter_name", "")
