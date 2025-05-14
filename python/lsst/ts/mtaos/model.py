@@ -1394,7 +1394,7 @@ class Model:
 
                 min_index_above = [
                     z_idx - 4
-                    for z_idx, value in self.zernike_thresholds.values()
+                    for z_idx, value in self.zernike_thresholds.items()
                     if wavefront_error[i][z_idx - 4] >= value
                 ]
 
