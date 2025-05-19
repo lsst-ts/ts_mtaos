@@ -1384,7 +1384,6 @@ class Model:
                 filter_name: `string`
                     Name of the filter used for the observations.
         """
-        self.ofc.ofc_data.zn_selected = zk_indices
         wavefront_error = np.zeros((len(sensor_ids), np.max(zk_indices) - 4 + 1))
 
         above_threshold_index = None
