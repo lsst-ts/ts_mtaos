@@ -1598,7 +1598,7 @@ class Model:
                         self.ofc.ofc_data.xref = kwargs[key]
 
                     elif key == "zn_selected" and kwargs[key]:
-                        self.ofc.ofc_data.zn_selected = kwargs[key]
+                        self.ofc.ofc_data.zn_selected = np.array(kwargs[key])
 
         except Exception:
             self.log.error(
