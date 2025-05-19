@@ -1597,7 +1597,7 @@ class Model:
                     elif key == "xref":
                         self.ofc.ofc_data.xref = kwargs[key]
 
-                    elif key == "zn_selected":
+                    elif key == "zn_selected" and kwargs[key]:
                         self.ofc.ofc_data.zn_selected = kwargs[key]
 
         except Exception:
