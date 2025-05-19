@@ -1597,7 +1597,7 @@ class Model:
                     elif key == "xref":
                         self.ofc.ofc_data.xref = kwargs[key]
 
-                    elif key == "zn_selected" and kwargs[key]:
+                    elif key == "zn_selected" and len(kwargs[key]) > 0:
                         self.ofc.ofc_data.zn_selected = np.array(kwargs[key])
 
         except Exception:
