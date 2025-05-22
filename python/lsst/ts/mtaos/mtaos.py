@@ -74,6 +74,7 @@ class MTAOS(salobj.ConfigurableCsc):
     LOG_FILE_NAME = "MTAOS.log"
     MAX_TIME_SAMPLE = 100
     CMD_TIMEOUT = 60.0
+    WEP_PROCESSING_TIMEOUT = 300.0
     CLOSED_LOOP_FAILED = 1
 
     def __init__(
@@ -765,8 +766,23 @@ class MTAOS(salobj.ConfigurableCsc):
                     self.execution_times["RUN_WEP"] = []
                 self.execution_times["RUN_WEP"].append(time.time() - start_time)
 
+                ocps_job_result = await self.ocps.evt_job_result.next(
+                    timeout=self.WEP_PROCESSING_TIMEOUT,
+                    flush=False,
+                )
+                job_result = json.loads(ocps_job_result.result)
+
+                while job_result["visit_id"] != intra_visit_id:
+                    ocps_job_result = await self.ocps.evt_job_result.next(
+                        timeout=self.WEP_PROCESSING_TIMEOUT,
+                        flush=False,
+                    )
+                    job_result = json.loads(ocps_job_result.result)
+
                 await self.model.query_ocps_results(
-                    self.model.instrument, intra_visit_id, extra_visit_id
+                    self.model.instrument,
+                    intra_visit_id,
+                    extra_visit_id,
                 )
         else:
             if timestamp is None or identity is None:
