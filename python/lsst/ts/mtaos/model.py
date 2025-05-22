@@ -1172,7 +1172,7 @@ class Model:
         pair_id = extra_id if extra_id is not None else intra_id
 
         if extra_id is not None:
-            n_tables = 189
+            n_tables = 185
             n_tables_min = 100
         else:
             n_tables = 4
