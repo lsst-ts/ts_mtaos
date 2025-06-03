@@ -390,7 +390,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # Set elevation and rotation angle limits
         self.elevation_angle_limit = config.elevation_delta_limit_max
-        self.rotator_angle_limit = config.rotation_delta_limit
+        self.rotation_angle_limit = config.rotation_delta_limit
 
         self.log.debug("MTAOS configuration completed.")
 
