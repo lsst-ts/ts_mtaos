@@ -476,11 +476,63 @@ class MTAOS(salobj.ConfigurableCsc):
         elif self.summary_state is salobj.State.ENABLED:
             self.log.info("Restoring previous state.")
             try:
-                await self._execute_issue_correction()
+                if (
+                    await self.check_components_alive()
+                    and await self.check_components_enabled()
+                ):
+                    await self._execute_issue_correction()
+                else:
+                    self.log.warning(
+                        "One or more CSCs are not alive or enabled, skip issuing correction."
+                    )
             except Exception:
                 self.log.exception(
                     "MTAOS unable to apply initial corrections. Ignoring."
                 )
+
+    async def check_components_enabled(self):
+        """Checks if all components are ENABLED.
+
+        Raises
+        ------
+        RunTimeError:
+            If either component is not ENABLED
+        """
+        return all(
+            await asyncio.gather(
+                *[self._check_enabled(remote) for remote in self.remotes]
+            )
+        )
+
+    async def _check_enabled(self, remote) -> bool:
+        """Check if a specific remote component is enabled."""
+        summary_state = await self.remote[remote].evt_summaryState.aget()
+        return salobj.State(summary_state.summaryState) == salobj.State.ENABLED
+
+    async def check_components_alive(self) -> bool:
+        """Check if all AOS components are alive, e.g. publishing heartbeats.
+
+        Returns
+        -------
+        `bool`
+            True if all components are alive, False otherwise
+        """
+        return all(
+            await asyncio.gather(
+                *[self._check_liveliness(remote) for remote in self.remotes]
+            )
+        )
+
+    async def _check_liveliness(self, remote) -> bool:
+        """Check if a specific remote component is alive."""
+        try:
+            await self.remote[remote].evt_heartbeat.next(
+                flush=True, timeout=self.DEFAULT_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            return False
+        else:
+            return True
 
     async def do_resetCorrection(self, data):
         """Command to reset the current wavefront error calculations.
