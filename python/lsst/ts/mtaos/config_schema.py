@@ -158,6 +158,7 @@ properties:
       consecutive exposures is greater than this value, the
       closed loop will not apply the computed corrections.
     type: number
+    default: 9.0
 
   m1m3_stress_limit:
     description: >-

@@ -70,7 +70,7 @@ class MTAOS(salobj.ConfigurableCsc):
     version = __version__
 
     DEFAULT_TIMEOUT = 10.0
-    LONG_TIMEOUT = 60.0
+    LONG_TIMEOUT = 90.0
     LOG_FILE_NAME = "MTAOS.log"
     MAX_TIME_SAMPLE = 100
     CMD_TIMEOUT = 60.0
@@ -242,6 +242,8 @@ class MTAOS(salobj.ConfigurableCsc):
         self.current_elevation_position = None
         self.current_rotator_position = None
 
+        self.previous_dofs = None
+
         self.log.info("MTAOS CSC is ready.")
 
     async def configure(self, config: typing.Any) -> None:
@@ -350,7 +352,9 @@ class MTAOS(salobj.ConfigurableCsc):
             ),
         )
 
-        if dof_state0 is not None:
+        if self.previous_dofs is not None:
+            self.model.ofc.aggregated_state = self.previous_dofs
+        elif dof_state0 is not None:
             self.model.ofc_data.dof_state0 = dof_state0
 
         if hasattr(config, "wep_config"):
@@ -443,6 +447,92 @@ class MTAOS(salobj.ConfigurableCsc):
                 pass
 
         await self.evt_closedLoopState.set_write(state=ClosedLoopState.IDLE)
+
+    async def begin_start(self, data):
+        await self.cmd_start.ack_in_progress(
+            data,
+            timeout=self.CMD_TIMEOUT,
+            result="MTAOS CSC started.",
+        )
+        await super().begin_start(data)
+
+    async def begin_enable(self, data):
+        await self.cmd_enable.ack_in_progress(
+            data,
+            timeout=self.CMD_TIMEOUT,
+            result="Enabling MTAOS CSC.",
+        )
+        await super().begin_enable(data)
+
+    async def handle_summary_state(self):
+        """Handle summary state changes.
+        Here we store the previous state of the DOFs when
+        going to fault or disabled.
+        """
+        if self.summary_state in {salobj.State.FAULT, salobj.State.DISABLED}:
+            self.log.info("Storing previous state.")
+            self.previous_dofs = self.model.ofc.controller.aggregated_state
+
+        elif self.summary_state is salobj.State.ENABLED:
+            self.log.info("Restoring previous state.")
+            try:
+                if (
+                    await self.check_components_alive()
+                    and await self.check_components_enabled()
+                ):
+                    await self._execute_issue_correction()
+                else:
+                    self.log.warning(
+                        "One or more CSCs are not alive or enabled, skip issuing correction."
+                    )
+            except Exception:
+                self.log.exception(
+                    "MTAOS unable to apply initial corrections. Ignoring."
+                )
+
+    async def check_components_enabled(self):
+        """Checks if all components are ENABLED.
+
+        Raises
+        ------
+        RunTimeError:
+            If either component is not ENABLED
+        """
+        return all(
+            await asyncio.gather(
+                *[self._check_enabled(remote) for remote in self.remotes]
+            )
+        )
+
+    async def _check_enabled(self, remote) -> bool:
+        """Check if a specific remote component is enabled."""
+        summary_state = await self.remote[remote].evt_summaryState.aget()
+        return salobj.State(summary_state.summaryState) == salobj.State.ENABLED
+
+    async def check_components_alive(self) -> bool:
+        """Check if all AOS components are alive, e.g. publishing heartbeats.
+
+        Returns
+        -------
+        `bool`
+            True if all components are alive, False otherwise
+        """
+        return all(
+            await asyncio.gather(
+                *[self._check_liveliness(remote) for remote in self.remotes]
+            )
+        )
+
+    async def _check_liveliness(self, remote) -> bool:
+        """Check if a specific remote component is alive."""
+        try:
+            await self.remote[remote].evt_heartbeat.next(
+                flush=True, timeout=self.DEFAULT_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            return False
+        else:
+            return True
 
     async def do_resetCorrection(self, data):
         """Command to reset the current wavefront error calculations.
