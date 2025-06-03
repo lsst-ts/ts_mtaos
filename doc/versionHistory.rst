@@ -13,6 +13,8 @@ v0.19.0
 
 * Fix configuration of OFC when running with `runOFC` and no configuration provided.
 
+* Fix typos in mtaos.py and model.py
+
 v0.18.0
 -------
 
