@@ -2,6 +2,19 @@
 Version History
 ===============
 
+v0.19.0
+-------
+
+* Add configuration option for `do_startClosedLoop` in mtaos.py.
+
+* Add rotation angle limit above which corrections will not be applied between exposures.
+  
+* Store previous state when going to `DISABLED` or `FAULT` state, and apply it when going back to `ENABLED`.
+
+* Fix configuration of OFC when running with `runOFC` and no configuration provided.
+
+* Fix typos in mtaos.py and model.py
+
 v0.18.0
 -------
 
