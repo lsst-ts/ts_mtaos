@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.19.1
+-------
+
+* Add heartbeat and summaryState to remotes in `mtaos.py` and fix typo.
+
 v0.19.0
 -------
 
