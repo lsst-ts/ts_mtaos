@@ -160,6 +160,14 @@ properties:
     type: number
     default: 9.0
 
+  zernike_thresholds:
+    description: >-
+      Zernike threshold in um for chosen zernikes.
+    type: object
+    pattenProperties:
+    "^[0-9]+$":
+        type: number
+
   m1m3_stress_limit:
     description: >-
       Stress limit for M1M3 in psi.
