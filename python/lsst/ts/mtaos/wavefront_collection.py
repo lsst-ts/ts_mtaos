@@ -41,12 +41,15 @@ class WavefrontCollection(object):
 
         # Collection of list of wavefront error data
         self._collectionData = deque(maxlen=int(maxLeng))
+        self._collectionRadii = deque(maxlen=int(maxLeng))
 
         # Collection of taken data of list of wavefront error data.
         # This is designed for the MtaosCsc to publish the event of wavefront
         # error. The published data will be in this collection.
         # This is a list of tuples with (sensor_id, np.ndarray)
         self._collectionDataTaken = dict()
+        self._collectionRadiiTaken = deque(maxlen=int(maxLeng))
+
         # Number of data taken from collectionData into collectionDataTaken
         self._numDataTaken = 0
 
@@ -72,7 +75,7 @@ class WavefrontCollection(object):
 
         return self._numDataTaken
 
-    def append(self, zernikes_data):
+    def append(self, zernikes_data, radius_data):
         """Add the list of wavefront error data to collection.
 
         Parameters
@@ -83,15 +86,18 @@ class WavefrontCollection(object):
             first elements specify the sensor id and the second is an astropy
             table with the zernike coeffients or an array with zernike
             coefficients.
+        radius_data : `list` of `tuple` with [`float`, `float`, `float`]
+            List of tuples with the radius data. Each tuple contains the
+            x_position, y_position of the sensor, and the radius of
+            the donuts in that sensor.
         """
-
         zernikes_array = [
             (sensor_id, zernikes)
             for sensor_id, zernikes in zernikes_data
             if len(zernikes) > 0
         ]
-
         self._collectionData.append(zernikes_array)
+        self._collectionRadii.append(radius_data)
 
     def pop(self):
         """Pop the list of wavefront error data from collection.
@@ -103,6 +109,9 @@ class WavefrontCollection(object):
         """
         try:
             data = self._collectionData.popleft()
+            radii_data = self._collectionRadii.popleft()
+
+            self._collectionRadiiTaken = radii_data
             for sensor_id, zernikes_data in data:
                 if isinstance(zernikes_data, QTable):
                     zk_indices = np.array(
@@ -142,8 +151,34 @@ class WavefrontCollection(object):
         """Clear the collection."""
 
         self._collectionData.clear()
+        self._collectionRadii.clear()
         self._collectionDataTaken = dict()
+        self._collectionRadiiTaken = dict()
         self._numDataTaken = 0
+
+    def getListOfRadiiInTakenData(self):
+        """Get the list of radii in taken data.
+
+        Returns
+        -------
+        radii : `list` of `tuple` with [`float`, `float`, `float`]
+            List of tuples with the radius data. Each tuple contains the
+            x_position, y_position of the sensor, and the radius of
+            the donuts in that sensor.
+
+        Raises
+        ------
+        RuntimeError
+            No data in the collection of taken data.
+        """
+        if len(self._collectionRadiiTaken) == 0:
+            warnings.warn(
+                "No data in the collection of taken data. Returning empty radii.",
+                UserWarning,
+            )
+            return []
+
+        return list(self._collectionRadiiTaken)
 
     def getListOfWavefrontErrorAvgInTakenData(self):
         """Get the list of average wavefront error in taken data.
