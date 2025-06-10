@@ -280,9 +280,10 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.model.m2_correction()), 72)
 
     def test_reset_wfe_correction(self):
-        data = [(1, [1, 2, 3]), (2, [1, 2, 3]), (3, [1, 2, 3])]
-        self.model.wavefront_errors.append(data)
-        self.model.rejected_wavefront_errors.append(data)
+        wfe_data = [(1, [1, 2, 3]), (2, [1, 2, 3]), (3, [1, 2, 3])]
+        radii_data = [1.0, 2.0, 3.0]
+        self.model.wavefront_errors.append(wfe_data, radii_data)
+        self.model.rejected_wavefront_errors.append(wfe_data, radii_data)
 
         self.model.reset_wfe_correction()
 
