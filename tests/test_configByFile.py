@@ -28,27 +28,27 @@ from lsst.ts import mtaos
 class TestConfigByFile(unittest.TestCase):
     """Test the Config class with a file."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         os.environ["ISRDIRPATH"] = os.path.join(os.sep, "isrDir")
 
         configFile = mtaos.getModulePath().joinpath("tests", "testData", "default.yaml")
         self.config = mtaos.Config(str(configFile))
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         try:
             os.environ.pop("ISRDIRPATH")
         except KeyError:
             pass
 
-    def testGetInstName(self):
+    def testGetInstName(self) -> None:
         instName = self.config.getInstName()
         self.assertEqual(instName, "comcam")
 
-    def testGetIsrDirWithEnvPath(self):
+    def testGetIsrDirWithEnvPath(self) -> None:
         isrDir = self.config.getIsrDir()
         self.assertEqual(isrDir, os.environ["ISRDIRPATH"])
 
-    def testGetIsrDirWithoutEnvPath(self):
+    def testGetIsrDirWithoutEnvPath(self) -> None:
         os.environ.pop("ISRDIRPATH")
 
         with self.assertWarns(UserWarning):
@@ -56,11 +56,11 @@ class TestConfigByFile(unittest.TestCase):
 
         self.assertEqual(isrDir, "/home/lsst/input")
 
-    def testGetDefaultSkyFile(self):
+    def testGetDefaultSkyFile(self) -> None:
         skyFilePath = self.config.getDefaultSkyFile()
         self.assertTrue(skyFilePath.exists())
 
-    def testGetState0DofFile(self):
+    def testGetState0DofFile(self) -> None:
         dofFileName = self.config.getState0DofFile()
         self.assertTrue(dofFileName.exists())
 
