@@ -4,5 +4,5 @@ check-yaml: true
 flake8: true
 format-xmllint: true
 isort: true
-mypy: false
+mypy: true
 ruff: true
