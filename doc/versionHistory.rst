@@ -7,6 +7,8 @@ v.0.20.0
 
 * Add automatic refocus functionality in calculate_corrections. If not enough wavefront errors are estimated, it will attempt to use donut radii to focus the telescope.
 
+* Fix log message in `run_closed_loop` when rotator or elevation jump exceed the thresholds.
+
 v0.19.1
 -------
 

@@ -1163,8 +1163,8 @@ class MTAOS(salobj.ConfigurableCsc):
                             else "not set"
                         )
                         self.log.info(
-                            f"Current rotator position: {report_rotator:.1f}, "
-                            f"current elevation: {report_elevation:.1f}. "
+                            f"Current rotator position: {report_rotator}, "
+                            f"current elevation: {report_elevation}. "
                             f"Image to process was taken at {rotation_angle=} and {elevation=}. "
                             f"Difference above threshold rot_limit={self.rotation_angle_limit} "
                             f"el_limit={self.elevation_angle_limit}. "
