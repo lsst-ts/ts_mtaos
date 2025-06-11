@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v.0.20.0
+--------
+
+* Add automatic refocus functionality in calculate_corrections. If not enough wavefront errors are estimated, it will attempt to use donut radii to focus the telescope.
+
 v0.19.1
 -------
 

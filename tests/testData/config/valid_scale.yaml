@@ -20,5 +20,8 @@ stress_scale_factor: 1.25
 elevation_delta_limit_max: 9.0
 elevation_delta_limit_min: 4.0
 rotation_delta_limit: 9.0
+tilt_offset_threshold: 0.05
+dz_threshold_min: 300.0
+dz_threshold_max: 1500.0
 use_ocps: False
 used_dofs: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]

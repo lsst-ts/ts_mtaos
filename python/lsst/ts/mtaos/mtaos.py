@@ -349,6 +349,9 @@ class MTAOS(salobj.ConfigurableCsc):
             zernike_table_name=config.zernike_table_name,
             elevation_delta_limit_max=config.elevation_delta_limit_max,
             elevation_delta_limit_min=config.elevation_delta_limit_min,
+            tilt_offset_threshold=config.tilt_offset_threshold,
+            dz_threshold_min=config.dz_threshold_min,
+            dz_threshold_max=config.dz_threshold_max,
             data_instrument_name=(
                 config.data_instrument_name
                 if hasattr(config, "data_instrument_name")

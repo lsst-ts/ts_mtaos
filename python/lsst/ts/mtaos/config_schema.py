@@ -37,7 +37,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v6
+title: MTAOS v7
 description: Schema for MTAOS configuration files
 type: object
 
@@ -159,6 +159,30 @@ properties:
       closed loop will not apply the computed corrections.
     type: number
     default: 9.0
+
+  tilt_offset_threshold:
+    description: >-
+      Tilt offset threshold in deg. If the tilt offset
+      when defaulting to atuomatic refocus exceeds this
+      value, the refocus will not be applied.
+    type: number
+    default: 0.1
+
+  dz_threshold_min:
+    description: >-
+      Z offset threshold in um. If the Z offset
+      when defaulting to atuomatic refocus exceeds this
+      value, the refocus will be attempted.
+    type: number
+    default: 300.0
+
+  dz_threshold_max:
+    description: >-
+      Z offset threshold in um. If the Z offset
+      when defaulting to atuomatic refocus exceeds this
+      value, the refocus will not be applied.
+    type: number
+    default: 900.0
 
   m1m3_stress_limit:
     description: >-
