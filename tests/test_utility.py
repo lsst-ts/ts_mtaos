@@ -27,6 +27,7 @@ import time
 import unittest
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -40,33 +41,33 @@ from lsst.ts.wep.utils import getModulePath as getModulePathWep
 class TestUtility(unittest.TestCase):
     """Test the Utility functions."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.dataDir = tempfile.TemporaryDirectory(
             dir=mtaos.getModulePath().joinpath("tests").as_posix()
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.dataDir.cleanup()
 
-    def testGetModulePath(self):
+    def testGetModulePath(self) -> None:
         modulePath = mtaos.getModulePath()
         self.assertTrue(modulePath.exists())
         self.assertTrue("ts_mtaos" in modulePath.name.lower())
 
-    def testGetConfigDir(self):
+    def testGetConfigDir(self) -> None:
         ansConfigDir = mtaos.getModulePath().joinpath("policy")
         self.assertEqual(mtaos.getConfigDir(), ansConfigDir)
 
-    def testGetLogDir(self):
+    def testGetLogDir(self) -> None:
         ansLogDir = mtaos.getModulePath().joinpath("logs")
         self.assertEqual(mtaos.getLogDir(), ansLogDir)
         self.assertTrue(ansLogDir.exists())
 
-    def testGetIsrDirPathNotAssigned(self):
+    def testGetIsrDirPathNotAssigned(self) -> None:
         isrDir = mtaos.getIsrDirPath()
         self.assertEqual(isrDir, None)
 
-    def testGetIsrDirPath(self):
+    def testGetIsrDirPath(self) -> None:
         ISRDIRPATH = "/path/to/isr/dir"
         os.environ["ISRDIRPATH"] = ISRDIRPATH
 
@@ -75,11 +76,11 @@ class TestUtility(unittest.TestCase):
 
         os.environ.pop("ISRDIRPATH")
 
-    def testGetCscName(self):
+    def testGetCscName(self) -> None:
         cscName = mtaos.getCscName()
         self.assertEqual(cscName, "MTAOS")
 
-    def testAddRotFileHandler(self):
+    def testAddRotFileHandler(self) -> None:
         log = logging.Logger("test")
         dataDirPath = self.dataDir.name
         filePath = Path(dataDirPath).joinpath("test.log")
@@ -98,13 +99,13 @@ class TestUtility(unittest.TestCase):
         numOfFile = self._getNumOfFileInFolder(dataDirPath)
         self.assertEqual(numOfFile, 2)
 
-    def _getNumOfFileInFolder(self, folder):
+    def _getNumOfFileInFolder(self, folder: str) -> int:
         items = Path(folder).glob("*")
         files = [aItem for aItem in items if aItem.is_file()]
 
         return len(files)
 
-    def test_get_formatted_corner_wavefront_sensors_ids(self):
+    def test_get_formatted_corner_wavefront_sensors_ids(self) -> None:
         mtaos_cwfs_detector_ids = set(
             [
                 int(detector_id)
@@ -128,18 +129,22 @@ class TestUtility(unittest.TestCase):
 
         assert mtaos_cwfs_detector_ids == expected_cwfs_detector_ids
 
-    def test_timeit(self):
+    def test_timeit(self) -> None:
         @mtaos.timeit
-        def my_retval(arg1, arg2, arg3, arg4, sleep_time, **kwargs):
+        def my_retval(
+            arg1: str, arg2: str, arg3: str, arg4: str, sleep_time: float, **kwargs: Any
+        ) -> tuple:
             time.sleep(sleep_time)
             return arg1, arg2, arg3, arg4
 
         @mtaos.timeit
-        async def amy_retval(arg1, arg2, arg3, arg4, sleep_time, **kwargs):
+        async def amy_retval(
+            arg1: str, arg2: str, arg3: str, arg4: str, sleep_time: float, **kwargs: Any
+        ) -> tuple:
             await asyncio.sleep(sleep_time)
             return arg1, arg2, arg3, arg4
 
-        exec_time = {}
+        exec_time: dict = dict()
         sleep_time = 0.1
 
         for i in range(10):

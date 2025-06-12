@@ -22,10 +22,17 @@
 # The version file is gotten by the scons. However, the scons does not support
 # the build without unit tests. This is a needed function for the Jenkins to
 # use.
-try:
-    from .version import *
-except ImportError:
+import typing
+
+# For an explanation why these next lines are so complicated, see
+# https://confluence.lsstcorp.org/pages/viewpage.action?spaceKey=LTS&title=Enabling+Mypy+in+Pytest
+if typing.TYPE_CHECKING:
     __version__ = "?"
+else:
+    try:
+        from .version import *
+    except ImportError:
+        __version__ = "?"
 
 from .config import *
 from .config_schema import *
