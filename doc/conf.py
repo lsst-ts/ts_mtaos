@@ -10,7 +10,7 @@ project = "ts_mtaos"
 html_theme_options["logotext"] = project  # type: ignore # noqa
 html_title = project
 html_short_title = project
-doxylink = {}  # Avoid warning: Could not find tag file _doxygen/doxygen.tag
+doxylink = {}  # type: ignore # Avoid warning: Could not find tag file _doxygen/doxygen.tag
 
 intersphinx_mapping["ts_xml"] = ("https://ts-xml.lsst.io", None)  # type: ignore # noqa
 intersphinx_mapping["ts_salobj"] = ("https://ts-salobj.lsst.io", None)  # type: ignore # noqa
