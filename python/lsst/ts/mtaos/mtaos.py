@@ -39,6 +39,7 @@ from astropy import units as u
 from lsst.ts import salobj
 from lsst.ts.ofc import OFCData
 from lsst.ts.utils import astropy_time_from_tai_unix, make_done_future
+from lsst.ts.xml import type_hints
 from lsst.ts.xml.enums.MTAOS import ClosedLoopState, FilterType
 from lsst.ts.xml.sal_enums import SalRetCode
 
@@ -411,7 +412,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         self.log.debug("MTAOS configuration completed.")
 
-    async def end_enable(self, data: salobj.DataType) -> None:
+    async def end_enable(self, data: type_hints.BaseMsgType) -> None:
         """Runs after CSC goes into enable.
 
         Parameters
@@ -435,7 +436,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         await super().start()
 
-    async def begin_disable(self, data: salobj.DataType) -> None:
+    async def begin_disable(self, data: type_hints.BaseMsgType) -> None:
         """Begin do_disable; called before state changes.
 
         Parameters
@@ -463,7 +464,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         await self.evt_closedLoopState.set_write(state=ClosedLoopState.IDLE)
 
-    async def begin_start(self, data: salobj.DataType) -> None:
+    async def begin_start(self, data: type_hints.BaseMsgType) -> None:
         await self.cmd_start.ack_in_progress(
             data,
             timeout=self.CMD_TIMEOUT,
@@ -471,7 +472,7 @@ class MTAOS(salobj.ConfigurableCsc):
         )
         await super().begin_start(data)
 
-    async def begin_enable(self, data: salobj.DataType) -> None:
+    async def begin_enable(self, data: type_hints.BaseMsgType) -> None:
         await self.cmd_enable.ack_in_progress(
             data,
             timeout=self.CMD_TIMEOUT,
@@ -577,7 +578,7 @@ class MTAOS(salobj.ConfigurableCsc):
         else:
             return True
 
-    async def do_resetCorrection(self, data: salobj.DataType) -> None:
+    async def do_resetCorrection(self, data: type_hints.BaseMsgType) -> None:
         """Command to reset the current wavefront error calculations.
 
         When resetting the wavefront corrections it is recommended that the
@@ -602,7 +603,7 @@ class MTAOS(salobj.ConfigurableCsc):
         await self.pubEvent_m1m3Correction()
         await self.pubEvent_m2Correction()
 
-    async def do_issueCorrection(self, data: salobj.DataType) -> None:
+    async def do_issueCorrection(self, data: type_hints.BaseMsgType) -> None:
         """Command to issue the wavefront corrections to the M2 hexapod, camera
         hexapod, M1M3, and M2 using the most recently measured wavefront error.
 
@@ -637,7 +638,7 @@ class MTAOS(salobj.ConfigurableCsc):
             await self.handle_corrections()
             await self.pubEvent_mirrorStresses()
 
-    async def do_rejectCorrection(self, data: salobj.DataType) -> None:
+    async def do_rejectCorrection(self, data: type_hints.BaseMsgType) -> None:
         """Reject the most recent wavefront correction.
 
         Parameters
@@ -657,7 +658,7 @@ class MTAOS(salobj.ConfigurableCsc):
         await self.pubEvent_m1m3Correction()
         await self.pubEvent_m2Correction()
 
-    async def do_selectSources(self, data: salobj.DataType) -> None:
+    async def do_selectSources(self, data: type_hints.BaseMsgType) -> None:
         """Run source selection algorithm for a specific field and visit
         configuration.
 
@@ -684,7 +685,7 @@ class MTAOS(salobj.ConfigurableCsc):
             mode=data.mode,
         )
 
-    async def do_preProcess(self, data: salobj.DataType) -> None:
+    async def do_preProcess(self, data: type_hints.BaseMsgType) -> None:
         """Pre-process image for WEP.
 
         Parameters
@@ -712,7 +713,7 @@ class MTAOS(salobj.ConfigurableCsc):
                 config=yaml.safe_load(data.config),
             )
 
-    async def do_runWEP(self, data: salobj.DataType) -> None:
+    async def do_runWEP(self, data: type_hints.BaseMsgType) -> None:
         """Process wavefront data.
 
         Parameters
@@ -849,7 +850,7 @@ class MTAOS(salobj.ConfigurableCsc):
         await self.pubEvent_rejectedWavefrontError()
         await self.pubEvent_wepDuration()
 
-    async def do_runOFC(self, data: salobj.DataType) -> None:
+    async def do_runOFC(self, data: type_hints.BaseMsgType) -> None:
         """Run OFC on the latest wavefront errors data. Before running this
         command, you must have ran runWEP at least once.
 
@@ -949,7 +950,7 @@ class MTAOS(salobj.ConfigurableCsc):
             await self.pubEvent_m2Correction()
             await self.pubEvent_ofcDuration()
 
-    async def do_addAberration(self, data: salobj.DataType) -> None:
+    async def do_addAberration(self, data: type_hints.BaseMsgType) -> None:
         """Utility command to add aberration to the system based on user
         provided wavefront errors. The command assume uniform aberration on all
         sensors.
@@ -1071,7 +1072,7 @@ class MTAOS(salobj.ConfigurableCsc):
             await self.pubEvent_degreeOfFreedom()
             await self.pubEvent_mirrorStresses()
 
-    async def do_stopClosedLoop(self, data: salobj.DataType) -> None:
+    async def do_stopClosedLoop(self, data: type_hints.BaseMsgType) -> None:
         """Stop the closed loop operation.
 
         Parameters
@@ -1097,7 +1098,7 @@ class MTAOS(salobj.ConfigurableCsc):
             self.log.info("Timedout waiting for closed loop task to finish.")
             pass
 
-    def do_startClosedLoop(self, data: salobj.DataType) -> None:
+    def do_startClosedLoop(self, data: type_hints.BaseMsgType) -> None:
         """Start the closed loop operation.
 
         Parameters
@@ -1919,12 +1920,12 @@ class MTAOS(salobj.ConfigurableCsc):
         )
         await self.evt_ofcDuration.set_write(calcTime=duration)
 
-    async def follow_start_integration(self, data: salobj.DataType) -> None:
+    async def follow_start_integration(self, data: type_hints.BaseMsgType) -> None:
         self.log.info(f"{data.imageName} started.")
         self.current_image = data.imageName
         self.image_rotator[data.imageName] = []
 
-    async def follow_end_integration(self, data: salobj.DataType) -> None:
+    async def follow_end_integration(self, data: type_hints.BaseMsgType) -> None:
         if self.current_image == data.imageName:
             self.current_image = None
 
@@ -1938,12 +1939,12 @@ class MTAOS(salobj.ConfigurableCsc):
             for item in items_to_pop:
                 self.image_rotator.pop(item)
 
-    async def follow_rotator_position(self, data: salobj.DataType) -> None:
+    async def follow_rotator_position(self, data: type_hints.BaseMsgType) -> None:
         self.current_rotator_position = data.actualPosition
         if self.current_image is not None:
             self.image_rotator[self.current_image].append(data.actualPosition)
 
-    async def follow_elevation_position(self, data: salobj.DataType) -> None:
+    async def follow_elevation_position(self, data: type_hints.BaseMsgType) -> None:
         self.current_elevation_position = data.actualPosition
 
     def get_subsystems_versions(self) -> str:
