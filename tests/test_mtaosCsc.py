@@ -486,7 +486,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             ofc_data.dof_state0 = dof_state0
 
-            self.csc.model = mtaos.Model(
+            self.csc._model = mtaos.Model(
                 instrument=ofc_data.name,
                 data_path=self.data_path,
                 ofc_data=ofc_data,
