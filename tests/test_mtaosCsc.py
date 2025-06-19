@@ -61,7 +61,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         cls.run_name = "run1"
 
         # Check that run doesn't already exist due to previous improper cleanup
-        butler = dafButler.Butler(cls.data_path)
+        butler = dafButler.Butler(cls.data_path)  # type: ignore
         registry = butler.registry
 
         # This is the expected index of the maximum zernike coefficient.
@@ -91,7 +91,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         # Check that run doesn't already exist due to previous improper cleanup
-        butler = dafButler.Butler(cls.data_path)
+        butler = dafButler.Butler(cls.data_path)  # type: ignore
 
         if cls.run_name in list(butler.registry.queryCollections()):
             runProgram(writeCleanUpRepoCmd(cls.data_path, cls.run_name))

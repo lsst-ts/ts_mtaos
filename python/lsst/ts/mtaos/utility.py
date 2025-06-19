@@ -46,7 +46,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from lsst.daf.butler import Butler
-from lsst.obs.base import DefineVisitsTask, Instrument
+from lsst.obs.base import DefineVisitsConfig, DefineVisitsTask, Instrument
 from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
 from lsst.utils import getPackageDir
 
@@ -309,7 +309,7 @@ def define_visit(
         to be processed.
     """
 
-    butler = Butler(data_path, collections=collections, writeable=True)
+    butler = Butler(data_path, collections=collections, writeable=True)  # type: ignore
 
     exposure_data_ids = set(
         butler.registry.queryDataIds(["exposure"], where=exposures_str)
@@ -317,11 +317,11 @@ def define_visit(
 
     Instrument.fromName(instrument_name, registry=butler.registry)
 
-    config = DefineVisitsTask.ConfigClass()
+    config = DefineVisitsConfig()  # type: ignore
 
-    config.groupExposures.name = "one-to-one"
+    config.groupExposures.name = "one-to-one"  # type: ignore
 
-    task = DefineVisitsTask(config=config, butler=butler)
+    task = DefineVisitsTask(config=config, butler=butler)  # type: ignore
 
     task.run(exposure_data_ids)
 

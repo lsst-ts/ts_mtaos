@@ -64,7 +64,7 @@ class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
         run_name = "run2"
 
         # Check that run doesn't already exist due to previous improper cleanup
-        butler = dafButler.Butler(data_path)
+        butler = dafButler.Butler(data_path)  # type: ignore
         registry = butler.registry
 
         # This is the expected index of the maximum zernike coefficient.
@@ -91,7 +91,7 @@ class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         # Check that run doesn't already exist due to previous improper cleanup
-        butler = dafButler.Butler(cls.model.data_path)
+        butler = dafButler.Butler(cls.model.data_path)  # type: ignore
 
         if cls.model.run_name in list(butler.registry.queryCollections()):
             runProgram(writeCleanUpRepoCmd(cls.model.data_path, cls.model.run_name))

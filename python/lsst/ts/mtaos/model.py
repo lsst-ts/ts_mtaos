@@ -1108,7 +1108,7 @@ class Model:
             self.data_path,
             instrument="LSSTCam",
             collections=[self.run_name, "LSSTCam/raw/all"],
-        )
+        )  # type: ignore
         refs = butler.query_datasets("raw", where=f"visit={visit_id}")
 
         image = butler.get(refs[0])
@@ -1213,7 +1213,7 @@ class Model:
 
         butler = Butler(
             self.data_path, collections=[self.run_name], instrument="LSSTCam"
-        )
+        )  # type: ignore
         start_time = time.time()
         elapsed_time = 0.0
 
@@ -1315,7 +1315,7 @@ class Model:
         """
         self.log.debug("Data processing completed successfully. Gathering output.")
 
-        butler = Butler(self.data_path)
+        butler = Butler(self.data_path)  # type: ignore
 
         # We may need to run the following in an executor so we won't block the
         # event loop.
