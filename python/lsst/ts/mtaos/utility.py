@@ -27,7 +27,6 @@ __all__ = [
     "getConfigDir",
     "getLogDir",
     "getIsrDirPath",
-    "getCamType",
     "getCscName",
     "addRotFileHandler",
     "timeit",
@@ -44,9 +43,10 @@ import typing
 from enum import Enum, auto
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import Any, Callable
 
 from lsst.daf.butler import Butler
-from lsst.obs.base import DefineVisitsTask, Instrument
+from lsst.obs.base import DefineVisitsConfig, DefineVisitsTask, Instrument
 from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
 from lsst.utils import getPackageDir
 
@@ -67,7 +67,7 @@ class MTHexapodIndex(Enum):
     M2 = auto()
 
 
-def getModulePath():
+def getModulePath() -> Path:
     """Get the path of module.
 
     Returns
@@ -75,11 +75,10 @@ def getModulePath():
     pathlib.PosixPath
         Directory path of module.
     """
-
     return Path(getPackageDir("ts_mtaos"))
 
 
-def getConfigDir():
+def getConfigDir() -> Path:
     """Get the directory of configuration files.
 
     Returns
@@ -87,11 +86,10 @@ def getConfigDir():
     pathlib.PosixPath
         Directory of configuration files.
     """
-
     return getModulePath().joinpath("policy")
 
 
-def getLogDir():
+def getLogDir() -> Path:
     """Get the directory of log files.
 
     Returns
@@ -99,11 +97,10 @@ def getLogDir():
     pathlib.PosixPath
         Directory of log files.
     """
-
     return getModulePath().joinpath("logs")
 
 
-def getIsrDirPath(isrDirPathVar="ISRDIRPATH"):
+def getIsrDirPath(isrDirPathVar: str = "ISRDIRPATH") -> Path | None:
     """Get the instrument signature removal (ISR) directory path.
 
     Parameters
@@ -116,45 +113,28 @@ def getIsrDirPath(isrDirPathVar="ISRDIRPATH"):
     pathlib.PosixPath or None
         ISR directory path. Return None if the path variable is not defined.
     """
-
     try:
         return Path(os.environ[isrDirPathVar])
     except KeyError:
         return None
 
 
-def getCamType(camera):
-    """Get the enum of camera type.
-
-    Parameters
-    ----------
-    camera : str
-        Camera ("lsstCam", "lsstFamCam", or "comcam").
-
-    Returns
-    -------
-    enum 'CamType' in lsst.ts.wep.Utility
-        Camera type.
-
-    Raises
-    ------
-    ValueError
-        The camera is not supported.
-    """
-    raise DeprecationWarning("This method is deprecated.")
-
-
-def getCscName():
+def getCscName() -> str:
     """Get the CSC name.
 
     CSC: Configurable SAL component.
     SAL: Service abstraction layer.
     """
-
     return "MTAOS"
 
 
-def addRotFileHandler(log, filePath, debugLevel, maxBytes=1e6, backupCount=5):
+def addRotFileHandler(
+    log: logging.Logger,
+    filePath: Path,
+    debugLevel: int | str,
+    maxBytes: float = 1e6,
+    backupCount: int = 5,
+) -> logging.handlers.RotatingFileHandler:
     """Add a rotating file handler to a logger.
 
     Note: The input log object will be updated directly.
@@ -167,7 +147,7 @@ def addRotFileHandler(log, filePath, debugLevel, maxBytes=1e6, backupCount=5):
         File path.
     debugLevel : int or str
         Logging level of file handler.
-    maxBytes : int, optional
+    maxBytes : float, optional
         Maximum file size in bytes for each file. (the default is 1e6.)
     backupCount : int, optional
         Number of log files to retain. (the default is 5.)
@@ -177,7 +157,6 @@ def addRotFileHandler(log, filePath, debugLevel, maxBytes=1e6, backupCount=5):
     fileHandler : logging.RotatingFileHandler
         The file handler added.
     """
-
     fileHandler = RotatingFileHandler(
         filename=filePath,
         mode="a",
@@ -195,7 +174,7 @@ def addRotFileHandler(log, filePath, debugLevel, maxBytes=1e6, backupCount=5):
     return fileHandler
 
 
-def timeit(func):
+def timeit(func: Callable) -> Callable:
     """Decorator to compute execution time.
 
     Add this decorator to a method to allow computing execution times.
@@ -248,7 +227,7 @@ def timeit(func):
 
     if asyncio.iscoroutinefunction(func):
 
-        async def atimed(*args, **kwargs):
+        async def atimed(*args: Any, **kwargs: Any) -> Any:
             """Time execution of function `func`.
 
             The method can either me a normal method or a coroutine.
@@ -266,7 +245,7 @@ def timeit(func):
         return atimed
     else:
 
-        def timed(*args, **kwargs):
+        def timed(*args: Any, **kwargs: Any) -> Any:
             """Time execution of function `func`.
 
             The method can either me a normal method or a coroutine.
@@ -330,7 +309,7 @@ def define_visit(
         to be processed.
     """
 
-    butler = Butler(data_path, collections=collections, writeable=True)
+    butler = Butler(data_path, collections=collections, writeable=True)  # type: ignore
 
     exposure_data_ids = set(
         butler.registry.queryDataIds(["exposure"], where=exposures_str)
@@ -338,11 +317,11 @@ def define_visit(
 
     Instrument.fromName(instrument_name, registry=butler.registry)
 
-    config = DefineVisitsTask.ConfigClass()
+    config = DefineVisitsConfig()  # type: ignore
 
-    config.groupExposures.name = "one-to-one"
+    config.groupExposures.name = "one-to-one"  # type: ignore
 
-    task = DefineVisitsTask(config=config, butler=butler)
+    task = DefineVisitsTask(config=config, butler=butler)  # type: ignore
 
     task.run(exposure_data_ids)
 

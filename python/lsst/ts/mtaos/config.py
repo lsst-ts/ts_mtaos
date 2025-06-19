@@ -23,6 +23,7 @@ __all__ = ["Config"]
 
 import warnings
 from collections import namedtuple
+from pathlib import Path
 
 import yaml
 
@@ -30,12 +31,12 @@ from . import utility
 
 
 class Config(object):
-    def __init__(self, config):
+    def __init__(self, config: str | tuple) -> None:
         """Configuration class.
 
         Parameters
         ----------
-        config : str or object
+        config : str or tuple
             Source of the configuration. Either object received in configure
             CSC call, or string for a filename.
         """
@@ -45,18 +46,7 @@ class Config(object):
         else:
             self.configObj = config
 
-    def getCamType(self):
-        """Get the enum of camera type in the configuration.
-
-        Returns
-        -------
-        enum 'CamType' in lsst.ts.wep.utility
-            Camera type.
-        """
-
-        return utility.getCamType(self.configObj.camera)
-
-    def getInstName(self):
+    def getInstName(self) -> str:
         """Get the enum of instrument name in the configuration.
 
         Returns
@@ -64,10 +54,14 @@ class Config(object):
         enum 'InstName' in lsst.ts.ofc.utility
             Instrument name.
         """
-
+        if not hasattr(self.configObj, "instrument"):
+            raise RuntimeError(
+                "No 'instrument' attribute in the configuration. "
+                "Please check the configuration file."
+            )
         return self.configObj.instrument
 
-    def getIsrDir(self):
+    def getIsrDir(self) -> str:
         """Get the ISR directory.
 
         ISR: Instrument signature removal.
@@ -79,48 +73,58 @@ class Config(object):
         str
             ISR directory.
         """
-
         isrDir = utility.getIsrDirPath()
         if isrDir is None:
+            if not hasattr(self.configObj, "defaultIsrDir"):
+                raise RuntimeError(
+                    "No 'defaultIsrDir' attribute in the configuration. "
+                    "Please check the configuration file."
+                )
+
             isrDir = self.configObj.defaultIsrDir
             warnings.warn(
                 f"No 'ISRDIRPATH' assigned. Using {isrDir} instead.",
                 category=UserWarning,
             )
-            return isrDir
+            return Path(isrDir).as_posix()
         else:
             return isrDir.as_posix()
 
-    def getDefaultSkyFile(self):
+    def getDefaultSkyFile(self) -> Path | None:
         """Get the default sky file path in the configuration.
 
         This is for the test only.
 
         Returns
         -------
-        pathlib.PosixPath or None
+        pathlib.Path or None
             Get the default sky file path. Return None if there is no such
             setting.
         """
-
-        try:
-            relativePath = self.configObj.defaultSkyFilePath
-        except AttributeError:
+        if not hasattr(self.configObj, "defaultSkyFilePath"):
+            warnings.warn(
+                "No 'defaultSkyFilePath' attribute in the configuration. "
+                "Please check the configuration file."
+            )
             return None
+
+        relativePath = self.configObj.defaultSkyFilePath
         return utility.getModulePath().joinpath(relativePath)
 
-    def getState0DofFile(self):
+    def getState0DofFile(self) -> Path | None:
         """Get the state 0 DoF filename.
 
         Returns
         -------
-        pathlib.PosixPath or None
+        pathlib.Path or None
             Default state 0 DoF file path. Return None if value isn't
             specified.
         """
-
-        try:
-            relativePath = self.configObj.state0DofFilePath
-        except AttributeError:
+        if not hasattr(self.configObj, "state0DofFilePath"):
+            warnings.warn(
+                "No 'state0DofFilePath' attribute in the configuration. "
+                "Please check the configuration file."
+            )
             return None
+        relativePath = self.configObj.state0DofFilePath
         return utility.getModulePath().joinpath(relativePath)

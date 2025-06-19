@@ -22,6 +22,7 @@
 import asyncio
 import os
 import unittest
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -35,8 +36,14 @@ from lsst.ts.wep.utils import runProgram, writeCleanUpRepoCmd
 
 @pytest.mark.integtest
 class TestComCam(unittest.IsolatedAsyncioTestCase):
+    dataDir: Path
+    isrDir: Path
+    model: mtaos.Model
+    short_waittime: float
+    zernike_coefficient_maximum_expected: set[int]
+
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         cls.isrDir = cls.dataDir.joinpath("input")
 
@@ -60,7 +67,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         run_name = "run1"
 
         # Check that run doesn't already exist due to previous improper cleanup
-        butler = dafButler.Butler(data_path)
+        butler = dafButler.Butler(data_path)  # type: ignore
         registry = butler.registry
 
         # This is the expected index of the maximum zernike coefficient.
@@ -83,15 +90,18 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
 
         cls.short_waittime = 10.0
 
+    def setUp(self) -> None:
+        self.model = self.__class__.model
+
     @classmethod
-    def tearDownClass(cls):
+    def tearDownClass(cls) -> None:
         # Check that run doesn't already exist due to previous improper cleanup
-        butler = dafButler.Butler(cls.model.data_path)
+        butler = dafButler.Butler(cls.model.data_path)  # type: ignore
 
         if cls.model.run_name in list(butler.registry.queryCollections()):
             runProgram(writeCleanUpRepoCmd(cls.model.data_path, cls.model.run_name))
 
-    async def test_process_comcam(self):
+    async def test_process_comcam(self) -> None:
         await self.model.process_comcam(
             4021123106001,
             4021123106002,
@@ -136,7 +146,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(len(zk_avg[94][0]) == len(zk_avg[94][1]))
 
-    async def test_interrupt_wep_process(self):
+    async def test_interrupt_wep_process(self) -> None:
         task = asyncio.create_task(
             self.model.process_comcam(
                 4021123106001,
@@ -152,7 +162,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             await task
 
-    async def test_process_comcam_fail_if_ongoing(self):
+    async def test_process_comcam_fail_if_ongoing(self) -> None:
         """If two process_comcam tasks are scheduled concurrently, one should
         fail.
         """
@@ -170,7 +180,7 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
                 ),
             )
 
-    async def test_wep_process_fail_bad_config(self):
+    async def test_wep_process_fail_bad_config(self) -> None:
         task = asyncio.create_task(
             self.model.process_comcam(
                 4021123106001,

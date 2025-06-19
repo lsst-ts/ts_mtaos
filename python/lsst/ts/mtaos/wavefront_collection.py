@@ -30,7 +30,7 @@ from astropy.table import QTable
 
 
 class WavefrontCollection(object):
-    def __init__(self, maxLeng):
+    def __init__(self, maxLeng: int) -> None:
         """Collection of list of wavefront sensor data.
 
         Parameters
@@ -38,22 +38,21 @@ class WavefrontCollection(object):
         maxLeng : `int`
             Maximum length of collection.
         """
-
         # Collection of list of wavefront error data
-        self._collectionData = deque(maxlen=int(maxLeng))
-        self._collectionRadii = deque(maxlen=int(maxLeng))
+        self._collectionData: deque = deque(maxlen=int(maxLeng))
+        self._collectionRadii: deque = deque(maxlen=int(maxLeng))
 
         # Collection of taken data of list of wavefront error data.
         # This is designed for the MtaosCsc to publish the event of wavefront
         # error. The published data will be in this collection.
         # This is a list of tuples with (sensor_id, np.ndarray)
-        self._collectionDataTaken = dict()
-        self._collectionRadiiTaken = deque(maxlen=int(maxLeng))
+        self._collectionDataTaken: dict = dict()
+        self._collectionRadiiTaken: deque = deque(maxlen=int(maxLeng))
 
         # Number of data taken from collectionData into collectionDataTaken
         self._numDataTaken = 0
 
-    def getNumOfData(self):
+    def getNumOfData(self) -> int:
         """Get the number of data.
 
         Returns
@@ -61,10 +60,9 @@ class WavefrontCollection(object):
         `int`
             Number of data.
         """
-
         return len(self._collectionData)
 
-    def getNumOfDataTaken(self):
+    def getNumOfDataTaken(self) -> int:
         """Get the number of taken data.
 
         Returns
@@ -72,10 +70,13 @@ class WavefrontCollection(object):
         `int`
             Number of taken data.
         """
-
         return self._numDataTaken
 
-    def append(self, zernikes_data, radius_data):
+    def append(
+        self,
+        zernikes_data: list[tuple[int, QTable | np.ndarray]],
+        radius_data: list[tuple[float, float, float]],
+    ) -> None:
         """Add the list of wavefront error data to collection.
 
         Parameters
@@ -99,7 +100,7 @@ class WavefrontCollection(object):
         self._collectionData.append(zernikes_array)
         self._collectionRadii.append(radius_data)
 
-    def pop(self):
+    def pop(self) -> list[tuple[int, np.ndarray]]:
         """Pop the list of wavefront error data from collection.
 
         Returns
@@ -147,16 +148,15 @@ class WavefrontCollection(object):
 
         return data
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear the collection."""
-
         self._collectionData.clear()
         self._collectionRadii.clear()
         self._collectionDataTaken = dict()
-        self._collectionRadiiTaken = dict()
+        self._collectionRadiiTaken = deque()
         self._numDataTaken = 0
 
-    def getListOfRadiiInTakenData(self):
+    def getListOfRadiiInTakenData(self) -> list[tuple[float, float, float]]:
         """Get the list of radii in taken data.
 
         Returns
@@ -180,7 +180,9 @@ class WavefrontCollection(object):
 
         return list(self._collectionRadiiTaken)
 
-    def getListOfWavefrontErrorAvgInTakenData(self):
+    def getListOfWavefrontErrorAvgInTakenData(
+        self,
+    ) -> dict[int, tuple[np.ndarray, np.ndarray]]:
         """Get the list of average wavefront error in taken data.
 
         Returns

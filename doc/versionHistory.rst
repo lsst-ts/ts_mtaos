@@ -9,6 +9,8 @@ v.0.20.0
 
 * Fix log message in `run_closed_loop` when rotator or elevation jump exceed the thresholds.
 
+* Add mypy for type checking in the entire package.
+
 v0.19.1
 -------
 
