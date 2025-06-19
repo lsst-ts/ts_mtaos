@@ -102,7 +102,7 @@ class Config(object):
             setting.
         """
         if not hasattr(self.configObj, "defaultSkyFilePath"):
-            raise Warning(
+            warnings.warn(
                 "No 'defaultSkyFilePath' attribute in the configuration. "
                 "Please check the configuration file."
             )
@@ -121,7 +121,7 @@ class Config(object):
             specified.
         """
         if not hasattr(self.configObj, "state0DofFilePath"):
-            raise Warning(
+            warnings.warn(
                 "No 'state0DofFilePath' attribute in the configuration. "
                 "Please check the configuration file."
             )
