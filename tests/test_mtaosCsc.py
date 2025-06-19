@@ -43,7 +43,10 @@ TEST_CONFIG_DIR = Path(__file__).parents[1].joinpath("tests", "testData", "confi
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(
-        self, config_dir: str, simulation_mode: int | str
+        self,
+        initial_state: salobj.State | int,
+        config_dir: str,
+        simulation_mode: int | str,
     ) -> mtaos.MTAOS:
         return mtaos.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
 
