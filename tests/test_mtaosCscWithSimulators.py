@@ -27,6 +27,7 @@ import numpy as np
 import pytest
 import yaml
 from lsst.ts import mtaos, salobj
+from lsst.ts.xml import type_hints
 
 # standard command timeout (sec)
 SHORT_TIMEOUT = 5
@@ -500,27 +501,31 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         self.cscM2.cmd_applyForces.callback = self.m2_apply_forces_callbck
         self.cscM2.cmd_resetForceOffsets.callback = self.m2_reset_force_offsets_callback
 
-    async def hexapod_move_callbck(self, data: salobj.DataType) -> None:
+    async def hexapod_move_callbck(self, data: type_hints.BaseMsgType) -> None:
         if data.salIndex == mtaos.utility.MTHexapodIndex.M2.value:
             self.m2_hex_corrections.append(data)
         else:
             self.cam_hex_corrections.append(data)
 
     async def m1m3_clear_active_optic_forces_callback(
-        self, data: salobj.DataType
+        self, data: type_hints.BaseMsgType
     ) -> None:
         await asyncio.sleep(1.0)
 
-    async def m1m3_apply_forces_callbck(self, data: salobj.DataType) -> None:
+    async def m1m3_apply_forces_callbck(self, data: type_hints.BaseMsgType) -> None:
         self.m1m3_corrections.append(data)
 
-    async def m1m3_apply_forces_fail_callbck(self, data: salobj.DataType) -> None:
+    async def m1m3_apply_forces_fail_callbck(
+        self, data: type_hints.BaseMsgType
+    ) -> None:
         raise RuntimeError("This is a test.")
 
-    async def m2_reset_force_offsets_callback(self, data: salobj.DataType) -> None:
+    async def m2_reset_force_offsets_callback(
+        self, data: type_hints.BaseMsgType
+    ) -> None:
         await asyncio.sleep(1.0)
 
-    async def m2_apply_forces_callbck(self, data: salobj.DataType) -> None:
+    async def m2_apply_forces_callbck(self, data: type_hints.BaseMsgType) -> None:
         self.m2_corrections.append(data)
 
     async def _startCsc(self) -> None:

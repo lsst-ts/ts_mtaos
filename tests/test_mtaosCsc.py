@@ -33,6 +33,7 @@ from lsst.ts import mtaos, salobj
 from lsst.ts.ofc import OFCData
 from lsst.ts.wep.utils import getModulePath as getModulePathWep
 from lsst.ts.wep.utils import runProgram, writeCleanUpRepoCmd
+from lsst.ts.xml import type_hints
 
 # standard command timeout (sec)
 STD_TIMEOUT = 60
@@ -687,7 +688,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(salobj.AckError):
                 await run_wep_task
 
-    def assert_software_versions(self, sofware_versions: salobj.DataType) -> None:
+    def assert_software_versions(
+        self, sofware_versions: type_hints.BaseMsgType
+    ) -> None:
         """Assert software versions payload is correctly populated.
 
         Raises
