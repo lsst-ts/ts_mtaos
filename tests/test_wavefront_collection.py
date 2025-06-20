@@ -41,7 +41,8 @@ class TestWavefrontCollection(unittest.TestCase):
 
     def testAppend(self):
         listOfWfErr = self._prepareListOfWfErr()
-        self.wavefront_collection.append(listOfWfErr)
+        listOfRadii = [1.0, 2.0]
+        self.wavefront_collection.append(listOfWfErr, listOfRadii)
 
         self.assertEqual(self.wavefront_collection.getNumOfData(), 1)
 
@@ -77,7 +78,8 @@ class TestWavefrontCollection(unittest.TestCase):
         self.assertEqual(self.wavefront_collection.getNumOfDataTaken(), 0)
 
         listOfWfErr = self._prepareListOfWfErr()
-        self.wavefront_collection.append(listOfWfErr)
+        listOfRadii = [1.0, 2.0]
+        self.wavefront_collection.append(listOfWfErr, listOfRadii)
 
         listOfWfErrPop = self.wavefront_collection.pop()
         self.assertEqual(len(listOfWfErrPop), 2)
@@ -88,8 +90,9 @@ class TestWavefrontCollection(unittest.TestCase):
 
     def testClear(self):
         listOfWfErr = self._prepareListOfWfErr()
+        listOfRadii = [1.0, 2.0]
         for idx in range(3):
-            self.wavefront_collection.append(listOfWfErr)
+            self.wavefront_collection.append(listOfWfErr, listOfRadii)
         self.wavefront_collection.pop()
 
         self.assertEqual(self.wavefront_collection.getNumOfData(), 2)
@@ -123,7 +126,8 @@ class TestWavefrontCollection(unittest.TestCase):
 
     def _collectListOfWfErrForAvgTestSgl(self, listSensorId, listSensorZk):
         listOfWfErr = self._getListOfWfErr(listSensorId, listSensorZk)
-        self.wavefront_collection.append(listOfWfErr)
+        listOfRadii = [1.0, 2.0]
+        self.wavefront_collection.append(listOfWfErr, listOfRadii)
 
     def testGetListOfWavefrontErrorAvgInTakenDataWithMultiData(self):
         self._collectListOfWfErrForAvgTest()
@@ -145,7 +149,8 @@ class TestWavefrontCollection(unittest.TestCase):
 
         # There are only 2 sensor data here
         listOfWfErr = self._prepareListOfWfErr()
-        self.wavefront_collection.append(listOfWfErr)
+        listOfRadii = [1.0, 2.0]
+        self.wavefront_collection.append(listOfWfErr, listOfRadii)
 
         for idx in range(4):
             self.wavefront_collection.pop()

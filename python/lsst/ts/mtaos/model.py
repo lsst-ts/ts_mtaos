@@ -35,7 +35,9 @@ from typing import Optional
 
 import numpy as np
 import yaml
+from lsst.afw.cameraGeom import FIELD_ANGLE
 from lsst.daf.butler import Butler, EmptyQueryResultError
+from lsst.obs.lsst import LsstCam
 from lsst.ts.ofc import OFC, BendModeToForce
 from lsst.ts.ofc.utils.ofc_data_helpers import get_intrinsic_zernikes, get_sensor_names
 from lsst.ts.salobj import DefaultingValidator
@@ -57,6 +59,10 @@ from .wavefront_collection import WavefrontCollection
 class Model:
     # Maximum length of queue for wavefront error
     MAX_LEN_QUEUE = 10
+    NOMINAL_DEFOCUS = 1500
+    FOCAL_RATIO = 1.234
+    PIXEL_SIZE = 10
+    PIXEL_SCALE = 0.2  # arcsec/pixel
 
     def __init__(
         self,
@@ -73,6 +79,9 @@ class Model:
         zernike_table_name="zernikes",
         elevation_delta_limit_max=9.0,
         elevation_delta_limit_min=4.0,
+        tilt_offset_threshold=0.1,
+        dz_threshold_min=300.0,
+        dz_threshold_max=900.0,
     ):
         """MTAOS model class.
 
@@ -209,6 +218,9 @@ class Model:
         self.reference_detector = reference_detector
         self.elevation_delta_limit_max = elevation_delta_limit_max
         self.elevation_delta_limit_min = elevation_delta_limit_min
+        self.tilt_offset_threshold = tilt_offset_threshold
+        self.dz_threshold_min = dz_threshold_min
+        self.dz_threshold_max = dz_threshold_max
 
         science_sensor_config_schema = copy.deepcopy(WEP_HEADER_CONFIG)
         science_sensor_config_schema["properties"]["tasks"]["properties"] = dict()
@@ -470,7 +482,6 @@ class Model:
         offset : `np.array`
             Offset to apply to the degrees of freedom.
         """
-
         self.ofc.controller.aggregate_state(offset, self.ofc.ofc_data.dof_idx)
 
         # Update last visit DOF which is the last
@@ -638,13 +649,13 @@ class Model:
         ):
             await self.wep_process.wait()
 
-        self.wavefront_errors.append(
-            self._gather_outputs(
-                run_name=run_name,
-                visit_id=visit_id,
-                instrument="lsstCam",
-            )
+        wavefront_errors, radii_data = self._gather_outputs(
+            run_name=run_name,
+            visit_id=visit_id,
+            instrument="lsstCam",
         )
+
+        self.wavefront_errors.append(wavefront_errors, radii_data)
 
     async def process_comcam(
         self,
@@ -688,24 +699,27 @@ class Model:
         ):
             await self.wep_process.wait()
 
-        self.wavefront_errors.append(
-            self._gather_outputs(
-                run_name=run_name,
-                visit_id=intra_id,
-                instrument="comcam",
-            )
+        wavefront_errors, radii_data = self._gather_outputs(
+            run_name=run_name,
+            visit_id=intra_id,
+            instrument="comcam",
         )
+
+        self.wavefront_errors.append(wavefront_errors, radii_data)
 
     async def query_ocps_results(self, instrument, intra_id, extra_id, timeout=300):
         """Query the OCPS results."""
-        results = await self._poll_butler_outputs(
+        wavefront_results, radii_results = await self._poll_butler_outputs(
             intra_id=intra_id,
             extra_id=extra_id,
             instrument=instrument,
             timeout=timeout,
         )
-        self.log.debug(f"OCPS results: {results}")
-        self.wavefront_errors.append(results)
+        self.log.debug(
+            f"OCPS wavefront error results: {wavefront_results} "
+            f"OCPS radii fit from donuts results: {radii_results}"
+        )
+        self.wavefront_errors.append(wavefront_results, radii_results)
 
     @contextlib.asynccontextmanager
     async def handle_wep_process(
@@ -1153,6 +1167,8 @@ class Model:
         -------
         `list`
             List of wavefront errors from the Butler.
+        `list`
+            List of corner sensor offsets computed from donut radii.
 
         Raises
         ------
@@ -1224,7 +1240,7 @@ class Model:
             f"run_name: {self.run_name}, visit_id: {pair_id} yielded: {refs}"
         )
 
-        return [
+        wavefront_errors = [
             (
                 ref.dataId["detector"],
                 butler.get(
@@ -1236,12 +1252,15 @@ class Model:
             for ref in refs
         ]
 
+        corner_offsets = self.get_corner_offsets(refs, butler, self.run_name)
+        return wavefront_errors, corner_offsets
+
     def _gather_outputs(
         self,
         run_name: str,
         visit_id: int,
         instrument: str,
-    ) -> list:
+    ) -> tuple[list, list]:
         """Gather outputs from the given run for a given visit id.
 
         Parameters
@@ -1257,6 +1276,8 @@ class Model:
         -------
         `list`
             List of wavefront errors from the butler.
+        `list`
+            List of corner sensor offsets computed from donut radii.
         """
         self.log.debug("Data processing completed successfully. Gathering output.")
 
@@ -1268,10 +1289,9 @@ class Model:
             self.zernike_table_name,
             collections=[run_name],
         )
-
         self.log.debug(f"run_name: {run_name}, visit_id: {visit_id} yielded: {refs}")
 
-        return [
+        wavefront_errors = [
             (
                 ref.dataId["detector"],
                 butler.get(
@@ -1282,6 +1302,8 @@ class Model:
             )
             for ref in refs
         ]
+        radii_results = self.get_corner_offsets(refs, butler, run_name)
+        return (wavefront_errors, radii_results)
 
     def reject_unreasonable_wfe(self, listOfWfErr):
         """Reject the wavefront error that is unreasonable.
@@ -1318,14 +1340,217 @@ class Model:
 
         try:
             sensor_ids, zk_indices, wfe = self.get_wavefront_errors()
+            corner_offsets = self.wavefront_errors.getListOfRadiiInTakenData()
 
-            self._calculate_corrections(
-                wfe=wfe, zk_indices=zk_indices, sensor_ids=sensor_ids, **kwargs
-            )
+            dz, drx, dry = np.nan, np.nan, np.nan
+            if len(corner_offsets) > 0:
+                dz, drx, dry = self.fit_camera_z_tip_tilt(corner_offsets)
+                self.log.info(
+                    f"Corner offsets to refocus camera would be: "
+                    f"dz={dz} um, "
+                    f"drx={drx} deg, dry={dry} deg."
+                )
+            else:
+                self.log.warning("No corner offsets found in the wavefront errors.")
+
+            if wfe.shape[0] < 3 or (
+                np.abs(dz) > self.dz_threshold_min
+                or np.abs(drx) > self.tilt_offset_threshold
+                or np.abs(dry) > self.tilt_offset_threshold
+            ):
+                self.log.info(
+                    "Not enough wavefront sensors reported WFE measurements "
+                    f"(expected at least 3, got {wfe.shape[0]}), "
+                    "or the z_offset is large enough to require refocusing. "
+                    "Attempting to use donut radii for refocus."
+                )
+                max_dz = self.dz_threshold_max
+                dz_clipped = np.clip(dz, -max_dz, max_dz)
+
+                offset = np.zeros(len(self.ofc.ofc_data.dof_idx))
+                if 0 in self.ofc.ofc_data.dof_idx:
+                    i = np.where(self.ofc.ofc_data.dof_idx == 0)[0][0]
+                    offset[i] = dz_clipped / 2
+                if 5 in self.ofc.ofc_data.dof_idx:
+                    i = np.where(self.ofc.ofc_data.dof_idx == 5)[0][0]
+                    offset[i] = dz_clipped / 2
+                self.offset_dof(offset=offset)
+
+                if dz != dz_clipped:
+                    self.log.warning(
+                        f"dz exceeded threshold and was clipped: "
+                        f"original dz={dz:.2f} um → clipped to {dz_clipped:.2f} um "
+                        f"(threshold: ±{max_dz} um). "
+                        f"rx={drx:.4f} deg, ry={dry:.4f} deg "
+                        f"(tip/tilt threshold: ±{self.tilt_offset_threshold} deg)."
+                    )
+                else:
+                    self.log.info(
+                        f"Refocus using corner offsets accepted: "
+                        f"dz={dz:.2f} um, rx={drx:.4f} deg, ry={dry:.4f} deg."
+                    )
+
+            else:
+                self.log.info(
+                    "Enough wavefront error measurements were found. "
+                    "Proceeding to estimate the corrections with OFC."
+                )
+                self._calculate_corrections(
+                    wfe=wfe, zk_indices=zk_indices, sensor_ids=sensor_ids, **kwargs
+                )
 
         finally:
             # Clear the queue
             self._clear_wfe_collections()
+
+    def get_offset_from_radius(self, radius):
+        """Get the offset from the donut radius.
+
+        Parameters
+        ----------
+        radius : `float`
+            The radius of the donut in pixels.
+
+        Returns
+        -------
+        offset : `float`
+            The offset in microns.
+        """
+        # Compute the defocus offset from the median radius
+        # We multiply by sqrt(4 * f^2 - 1) * pixel_scale to get the defocus
+        # offset in meters, and subtract the nominal defocus of the wavefront
+        # sensors.
+        offset = (
+            radius * np.sqrt(4 * self.FOCAL_RATIO**2 - 1) * self.PIXEL_SIZE
+            - self.NOMINAL_DEFOCUS
+        )
+
+        return offset
+
+    def get_corner_offsets(self, refs, butler, run_name):
+        """Get the donut radius from the butler.
+
+        Parameters
+        ----------
+        refs : `list`
+            List of references to the corner wavefront sensors.
+        butler : `lsst.daf.Butler`
+            Butler instance to access the data.
+
+        Returns
+        -------
+        corner_offsets : `numpy.ndarray`
+            Array with corner offsets in microns. Each element is a tuple
+            (x, y, z) where x and y are the deg coordinates of the detector
+            and z is the offset in microns.
+        """
+        corner_offsets = []
+        for ref in refs:
+            donuts_intra = butler.get(
+                "donutStampsIntra",
+                dataId=ref.dataId,
+                collections=[run_name],
+            )
+            if (
+                "RADIUS" in donuts_intra.metadata
+                and "RADIUS_FAIL_FLAG" in donuts_intra.metadata
+            ):
+                intra_radius = np.array(donuts_intra.metadata.getArray("RADIUS"))
+                intra_radius_fail_flags = np.array(
+                    donuts_intra.metadata.getArray("RADIUS_FAIL_FLAG")
+                ).astype(bool)
+                valid_intra_radius = intra_radius[~intra_radius_fail_flags]
+                if len(valid_intra_radius) > 0:
+                    median_intra_radius = np.median(valid_intra_radius)
+                else:
+                    self.log.warning("No valid RADIUS values found in donuts_intra.")
+                    median_intra_radius = np.nan
+            else:
+                self.log.warning(
+                    f"Missing RADIUS or RADIUS_FAIL_FLAG in donuts_intra for {ref.dataId}."
+                )
+                median_intra_radius = np.nan
+
+            donuts_extra = butler.get(
+                "donutStampsExtra",
+                dataId=ref.dataId,
+                collections=[run_name],
+            )
+            if (
+                "RADIUS" in donuts_extra.metadata
+                and "RADIUS_FAIL_FLAG" in donuts_extra.metadata
+            ):
+                extra_radius = np.array(donuts_extra.metadata.getArray("RADIUS"))
+                extra_radius_fail_flags = np.array(
+                    donuts_extra.metadata.getArray("RADIUS_FAIL_FLAG")
+                ).astype(bool)
+                valid_extra_radius = extra_radius[~extra_radius_fail_flags]
+                if len(valid_extra_radius) > 0:
+                    median_extra_radius = np.median(valid_extra_radius)
+                else:
+                    self.log.warning("No valid RADIUS values found in donuts_extra.")
+                    median_extra_radius = np.nan
+            else:
+                self.log.warning(
+                    f"Missing RADIUS or RADIUS_FAIL_FLAG in donuts_intra for {ref.dataId}."
+                )
+                median_extra_radius = np.nan
+
+            self.log.info(
+                f"Donut median radii for {ref.dataId['detector']}: "
+                f"intra={median_intra_radius:.2f} px, "
+                f"extra={median_extra_radius:.2f} px. "
+            )
+
+            median_min_radius = np.nanmin([median_intra_radius, median_extra_radius])
+            detector_offset = self.get_offset_from_radius(median_min_radius)
+            self.log.info(
+                "Computed out-of-focus offsets from smallest radii: "
+                f"{detector_offset:.2f} um."
+            )
+            if median_min_radius == median_intra_radius:
+                detector_offset *= -1
+
+            camera = LsstCam().getCamera()
+            detector = camera.get(ref.dataId["detector"])
+            x_pos, y_pos = detector.getCenter(FIELD_ANGLE)
+            x_pos_um = np.degrees(x_pos) * self.PIXEL_SIZE * 3600 / self.PIXEL_SCALE
+            y_pos_um = np.degrees(y_pos) * self.PIXEL_SIZE * 3600 / self.PIXEL_SCALE
+            corner_offsets.append((x_pos_um, y_pos_um, detector_offset))
+
+        return np.array(corner_offsets)
+
+    def fit_camera_z_tip_tilt(self, corner_offsets):
+        """Fit the camera z, tip, and tilt from the corner offsets.
+
+        Parameters
+        ----------
+        corner_offsets : `numpy.ndarray`
+            Array with corner offsets in microns. Each element is a tuple
+            (x, y, z) where x and y are the pixel coordinates of the corner
+            and z is the offset in microns.
+
+        Returns
+        -------
+        z_offset : `float`
+            The z offset in microns.
+        tip_x : `float`
+            The rotation about x in degrees
+        tip_y : `float`
+            The rotation about y in degrees
+        """
+        # Build design matrix: 1 for piston, x for tip, y for tilt
+        A = np.array([[1, x, y] for (x, y, _) in corner_offsets])
+        b = np.array([z for (_, _, z) in corner_offsets])
+
+        # Least squares solution: [z, tip, tilt]
+        coeffs, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
+        z_offset, dzdx, dzdy = coeffs
+
+        tip_x = np.rad2deg(np.arctan(dzdx))
+        tip_y = np.rad2deg(np.arctan(dzdy))
+
+        return z_offset, tip_x, tip_y
 
     def get_wavefront_errors(self):
         """Get wavefront errors.

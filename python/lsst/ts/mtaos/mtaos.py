@@ -274,15 +274,19 @@ class MTAOS(salobj.ConfigurableCsc):
                 "m2hex": (
                     "MTHexapod",
                     utility.MTHexapodIndex.M2.value,
-                    [],
+                    ["summaryState", "heartbeat"],
                 ),
                 "camhex": (
                     "MTHexapod",
                     utility.MTHexapodIndex.Camera.value,
-                    [],
+                    ["summaryState", "heartbeat"],
                 ),
-                "m1m3": ("MTM1M3", None, ["summaryState", "appliedActiveOpticForces"]),
-                "m2": ("MTM2", None, ["summaryState", "axialForce"]),
+                "m1m3": (
+                    "MTM1M3",
+                    None,
+                    ["summaryState", "heartbeat", "appliedActiveOpticForces"],
+                ),
+                "m2": ("MTM2", None, ["summaryState", "heartbeat", "axialForce"]),
             }
 
             for remote_name in remotes_parameters:
@@ -345,6 +349,9 @@ class MTAOS(salobj.ConfigurableCsc):
             zernike_table_name=config.zernike_table_name,
             elevation_delta_limit_max=config.elevation_delta_limit_max,
             elevation_delta_limit_min=config.elevation_delta_limit_min,
+            tilt_offset_threshold=config.tilt_offset_threshold,
+            dz_threshold_min=config.dz_threshold_min,
+            dz_threshold_max=config.dz_threshold_max,
             data_instrument_name=(
                 config.data_instrument_name
                 if hasattr(config, "data_instrument_name")
@@ -506,7 +513,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
     async def _check_enabled(self, remote) -> bool:
         """Check if a specific remote component is enabled."""
-        summary_state = await self.remote[remote].evt_summaryState.aget()
+        summary_state = await self.remotes[remote].evt_summaryState.aget()
         return salobj.State(summary_state.summaryState) == salobj.State.ENABLED
 
     async def check_components_alive(self) -> bool:
@@ -526,7 +533,7 @@ class MTAOS(salobj.ConfigurableCsc):
     async def _check_liveliness(self, remote) -> bool:
         """Check if a specific remote component is alive."""
         try:
-            await self.remote[remote].evt_heartbeat.next(
+            await self.remotes[remote].evt_heartbeat.next(
                 flush=True, timeout=self.DEFAULT_TIMEOUT
             )
         except asyncio.TimeoutError:
@@ -1156,8 +1163,8 @@ class MTAOS(salobj.ConfigurableCsc):
                             else "not set"
                         )
                         self.log.info(
-                            f"Current rotator position: {report_rotator:.1f}, "
-                            f"current elevation: {report_elevation:.1f}. "
+                            f"Current rotator position: {report_rotator}, "
+                            f"current elevation: {report_elevation}. "
                             f"Image to process was taken at {rotation_angle=} and {elevation=}. "
                             f"Difference above threshold rot_limit={self.rotation_angle_limit} "
                             f"el_limit={self.elevation_angle_limit}. "
