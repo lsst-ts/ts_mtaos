@@ -4,19 +4,19 @@ This configuration only affects single-package Sphinx documentation builds.
 """
 
 import lsst.ts.mtaos  # noqa
-from documenteer.conf.pipelinespkg import *  # noqa
+from documenteer.conf.pipelinespkg import *  # type: ignore # noqa
 
 project = "ts_mtaos"
-html_theme_options["logotext"] = project  # noqa
+html_theme_options["logotext"] = project  # type: ignore # noqa
 html_title = project
 html_short_title = project
-doxylink = {}  # Avoid warning: Could not find tag file _doxygen/doxygen.tag
+doxylink = {}  # type: ignore # Avoid warning: Could not find tag file _doxygen/doxygen.tag
 
-intersphinx_mapping["ts_xml"] = ("https://ts-xml.lsst.io", None)  # noqa
-intersphinx_mapping["ts_salobj"] = ("https://ts-salobj.lsst.io", None)  # noqa
+intersphinx_mapping["ts_xml"] = ("https://ts-xml.lsst.io", None)  # type: ignore # noqa
+intersphinx_mapping["ts_salobj"] = ("https://ts-salobj.lsst.io", None)  # type: ignore # noqa
 
 # Support the sphinx extension of plantuml
-extensions.append("sphinxcontrib.plantuml")  # noqa
+extensions.append("sphinxcontrib.plantuml")  # type: ignore # noqa
 
 # Put the path to plantuml.jar
 plantuml = "java -jar /home/saluser/plantuml.jar"
