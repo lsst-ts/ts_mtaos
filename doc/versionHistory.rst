@@ -2,7 +2,12 @@
 Version History
 ===============
 
-v.0.20.0
+v0.20.1
+--------
+
+* Add mypy for type checking in the entire package.
+
+v0.20.0
 --------
 
 * Add automatic refocus functionality in calculate_corrections. If not enough wavefront errors are estimated, it will attempt to use donut radii to focus the telescope.
