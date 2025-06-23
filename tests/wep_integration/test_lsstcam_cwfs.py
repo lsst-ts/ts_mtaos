@@ -19,9 +19,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import logging
 import os
 import unittest
+from pathlib import Path
 
 import pytest
 import yaml
@@ -34,10 +34,14 @@ from lsst.ts.wep.utils import runProgram, writeCleanUpRepoCmd
 
 @pytest.mark.integtest
 class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.log = logging.getLogger(__name__)
+    dataDir: Path
+    isrDir: Path
+    model: mtaos.Model
+    short_waittime: float
+    zernike_coefficient_maximum_expected: set[int]
 
+    @classmethod
+    def setUpClass(cls) -> None:
         cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         cls.isrDir = cls.dataDir.joinpath("input")
 
@@ -60,7 +64,7 @@ class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
         run_name = "run2"
 
         # Check that run doesn't already exist due to previous improper cleanup
-        butler = dafButler.Butler(data_path)
+        butler = dafButler.Butler(data_path)  # type: ignore
         registry = butler.registry
 
         # This is the expected index of the maximum zernike coefficient.
@@ -81,15 +85,18 @@ class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
 
         cls.short_waittime = 1.0
 
+    def setUp(self) -> None:
+        self.model = self.__class__.model
+
     @classmethod
-    def tearDownClass(cls):
+    def tearDownClass(cls) -> None:
         # Check that run doesn't already exist due to previous improper cleanup
-        butler = dafButler.Butler(cls.model.data_path)
+        butler = dafButler.Butler(cls.model.data_path)  # type: ignore
 
         if cls.model.run_name in list(butler.registry.queryCollections()):
             runProgram(writeCleanUpRepoCmd(cls.model.data_path, cls.model.run_name))
 
-    async def test_process_lsstcam_corner_wfs(self):
+    async def test_process_lsstcam_corner_wfs(self) -> None:
         await self.model.process_lsstcam_corner_wfs(
             visit_id=4021123106000,
             config=dict(),

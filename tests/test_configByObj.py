@@ -28,7 +28,7 @@ from lsst.ts import mtaos
 class Config(object):
     """Config Class for the test."""
 
-    def __init__(self, hasSkyFile=True, hasState0Dof=True):
+    def __init__(self, hasSkyFile: bool = True, hasState0Dof: bool = True) -> None:
         self.camera = "comcam"
         self.instrument = "comcam"
         self.defaultIsrDir = "/home/lsst/input"
@@ -45,26 +45,26 @@ class Config(object):
 class TestConfigByObj(unittest.TestCase):
     """Test the Config class with an object."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         os.environ["ISRDIRPATH"] = os.path.join(os.sep, "isrDir")
 
         self.configObj = mtaos.Config(Config())
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         try:
             os.environ.pop("ISRDIRPATH")
         except KeyError:
             pass
 
-    def testGetInstName(self):
+    def testGetInstName(self) -> None:
         instName = self.configObj.getInstName()
         self.assertEqual(instName, "comcam")
 
-    def testGetIsrDirWithEnvPath(self):
+    def testGetIsrDirWithEnvPath(self) -> None:
         isrDir = self.configObj.getIsrDir()
         self.assertEqual(isrDir, os.environ["ISRDIRPATH"])
 
-    def testGetIsrDirWithoutEnvPath(self):
+    def testGetIsrDirWithoutEnvPath(self) -> None:
         os.environ.pop("ISRDIRPATH")
 
         with self.assertWarns(UserWarning):
@@ -72,22 +72,22 @@ class TestConfigByObj(unittest.TestCase):
 
         self.assertEqual(isrDir, self.configObj.configObj.defaultIsrDir)
 
-    def testGetDefaultSkyFile(self):
+    def testGetDefaultSkyFile(self) -> None:
         skyFilePath = self.configObj.getDefaultSkyFile()
         self.assertTrue(skyFilePath.exists())
 
-    def testGetDefaultSkyFileNot(self):
+    def testGetDefaultSkyFileNot(self) -> None:
         config = Config(hasSkyFile=False)
         configObj = mtaos.Config(config)
 
         skyFilePath = configObj.getDefaultSkyFile()
         self.assertTrue(skyFilePath is None)
 
-    def testGetState0DofFile(self):
+    def testGetState0DofFile(self) -> None:
         state0DofFilePath = self.configObj.getState0DofFile()
         self.assertTrue(state0DofFilePath.exists())
 
-    def testGetState0DofFileNot(self):
+    def testGetState0DofFileNot(self) -> None:
         config = Config(hasState0Dof=False)
         configObj = mtaos.Config(config)
 

@@ -27,6 +27,7 @@ import numpy as np
 import pytest
 import yaml
 from lsst.ts import mtaos, salobj
+from lsst.ts.xml import type_hints
 
 # standard command timeout (sec)
 SHORT_TIMEOUT = 5
@@ -35,37 +36,44 @@ TEST_CONFIG_DIR = Path(__file__).parents[1].joinpath("tests", "testData", "confi
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
-    def basic_make_csc(self, initial_state, config_dir, simulation_mode):
+    def basic_make_csc(
+        self,
+        initial_state: salobj.State | int,
+        config_dir: str,
+        simulation_mode: int | str,
+    ) -> mtaos.MTAOS:
         return mtaos.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls._randomize_topic_subname = True
 
-    def setUp(self):
+    def setUp(self) -> None:
         # Simulated CSCs
-        self.cscM2Hex = None
-        self.cscCamHex = None
-        self.cscM1M3 = None
-        self.cscM2 = None
+        self.cscM2Hex: salobj.Controller | None = None
+        self.cscCamHex: salobj.Controller | None = None
+        self.cscM1M3: salobj.Controller | None = None
+        self.cscM2: salobj.Controller | None = None
 
-        self.m2_hex_corrections = []
-        self.cam_hex_corrections = []
-        self.m1m3_corrections = []
-        self.m2_corrections = []
+        self.m2_hex_corrections: list = []
+        self.cam_hex_corrections: list = []
+        self.m1m3_corrections: list = []
+        self.m2_corrections: list = []
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         logFile = Path(mtaos.getLogDir()).joinpath("mtaos.log")
         if logFile.exists():
             logFile.unlink()
 
-    async def test_addAberration_issueCorrection(self):
+    async def test_addAberration_issueCorrection(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
             await self._simulateCSCs()
 
             await self._startCsc()
+            if self.cscM1M3 is None:
+                raise RuntimeError("M1M3 controller is not initialized.")
 
             # Set the timeout > 20 seconds for the long calculation time
             remote = self._getRemote()
@@ -242,7 +250,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 )
             )
 
-    async def test_addAberration_issueCorrection_xref_x0(self):
+    async def test_addAberration_issueCorrection_xref_x0(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
@@ -292,7 +300,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # The two times calculation of visit DOF should be eqaul under "x0"
             np.testing.assert_array_equal(dof_first.visitDoF, dof_second.visitDoF)
 
-    async def test_offsetDOF(self):
+    async def test_offsetDOF(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
@@ -346,7 +354,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             assert len(self.m2_corrections) == 1
             assert len(self.m1m3_corrections) == 1
 
-    async def test_stress_below_limit(self):
+    async def test_stress_below_limit(self) -> None:
         # Scenario where stress is below the limit,
         # so no scaling or truncation should happen
         async with self.make_csc(
@@ -378,7 +386,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 final_total_stress.stressM1M3, self.csc.m1m3_stress_limit
             )
 
-    async def test_stress_above_limit_scale(self):
+    async def test_stress_above_limit_scale(self) -> None:
         # Scenario where stress is above the
         # limit and sclaing approach is used
         async with self.make_csc(
@@ -425,7 +433,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 final_total_stress.stressM1M3, self.csc.m1m3_stress_limit
             )
 
-    async def test_stress_above_limit_truncate(self):
+    async def test_stress_above_limit_truncate(self) -> None:
         # Scenario where stress is above the
         # limit and truncation approach is used
         async with self.make_csc(
@@ -460,10 +468,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 final_total_stress.stressM1M3, self.csc.m1m3_stress_limit
             )
 
-    async def asyncTearDown(self):
+    async def asyncTearDown(self) -> None:
         await self._cancelCSCs()
 
-    async def _simulateCSCs(self):
+    async def _simulateCSCs(self) -> None:
         self.cscM2Hex = salobj.Controller(
             "MTHexapod", index=mtaos.utility.MTHexapodIndex.M2.value
         )
@@ -496,36 +504,49 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         self.cscM2.cmd_applyForces.callback = self.m2_apply_forces_callbck
         self.cscM2.cmd_resetForceOffsets.callback = self.m2_reset_force_offsets_callback
 
-    async def hexapod_move_callbck(self, data):
+    async def hexapod_move_callbck(self, data: type_hints.BaseMsgType) -> None:
         if data.salIndex == mtaos.utility.MTHexapodIndex.M2.value:
             self.m2_hex_corrections.append(data)
         else:
             self.cam_hex_corrections.append(data)
 
-    async def m1m3_clear_active_optic_forces_callback(self, data):
+    async def m1m3_clear_active_optic_forces_callback(
+        self, data: type_hints.BaseMsgType
+    ) -> None:
         await asyncio.sleep(1.0)
 
-    async def m1m3_apply_forces_callbck(self, data):
+    async def m1m3_apply_forces_callbck(self, data: type_hints.BaseMsgType) -> None:
         self.m1m3_corrections.append(data)
 
-    async def m1m3_apply_forces_fail_callbck(self, data):
+    async def m1m3_apply_forces_fail_callbck(
+        self, data: type_hints.BaseMsgType
+    ) -> None:
         raise RuntimeError("This is a test.")
 
-    async def m2_reset_force_offsets_callback(self, data):
+    async def m2_reset_force_offsets_callback(
+        self, data: type_hints.BaseMsgType
+    ) -> None:
         await asyncio.sleep(1.0)
 
-    async def m2_apply_forces_callbck(self, data):
+    async def m2_apply_forces_callbck(self, data: type_hints.BaseMsgType) -> None:
         self.m2_corrections.append(data)
 
-    async def _startCsc(self):
+    async def _startCsc(self) -> None:
         remote = self._getRemote()
         await salobj.set_summary_state(remote, salobj.State.ENABLED)
 
-    def _getRemote(self):
+    def _getRemote(self) -> salobj.Remote:
         # This is instantiated after calling self.make_csc().
         return self.remote
 
-    async def _cancelCSCs(self):
+    async def _cancelCSCs(self) -> None:
+        if (
+            self.cscM2Hex is None
+            or self.cscCamHex is None
+            or self.cscM1M3 is None
+            or self.cscM2 is None
+        ):
+            raise RuntimeError("CSCs are not initialized.")
         await asyncio.gather(
             self.cscM2Hex.close(),
             self.cscCamHex.close(),

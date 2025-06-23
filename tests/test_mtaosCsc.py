@@ -33,6 +33,7 @@ from lsst.ts import mtaos, salobj
 from lsst.ts.ofc import OFCData
 from lsst.ts.wep.utils import getModulePath as getModulePathWep
 from lsst.ts.wep.utils import runProgram, writeCleanUpRepoCmd
+from lsst.ts.xml import type_hints
 
 # standard command timeout (sec)
 STD_TIMEOUT = 60
@@ -41,11 +42,16 @@ TEST_CONFIG_DIR = Path(__file__).parents[1].joinpath("tests", "testData", "confi
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
-    def basic_make_csc(self, initial_state, config_dir, simulation_mode):
+    def basic_make_csc(
+        self,
+        initial_state: salobj.State | int,
+        config_dir: str,
+        simulation_mode: int | str,
+    ) -> mtaos.MTAOS:
         return mtaos.MTAOS(config_dir=config_dir, simulation_mode=simulation_mode)
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls._randomize_topic_subname = True
         cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         cls.isrDir = cls.dataDir.joinpath("input")
@@ -59,7 +65,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         cls.run_name = "run1"
 
         # Check that run doesn't already exist due to previous improper cleanup
-        butler = dafButler.Butler(cls.data_path)
+        butler = dafButler.Butler(cls.data_path)  # type: ignore
         registry = butler.registry
 
         # This is the expected index of the maximum zernike coefficient.
@@ -69,14 +75,14 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             cleanUpCmd = writeCleanUpRepoCmd(cls.data_path, cls.run_name)
             runProgram(cleanUpCmd)
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         self.isrDir = self.dataDir.joinpath("input")
 
         # Let the mtaos to set WEP based on this path variable
         os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         try:
             os.environ.pop("ISRDIRPATH")
         except KeyError:
@@ -87,26 +93,26 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             logFile.unlink()
 
     @classmethod
-    def tearDownClass(cls):
+    def tearDownClass(cls) -> None:
         # Check that run doesn't already exist due to previous improper cleanup
-        butler = dafButler.Butler(cls.data_path)
+        butler = dafButler.Butler(cls.data_path)  # type: ignore
 
         if cls.run_name in list(butler.registry.queryCollections()):
             runProgram(writeCleanUpRepoCmd(cls.data_path, cls.run_name))
 
-    def _getCsc(self):
+    def _getCsc(self) -> mtaos.MTAOS:
         # This is instantiated after calling self.make_csc().
         return self.csc
 
-    def _getRemote(self):
+    def _getRemote(self) -> salobj.Remote:
         # This is instantiated after calling self.make_csc().
         return self.remote
 
-    async def testBinScript(self):
+    async def testBinScript(self) -> None:
         cmdline_args = ["--log-to-file", "--log-level", "20"]
         await self.check_bin_script("MTAOS", 0, "run_mtaos", cmdline_args=cmdline_args)
 
-    async def testStandardStateTransitions(self):
+    async def testStandardStateTransitions(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
@@ -133,7 +139,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 timeout=STD_TIMEOUT,
             )
 
-    async def test_configuration(self):
+    async def test_configuration(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -199,7 +205,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     self.csc.model.zernike_table_name, config_data["zernike_table_name"]
                 )
 
-    async def testResetCorrection(self):
+    async def testResetCorrection(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
@@ -251,7 +257,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 timeout=STD_TIMEOUT,
             )
 
-    async def _checkCorrIsZero(self, remote):
+    async def _checkCorrIsZero(self, remote: salobj.Remote) -> None:
         await self.assert_next_sample(
             remote.evt_m2HexapodCorrection,
             flush=False,
@@ -288,7 +294,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(actForcesM2), 72)
         self.assertEqual(np.sum(np.abs(actForcesM2)), 0)
 
-    async def testIssueCorrectionError(self):
+    async def testIssueCorrectionError(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
@@ -314,7 +320,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 timeout=SHORT_TIMEOUT,
             )
 
-    async def test_addAberration(self):
+    async def test_addAberration(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
@@ -355,7 +361,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 remote.evt_m2Correction, flush=False, timeout=SHORT_TIMEOUT
             )
 
-    async def test_addAberration_with_config(self):
+    async def test_addAberration_with_config(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
@@ -432,12 +438,14 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 M1M3Bend=np.zeros(20, dtype=bool).tolist(),
                 M2Bend=np.zeros(20, dtype=bool).tolist(),
             )
-            config = dict(
+            updated_config = dict(
                 comp_dof_idx=new_comp_dof_idx, sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8]
             )
 
             await remote.cmd_addAberration.set_start(
-                wf=np.zeros(19), config=yaml.safe_dump(config), timeout=STD_TIMEOUT
+                wf=np.zeros(19),
+                config=yaml.safe_dump(updated_config),
+                timeout=STD_TIMEOUT,
             )
 
             await self.assert_next_sample(
@@ -460,7 +468,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     @pytest.mark.csc_integtest
-    async def test_run_wep_comcam(self):
+    async def test_run_wep_comcam(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -478,7 +486,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             ofc_data.dof_state0 = dof_state0
 
-            self.csc.model = mtaos.Model(
+            self.csc._model = mtaos.Model(
                 instrument=ofc_data.name,
                 data_path=self.data_path,
                 ofc_data=ofc_data,
@@ -510,7 +518,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     @pytest.mark.csc_integtest
-    async def test_run_wep_comcam_disable_after_execution_error(self):
+    async def test_run_wep_comcam_disable_after_execution_error(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -528,7 +536,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             ofc_data.dof_state0 = dof_state0
 
-            self.csc.model = mtaos.Model(
+            self.csc._model = mtaos.Model(
                 instrument=ofc_data.name,
                 data_path=self.data_path,
                 ofc_data=ofc_data,
@@ -552,7 +560,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await salobj.set_summary_state(self.remote, salobj.State.STANDBY)
 
     @pytest.mark.csc_integtest
-    async def test_run_wep_lsst_cwfs(self):
+    async def test_run_wep_lsst_cwfs(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -570,7 +578,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             ofc_data.dof_state0 = dof_state0
 
-            self.csc.model = mtaos.Model(
+            self.csc._model = mtaos.Model(
                 instrument=ofc_data.name,
                 data_path=self.data_path,
                 ofc_data=ofc_data,
@@ -599,7 +607,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     @pytest.mark.csc_integtest
-    async def test_run_wep_lsst_cwfs_ocps(self):
+    async def test_run_wep_lsst_cwfs_ocps(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -617,7 +625,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             ofc_data.dof_state0 = dof_state0
 
-            self.csc.model = mtaos.Model(
+            self.csc._model = mtaos.Model(
                 instrument=ofc_data.name,
                 data_path=self.data_path,
                 ofc_data=ofc_data,
@@ -638,7 +646,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 )
 
     @pytest.mark.csc_integtest
-    async def test_interruptWEP(self):
+    async def test_interruptWEP(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
         ):
@@ -654,7 +662,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             ofc_data.dof_state0 = dof_state0
 
-            self.csc.model = mtaos.Model(
+            self.csc._model = mtaos.Model(
                 instrument=ofc_data.name,
                 data_path=self.data_path,
                 ofc_data=ofc_data,
@@ -683,7 +691,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(salobj.AckError):
                 await run_wep_task
 
-    def assert_software_versions(self, sofware_versions) -> None:
+    def assert_software_versions(
+        self, sofware_versions: type_hints.BaseMsgType
+    ) -> None:
         """Assert software versions payload is correctly populated.
 
         Raises
