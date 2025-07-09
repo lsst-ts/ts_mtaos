@@ -2,6 +2,18 @@
 Version History
 ===============
 
+v0.21.0
+--------
+
+* Add retrials to `_execute_ofc` in `mtaos.py` to handle OFC failures from missing wavefront errors without faulting the system.
+
+* Add `skipped_images` collection in `mtaos.py` to store images that were skipped because the elevation or rotation angle jump exceeded the thresholds.
+
+* Add safeguard for missing rotation angle in `image_rotator` in `mtaos.py`.
+
+* Update ISR task configuration to use `IsrTaskLSST` instead of `IsrTask`.
+
+
 v0.20.1
 --------
 
