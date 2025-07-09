@@ -1384,16 +1384,14 @@ class Model:
             else:
                 self.log.warning("No corner offsets found in the wavefront errors.")
 
-            if wfe.shape[0] < 3 or (
+            if (
                 np.abs(dz) > self.dz_threshold_min
                 or np.abs(drx) > self.tilt_offset_threshold
                 or np.abs(dry) > self.tilt_offset_threshold
             ):
                 self.log.info(
-                    "Not enough wavefront sensors reported WFE measurements "
-                    f"(expected at least 3, got {wfe.shape[0]}), "
-                    "or the z_offset is large enough to require refocusing. "
-                    "Attempting to use donut radii for refocus."
+                    "The z_offset computed from donut radii "
+                    "is large enough to require automatic refocusing."
                 )
                 max_dz = self.dz_threshold_max
                 dz_clipped = np.clip(dz, -max_dz, max_dz)
@@ -1420,10 +1418,10 @@ class Model:
                         f"Refocus using corner offsets accepted: "
                         f"dz={dz:.2f} um, rx={drx:.4f} deg, ry={dry:.4f} deg."
                     )
-
             else:
                 self.log.info(
-                    "Enough wavefront error measurements were found. "
+                    f"{wfe.shape[0]}/4 wavefront error measurements were found. "
+                    "If fewer than 3 are found, this image will be skipped."
                     "Proceeding to estimate the corrections with OFC."
                 )
                 self._calculate_corrections(
