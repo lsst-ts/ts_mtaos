@@ -41,8 +41,12 @@ SHORT_WAIT_TIME = 1.0
 class TestModel(unittest.IsolatedAsyncioTestCase):
     """Test the Model class."""
 
+    dataDir: Path
+    isrDir: Path
+    model: mtaos.Model
+
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
         cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         cls.isrDir = cls.dataDir.joinpath("input")
 
@@ -67,14 +71,15 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         # patch _get_visit_info for unit testing
         cls.model._get_visit_info = Mock(side_effect=cls._get_visit_info_mock)
 
-    def setUp(self):
+    def setUp(self) -> None:
         os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
         self._makeDir(self.isrDir)
+        self.model = self.__class__.model
 
-    def _makeDir(self, directory):
-        Path(directory).mkdir(parents=True, exist_ok=True)
+    def _makeDir(self, directory: Path) -> None:
+        directory.mkdir(parents=True, exist_ok=True)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.model.reset_fwhm_data()
         self.model.reset_wfe_correction()
 
@@ -111,24 +116,24 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             boresightRotAngle=45.0 * degrees,
         )
 
-    def test_init(self):
+    def test_init(self) -> None:
         self.assertTrue(isinstance(self.model.ofc, OFC))
         self.assertEqual(self.model.ofc.ofc_data.name, "comcam")
 
-    def test_get_wfe(self):
+    def test_get_wfe(self) -> None:
         self.assertEqual(self.model.get_wfe(), [])
 
-    def test_get_rejected_wfe(self):
+    def test_get_rejected_wfe(self) -> None:
         self.assertEqual(self.model.get_rejected_wfe(), [])
 
-    def test_get_fwhm_sensors(self):
+    def test_get_fwhm_sensors(self) -> None:
         self.assertEqual(self.model.get_fwhm_sensors(), [])
 
         self.model.set_fwhm_data(5, np.zeros(2))
         self.assertEqual(len(self.model.get_fwhm_sensors()), 1)
         self.assertEqual(self.model.get_fwhm_sensors()[0], 5)
 
-    def test_set_fwhm_data(self):
+    def test_set_fwhm_data(self) -> None:
         self.model.set_fwhm_data(1, np.zeros(2))
 
         fwhm_data = self.model.get_fwhm_data()
@@ -140,7 +145,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         fwhm_data = self.model.get_fwhm_data()
         self.assertEqual(len(fwhm_data), 3)
 
-    def test_set_fwhm_data_repeat_sensor(self):
+    def test_set_fwhm_data_repeat_sensor(self) -> None:
         self.model.set_fwhm_data(1, np.zeros(2))
 
         new_fwhm_values = np.array([1, 2, 3])
@@ -153,30 +158,30 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         fwhm_values_in_list = fwhm_data[0]
         self.assertTrue(np.all(fwhm_values_in_list == new_fwhm_values))
 
-    def test_reset_fwhm_data(self):
+    def test_reset_fwhm_data(self) -> None:
         self.model.set_fwhm_data(1, np.zeros(2))
         self.model.reset_fwhm_data()
 
         fwhm_data = self.model.get_fwhm_data()
         self.assertEqual(len(fwhm_data), 0)
 
-    def test_get_dof_aggr(self):
+    def test_get_dof_aggr(self) -> None:
         self.assertEqual(len(self.model.get_dof_aggr()), 50)
 
-    def test_set_dof_aggr(self):
+    def test_set_dof_aggr(self) -> None:
         new_dof_aggr = np.zeros(50)
         self.model.set_dof_aggr(new_dof_aggr)
 
         self.assertTrue(np.all(self.model.get_dof_aggr() == new_dof_aggr))
 
-    def test_get_dof(self):
+    def test_get_dof(self) -> None:
         self.assertEqual(len(self.model.get_dof_lv()), 50)
 
-    def test_get_bending_mode_stresses(self):
+    def test_get_bending_mode_stresses(self) -> None:
         result = self.model.get_m1m3_bending_mode_stresses()
         self.assertEqual(len(result), 20)
 
-    def test_add_correction(self):
+    def test_add_correction(self) -> None:
         wavefront_errors = np.zeros(19)
         default_config = {"sensor_ids": [0, 1, 2, 3, 4, 5, 6, 7, 8]}
 
@@ -245,7 +250,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             f"{actCorr} not almost close to 0.",
         )
 
-    def test_m2_hexapod_correction(self):
+    def test_m2_hexapod_correction(self) -> None:
         x, y, z, u, v, w = self.model.m2_hexapod_correction()
         self.assertEqual(
             self.model.m2_hexapod_correction.correction_type, CorrectionType.POSITION
@@ -257,7 +262,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(v, 0)
         self.assertEqual(w, 0)
 
-    def test_cam_hexapod_correction(self):
+    def test_cam_hexapod_correction(self) -> None:
         self.assertEqual(
             self.model.cam_hexapod_correction.correction_type, CorrectionType.POSITION
         )
@@ -269,17 +274,17 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(v, 0)
         self.assertEqual(w, 0)
 
-    def test_m1m3_correction(self):
+    def test_m1m3_correction(self) -> None:
         self.assertEqual(
             self.model.m1m3_correction.correction_type, CorrectionType.FORCE
         )
         self.assertEqual(len(self.model.m1m3_correction()), 156)
 
-    def test_m2_correction(self):
+    def test_m2_correction(self) -> None:
         self.assertEqual(self.model.m2_correction.correction_type, CorrectionType.FORCE)
         self.assertEqual(len(self.model.m2_correction()), 72)
 
-    def test_reset_wfe_correction(self):
+    def test_reset_wfe_correction(self) -> None:
         wfe_data = [(1, [1, 2, 3]), (2, [1, 2, 3]), (3, [1, 2, 3])]
         radii_data = [1.0, 2.0, 3.0]
         self.model.wavefront_errors.append(wfe_data, radii_data)
@@ -290,19 +295,19 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.model.get_wfe(), [])
         self.assertEqual(self.model.get_rejected_wfe(), [])
 
-    def test_reject_unreasonable_wfe(self):
+    def test_reject_unreasonable_wfe(self) -> None:
         self.assertEqual(self.model.reject_unreasonable_wfe([]), [])
 
-    def test_generate_wep_configuration(self):
+    def test_generate_wep_configuration(self) -> None:
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
             config=dict(),
         )
 
-        expected_donut_catalog_wcs_config = dict()
+        expected_donut_catalog_wcs_config: dict = dict()
 
         expected_isr_config = {
-            "connections.outputExposure": "postISRCCD",
+            "connections.outputExposure": "post_isr_image",
             "doBias": False,
             "doVariance": False,
             "doLinearize": False,
@@ -329,7 +334,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             expected_zernike_science_sensor_config=expected_zernike_science_sensor_config,
         )
 
-    def test_generate_wep_configuration_custom_donut_catalog_online(self):
+    def test_generate_wep_configuration_custom_donut_catalog_online(self) -> None:
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
             config=dict(
@@ -344,13 +349,13 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-        expected_donut_catalog_cwfs_config = dict(
+        expected_donut_catalog_cwfs_config: dict = dict(
             filterName="g",
         )
         expected_donut_catalog_cwfs_config["connections.refCatalogs"] = "cal_ref_cat"
 
         expected_isr_config = {
-            "connections.outputExposure": "postISRCCD",
+            "connections.outputExposure": "post_isr_image",
             "doBias": False,
             "doVariance": False,
             "doLinearize": False,
@@ -378,7 +383,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             expected_zernike_science_sensor_config=expected_zernike_science_sensor_config,
         )
 
-    def test_generate_wep_configuration_custom_isr(self):
+    def test_generate_wep_configuration_custom_isr(self) -> None:
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
             config=dict(
@@ -393,9 +398,9 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-        expected_donut_catalog_cwfs_config = dict()
+        expected_donut_catalog_cwfs_config: dict = dict()
         expected_isr_config = {
-            "connections.outputExposure": "postISRCCD",
+            "connections.outputExposure": "post_isr_image",
             "doBias": True,
             "doVariance": False,
             "doLinearize": False,
@@ -422,7 +427,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             expected_zernike_science_sensor_config=expected_zernike_science_sensor_config,
         )
 
-    def test_generate_wep_configuration_custom_zernike_science_sensor(self):
+    def test_generate_wep_configuration_custom_zernike_science_sensor(self) -> None:
         wep_configuration = self.model.generate_wep_configuration(
             instrument="comcam",
             config=dict(
@@ -436,9 +441,9 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-        expected_donut_catalog_cwfs_config = dict()
+        expected_donut_catalog_cwfs_config: dict = dict()
         expected_isr_config = {
-            "connections.outputExposure": "postISRCCD",
+            "connections.outputExposure": "post_isr_image",
             "doBias": False,
             "doVariance": False,
             "doLinearize": False,
@@ -467,11 +472,24 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
 
     def assert_wep_configuration(
         self,
-        wep_configuration,
-        expected_donut_catalog_wcs_task_config,
-        expected_isr_config,
-        expected_zernike_science_sensor_config,
-    ):
+        wep_configuration: dict,
+        expected_donut_catalog_wcs_task_config: dict,
+        expected_isr_config: dict,
+        expected_zernike_science_sensor_config: dict,
+    ) -> None:
+        """Assert the WEP configuration.
+
+        Parameters
+        ----------
+        wep_configuration : `dict`
+            The WEP configuration to check.
+        expected_donut_catalog_wcs_task_config : `dict`
+            The expected configuration for the generateDonutCatalogWcsTask.
+        expected_isr_config : `dict`
+            The expected configuration for the isr task.
+        expected_zernike_science_sensor_config : `dict`
+            The expected configuration for the CutOutDonutsScienceSensorTask.
+        """
         assert "tasks" in wep_configuration
 
         self.assert_generate_donut_catalog_wcs_task_config(
@@ -485,8 +503,19 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         )
 
     def assert_generate_donut_catalog_wcs_task_config(
-        self, wep_configuration, expected_donut_catalog_wcs_task_config
-    ):
+        self,
+        wep_configuration: dict,
+        expected_donut_catalog_wcs_task_config: dict,
+    ) -> None:
+        """Assert the generateDonutCatalogWcsTask configuration.
+
+        Parameters
+        ----------
+        wep_configuration : `dict`
+            The WEP configuration to check.
+        expected_donut_catalog_wcs_task_config : `dict`
+            The expected configuration for the generateDonutCatalogWcsTask.
+        """
         assert "generateDonutCatalogWcsTask" in wep_configuration["tasks"]
         if len(expected_donut_catalog_wcs_task_config) > 0:
             assert "config" in wep_configuration["tasks"]["generateDonutCatalogWcsTask"]
@@ -505,7 +534,20 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
                     == expected_donut_catalog_wcs_task_config[config]
                 )
 
-    def assert_isr_config(self, wep_configuration, expected_isr_config):
+    def assert_isr_config(
+        self,
+        wep_configuration: dict,
+        expected_isr_config: dict,
+    ) -> None:
+        """Assert the isr task configuration.
+
+        Parameters
+        ----------
+        wep_configuration : `dict`
+            The WEP configuration to check.
+        expected_isr_config : `dict`
+            The expected configuration for the isr task.
+        """
         assert "isr" in wep_configuration["tasks"]
         assert "config" in wep_configuration["tasks"]["isr"]
         for config in set(
@@ -534,8 +576,19 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             ), f"Expected {config}"
 
     def assert_estimate_zernikes_science_sensor_task(
-        self, wep_configuration, expected_zernike_science_sensor_config
-    ):
+        self,
+        wep_configuration: dict,
+        expected_zernike_science_sensor_config: dict,
+    ) -> None:
+        """Assert the CutOutDonutsScienceSensorTask configuration.
+
+        Parameters
+        ----------
+        wep_configuration : `dict`
+            The WEP configuration to check.
+        expected_zernike_science_sensor_config : `dict`
+            The expected configuration for the CutOutDonutsScienceSensorTask.
+        """
         assert "CutOutDonutsScienceSensorTask" in wep_configuration["tasks"]
         assert "calcZernikesTask" in wep_configuration["tasks"]
         assert "config" in wep_configuration["tasks"]["CutOutDonutsScienceSensorTask"]
@@ -554,7 +607,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
                 == expected_zernike_science_sensor_config[config]
             )
 
-    async def test_log_stream(self):
+    async def test_log_stream(self) -> None:
         task = await asyncio.create_subprocess_shell(
             f"echo THIS IS A TEST; sleep {SHORT_WAIT_TIME};echo THIS IS A TEST",
             stdout=asyncio.subprocess.PIPE,

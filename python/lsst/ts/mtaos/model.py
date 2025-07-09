@@ -31,14 +31,15 @@ import os
 import shutil
 import tempfile
 import time
-from typing import Optional
+from collections.abc import AsyncIterator
+from typing import IO, Any
 
 import numpy as np
 import yaml
 from lsst.afw.cameraGeom import FIELD_ANGLE
 from lsst.daf.butler import Butler, EmptyQueryResultError
 from lsst.obs.lsst import LsstCam
-from lsst.ts.ofc import OFC, BendModeToForce
+from lsst.ts.ofc import OFC, BendModeToForce, Correction, OFCData
 from lsst.ts.ofc.utils.ofc_data_helpers import get_intrinsic_zernikes, get_sensor_names
 from lsst.ts.salobj import DefaultingValidator
 from lsst.ts.utils import make_done_future
@@ -66,23 +67,23 @@ class Model:
 
     def __init__(
         self,
-        instrument,
-        data_path,
-        ofc_data,
-        log=None,
-        run_name="mtaos_wep",
-        collections="LSSTComCam/raw/all,LSSTComCam/calib",
-        pipeline_instrument=None,
-        pipeline_n_processes=9,
-        data_instrument_name=None,
-        reference_detector=0,
-        zernike_table_name="zernikes",
-        elevation_delta_limit_max=9.0,
-        elevation_delta_limit_min=4.0,
-        tilt_offset_threshold=0.1,
-        dz_threshold_min=300.0,
-        dz_threshold_max=900.0,
-    ):
+        instrument: str,
+        data_path: str,
+        ofc_data: OFCData,
+        log: logging.Logger | None = None,
+        run_name: str = "mtaos_wep",
+        collections: str = "LSSTComCam/raw/all,LSSTComCam/calib",
+        pipeline_instrument: dict | None = None,
+        pipeline_n_processes: int = 9,
+        data_instrument_name: dict | None = None,
+        reference_detector: int = 0,
+        zernike_table_name: str = "zernikes",
+        elevation_delta_limit_max: float = 9.0,
+        elevation_delta_limit_min: float = 4.0,
+        tilt_offset_threshold: float = 0.1,
+        dz_threshold_min: float = 300.0,
+        dz_threshold_max: float = 900.0,
+    ) -> None:
         """MTAOS model class.
 
         This class implements a model for the MTAOS operations. It encapsulates
@@ -123,6 +124,21 @@ class Model:
         zernike_table_name : `str`, optional
             Name of the table in the butler with zernike coeffients.
             Default is "zernikes".
+        elevation_delta_limit_max : `float`, optional
+            Maximum elevation change allowed before rejecting corrections.
+            Default is 9.0.
+        elevation_delta_limit_min : `float`, optional
+            Minimum elevation change allowed before scaling corrections.
+            Default is 4.0.
+        tilt_offset_threshold : `float`, optional
+            Threshold for tilt offset in degrees. If the tilt offset is below
+            this value, the correction is not applied. Default is 0.1.
+        dz_threshold_min : `float`, optional
+            Minimum defocus change that will trigger automatic refocus.
+            Default is 300.0.
+        dz_threshold_max : `float`, optional
+            Maximum defocus change allowed for automatic refocus.
+            Default is 900.0.
 
         Attributes
         ----------
@@ -262,24 +278,25 @@ class Model:
         self.rejected_wavefront_errors = WavefrontCollection(self.MAX_LEN_QUEUE)
 
         # Dictionary of FWHM (full width at half maximum) sensor data
-        self._fwhm_data = dict()
+        self._fwhm_data: dict = dict()
 
         # Optical feedback control
+        self.ofc_data = ofc_data
         self.ofc = OFC(ofc_data, log=self.log)
 
         # M2 hexapod correction
-        self.m2_hexapod_correction = None
+        self.m2_hexapod_correction = Correction()
 
         # Camera hexapod correction
-        self.cam_hexapod_correction = None
+        self.cam_hexapod_correction = Correction()
 
         # M1M3 actuator correction
-        self.m1m3_correction = None
+        self.m1m3_correction = Correction()
 
         # M2 actuator correction
-        self.m2_correction = None
+        self.m2_correction = Correction()
 
-        self.wep_process = None
+        self.wep_process: asyncio.subprocess.Process | None = None
         self.wep_process_started_task = make_done_future()
 
         # This asyncio.Lock is used to synchronize the initialization of a new
@@ -294,7 +311,7 @@ class Model:
 
         self.reset_wfe_correction()
 
-    def get_fwhm_sensors(self):
+    def get_fwhm_sensors(self) -> list[int]:
         """Get list of fwhm sensor ids.
 
         Returns
@@ -304,7 +321,7 @@ class Model:
         """
         return list(self._fwhm_data.keys())
 
-    def get_fwhm_data(self):
+    def get_fwhm_data(self) -> np.ndarray:
         """Get an ndarray with the FWHM data for all the sensors.
 
         FWHM: Full width at half maximum.
@@ -315,7 +332,6 @@ class Model:
             2-D array with the fwhm data. Each element of the array contains an
             array with the fwhm data (in arcsec).
         """
-
         # Note that the array dtype bellow is object instead of float. The
         # reason is that we need to be able to support vectors with different
         # sizes. For instance, say you have 5 measurements for sensor 1, 7 for
@@ -327,7 +343,7 @@ class Model:
             dtype=object,
         )
 
-    def set_fwhm_data(self, sensor_id, fwhm_data):
+    def set_fwhm_data(self, sensor_id: int, fwhm_data: np.ndarray) -> None:
         """Set the FWHM sensor data.
 
         FWHM: Full width at half maximum.
@@ -341,11 +357,11 @@ class Model:
         """
         self._fwhm_data[sensor_id] = np.array(fwhm_data)
 
-    def reset_fwhm_data(self):
+    def reset_fwhm_data(self) -> None:
         """Reset fhwm data."""
         self._fwhm_data = dict()
 
-    def get_wfe(self):
+    def get_wfe(self) -> list:
         """Get the list of wavefront error from the collection.
 
         This is to let MtaosCsc to publish the latest calculated wavefront
@@ -356,10 +372,9 @@ class Model:
         list[lsst.ts.wep.ctrlIntf.SensorWavefrontData]
             List of wavefront error data.
         """
-
         return self.wavefront_errors.pop()
 
-    def get_rejected_wfe(self):
+    def get_rejected_wfe(self) -> list:
         """Get the list of rejected wavefront error from the collection.
 
         This is to let MtaosCsc to publish the latest rejected wavefront
@@ -372,7 +387,7 @@ class Model:
         """
         return self.rejected_wavefront_errors.pop()
 
-    def get_dof_aggr(self):
+    def get_dof_aggr(self) -> np.ndarray:
         """Get the aggregated DOF.
 
         DOF: Degree of freedom.
@@ -382,10 +397,9 @@ class Model:
         numpy.ndarray
             Aggregated DOF.
         """
-
         return self.ofc.controller.aggregated_state
 
-    def set_dof_aggr(self, dof_aggr):
+    def set_dof_aggr(self, dof_aggr: np.ndarray) -> None:
         """Set the aggregated DOF.
 
         DOF: Degree of freedom.
@@ -395,10 +409,9 @@ class Model:
         dof_aggr : `numpy.ndarray`
             Aggregated DOF.
         """
-
         self.ofc.controller.set_aggregated_state(dof_aggr)
 
-    def get_dof_lv(self):
+    def get_dof_lv(self) -> np.ndarray:
         """Get the DOF correction from the last visit.
 
         DOF: Degree of freedom.
@@ -408,7 +421,6 @@ class Model:
         numpy.ndarray
             DOF correction from the last visit.
         """
-
         return self.ofc.lv_dof
 
     def get_m1m3_bending_mode_stresses(self) -> np.ndarray:
@@ -445,9 +457,8 @@ class Model:
 
         return m2_stresses
 
-    def reject_correction(self):
+    def reject_correction(self) -> None:
         """Reject the correction of subsystems."""
-
         lv_dof = self.get_dof_lv()
 
         self.ofc.controller.aggregate_state(-lv_dof, self.ofc.ofc_data.dof_idx)
@@ -459,7 +470,7 @@ class Model:
             self.m2_correction,
         ) = self.ofc.get_all_corrections()
 
-    def reset_wfe_correction(self):
+    def reset_wfe_correction(self) -> None:
         """Reset the current calculation contains the wavefront error and
         subsystem corrections to be empty.
 
@@ -474,7 +485,7 @@ class Model:
             self.m2_correction,
         ) = self.ofc.reset()
 
-    def offset_dof(self, offset):
+    def offset_dof(self, offset: np.ndarray) -> None:
         """Add offset to the degrees of freedom.
 
         Parameters
@@ -495,7 +506,7 @@ class Model:
             self.m2_correction,
         ) = self.ofc.get_all_corrections()
 
-    def get_updated_corrections(self):
+    def get_updated_corrections(self) -> None:
         """Get the updated corrections."""
         (
             self.m2_hexapod_correction,
@@ -504,7 +515,7 @@ class Model:
             self.m2_correction,
         ) = self.ofc.get_all_corrections()
 
-    def _clear_wfe_collections(self):
+    def _clear_wfe_collections(self) -> None:
         """Clear the collections of wavefront error contain the rejected
         one.
         """
@@ -512,7 +523,14 @@ class Model:
         self.wavefront_errors.clear()
         self.rejected_wavefront_errors.clear()
 
-    async def select_sources(self, ra, dec, sky_angle, obs_filter, mode):
+    async def select_sources(
+        self,
+        ra: float,
+        dec: float,
+        sky_angle: float,
+        obs_filter: str,
+        mode: str,
+    ) -> None:
         """Setup and run source selection algorithm.
 
         Parameters
@@ -538,7 +556,7 @@ class Model:
         # TODO: (DM-28708) Finish implementation of selectSources.
         raise NotImplementedError("This function is not supported yet (DM-28708).")
 
-    async def pre_process(self, visit_id, config):
+    async def pre_process(self, visit_id: int, config: dict) -> None:
         """Pre-process image for WEP.
 
         The outputs of this command are donut images that are ready
@@ -562,12 +580,12 @@ class Model:
     @timeit
     async def run_wep(
         self,
-        visit_id,
-        extra_id,
-        config,
-        run_name_extention="",
-        **kwargs,
-    ):
+        visit_id: int,
+        extra_id: int | None,
+        config: dict,
+        run_name_extention: str = "",
+        **kwargs: Any,
+    ) -> None:
         """Process image or images with wavefront estimation pipeline.
 
         Parameters
@@ -583,7 +601,6 @@ class Model:
         kwargs :
             Additional keyword arguments, required by the timer decorator.
         """
-
         if extra_id is None:
             self.log.debug(
                 f"Processing MainCamera corner wavefront sensor on image {visit_id}."
@@ -609,10 +626,10 @@ class Model:
 
     async def process_lsstcam_corner_wfs(
         self,
-        visit_id,
-        config,
-        run_name_extention="",
-    ):
+        visit_id: int,
+        config: dict,
+        run_name_extention: str = "",
+    ) -> None:
         """Process LSSTCam Corner Wavefront Sensor data.
 
         Parameters
@@ -634,7 +651,6 @@ class Model:
         --------
         interrupt_wep_process : Interrupt an ongoing wep process.
         """
-
         self.log.debug(f"Processing LSSTCam corner wavefront sensor: {visit_id}.")
 
         run_name = f"{self.run_name}{run_name_extention}"
@@ -647,7 +663,8 @@ class Model:
             run_name=run_name,
             config=config,
         ):
-            await self.wep_process.wait()
+            if self.wep_process is not None:
+                await self.wep_process.wait()
 
         wavefront_errors, radii_data = self._gather_outputs(
             run_name=run_name,
@@ -659,11 +676,11 @@ class Model:
 
     async def process_comcam(
         self,
-        intra_id,
-        extra_id,
-        config,
-        run_name_extention="",
-    ):
+        intra_id: int,
+        extra_id: int,
+        config: dict,
+        run_name_extention: str = "",
+    ) -> None:
         """Process ComCam intra/extra focal images.
 
         Parameters
@@ -686,7 +703,6 @@ class Model:
         --------
         interrupt_wep_process : Interrupt an ongoing wep process.
         """
-
         self.log.debug(f"Processing ComCam intra/extra pair: {intra_id}/{extra_id}.")
 
         run_name = f"{self.run_name}{run_name_extention}"
@@ -697,7 +713,8 @@ class Model:
             run_name=run_name,
             config=config,
         ):
-            await self.wep_process.wait()
+            if self.wep_process is not None:
+                await self.wep_process.wait()
 
         wavefront_errors, radii_data = self._gather_outputs(
             run_name=run_name,
@@ -707,8 +724,26 @@ class Model:
 
         self.wavefront_errors.append(wavefront_errors, radii_data)
 
-    async def query_ocps_results(self, instrument, intra_id, extra_id, timeout=300):
-        """Query the OCPS results."""
+    async def query_ocps_results(
+        self,
+        instrument: str,
+        intra_id: int,
+        extra_id: int | None,
+        timeout: int = 300,
+    ) -> None:
+        """Query the OCPS results.
+
+        Parameters
+        ----------
+        instrument : `str`
+            Name of the instrument to query results for.
+        intra_id : `int`
+            Id of the intra-focal image.
+        extra_id : `int` or `None`
+            Id of the extra-focal image.
+        timeout : `int`, optional
+            Timeout in seconds for the query. Default is 300 seconds.
+        """
         wavefront_results, radii_results = await self._poll_butler_outputs(
             intra_id=intra_id,
             extra_id=extra_id,
@@ -727,8 +762,8 @@ class Model:
         instrument: str,
         exposures_str: str,
         run_name: str = "",
-        config: Optional[dict] = None,
-    ):
+        config: dict | None = None,
+    ) -> AsyncIterator[None]:
         """A context manager to start and cleanup the WEP pipeline task
         process.
 
@@ -752,7 +787,6 @@ class Model:
         config : `dict`, optional
             User-provided configuration overrides.
         """
-
         try:
             log_task, config_file = await self._start_wep_process(
                 instrument=instrument,
@@ -781,8 +815,8 @@ class Model:
         instrument: str,
         exposures_str: str,
         run_name: str = "",
-        config: Optional[dict] = None,
-    ) -> asyncio.Task:
+        config: dict | None = None,
+    ) -> tuple[asyncio.Task, IO[Any]]:
         """Start a wep process.
 
         Parameters
@@ -807,7 +841,6 @@ class Model:
         log_stream : Log messages from input stream asynchronously.
         _finish_wep_process : Finalize a wep process.
         """
-
         async with self._wep_process_start_lock:
             if (self.wep_process is not None) and (self.wep_process.returncode is None):
                 raise RuntimeError(
@@ -895,9 +928,8 @@ class Model:
             except Exception:
                 self.log.exception("Error defining visit. Pipeline task may fail.")
 
-    async def interrupt_wep_process(self):
+    async def interrupt_wep_process(self) -> None:
         """Interrupt a currently executing processing."""
-
         if self.wep_process is not None:
             self.log.debug("Waiting for wep process to start.")
             await self.wep_process_started_task
@@ -972,8 +1004,8 @@ class Model:
 
     def _save_wep_configuration(
         self,
-        instrument,
-        config,
+        instrument: str,
+        config: dict | None = None,
     ) -> tempfile._TemporaryFileWrapper:
         """Save wep configuration to a temporary yaml file for running the WEP
         pipeline, based on a reference image id and a configuration dictionary.
@@ -990,10 +1022,11 @@ class Model:
         config_file : `tempfile._TemporaryFileWrapper[str]`
             Handler for the generated configuration file.
         """
+        if config is None:
+            config = dict()
 
         # TODO: Implement configuration when user runs select_sources
         # beforehand.
-
         wep_configuration = self.generate_wep_configuration(
             instrument=instrument, config=config
         )
@@ -1008,10 +1041,10 @@ class Model:
 
     def _generate_pipetask_command(
         self,
-        run_name,
-        instrument,
-        config_filename,
-        exposures_str,
+        run_name: str,
+        instrument: str,
+        config_filename: str,
+        exposures_str: str,
     ) -> str:
         """Generate pipetask command to execute as a process.
 
@@ -1032,7 +1065,6 @@ class Model:
             A formatted string with the command line execution for the
             pipeline task.
         """
-
         run_pipetask_cmd = writePipetaskCmd(
             self.data_path,
             run_name,
@@ -1046,7 +1078,11 @@ class Model:
 
         return run_pipetask_cmd
 
-    async def get_image_info(self, visit_id, instrument):
+    async def get_image_info(
+        self,
+        visit_id: int,
+        instrument: str,
+    ) -> tuple[str, float]:
         """Get image information from the butler.
 
         Parameters
@@ -1060,8 +1096,6 @@ class Model:
         -------
         filter : `str`
             Filter of the image.
-        rotation_angle : `float`
-            Rotation angle of the image.
         elevation : `float`
             Elevation of the image.
 
@@ -1074,7 +1108,7 @@ class Model:
             self.data_path,
             instrument="LSSTCam",
             collections=[self.run_name, "LSSTCam/raw/all"],
-        )
+        )  # type: ignore
         refs = butler.query_datasets("raw", where=f"visit={visit_id}")
 
         image = butler.get(refs[0])
@@ -1141,11 +1175,11 @@ class Model:
     async def _poll_butler_outputs(
         self,
         intra_id: int,
-        extra_id: int,
+        extra_id: int | None,
         instrument: str,
         timeout: int,
         poll_interval: int = 5,
-    ) -> list:
+    ) -> tuple[list, list]:
         """
         Poll the Butler for the outputs of a given run
         and intra/extra image id, with a timeout.
@@ -1179,7 +1213,7 @@ class Model:
 
         butler = Butler(
             self.data_path, collections=[self.run_name], instrument="LSSTCam"
-        )
+        )  # type: ignore
         start_time = time.time()
         elapsed_time = 0.0
 
@@ -1281,7 +1315,7 @@ class Model:
         """
         self.log.debug("Data processing completed successfully. Gathering output.")
 
-        butler = Butler(self.data_path)
+        butler = Butler(self.data_path)  # type: ignore
 
         # We may need to run the following in an executor so we won't block the
         # event loop.
@@ -1305,7 +1339,7 @@ class Model:
         radii_results = self.get_corner_offsets(refs, butler, run_name)
         return (wavefront_errors, radii_results)
 
-    def reject_unreasonable_wfe(self, listOfWfErr):
+    def reject_unreasonable_wfe(self, listOfWfErr: list) -> list:
         """Reject the wavefront error that is unreasonable.
 
         The input listOfWfErr might be updated after calling this function.
@@ -1316,14 +1350,12 @@ class Model:
         listOfWfErr : list[lsst.ts.wep.ctrlIntf.SensorWavefrontData]
             List of wavefront error data.
         """
-
         # Need to have the algorithm to analyze the wavefront error is
         # reasonable or not. At this moment, just assume everything is good.
-
         return []
 
     @timeit
-    def calculate_corrections(self, **kwargs):
+    def calculate_corrections(self, **kwargs: Any) -> None:
         """Calculate the correction of subsystems based on the average
         wavefront error of multiple exposure images in a single visit.
 
@@ -1337,7 +1369,6 @@ class Model:
         RuntimeError
             No FWHM sensor data to use.
         """
-
         try:
             sensor_ids, zk_indices, wfe = self.get_wavefront_errors()
             corner_offsets = self.wavefront_errors.getListOfRadiiInTakenData()
@@ -1353,16 +1384,14 @@ class Model:
             else:
                 self.log.warning("No corner offsets found in the wavefront errors.")
 
-            if wfe.shape[0] < 3 or (
+            if (
                 np.abs(dz) > self.dz_threshold_min
                 or np.abs(drx) > self.tilt_offset_threshold
                 or np.abs(dry) > self.tilt_offset_threshold
             ):
                 self.log.info(
-                    "Not enough wavefront sensors reported WFE measurements "
-                    f"(expected at least 3, got {wfe.shape[0]}), "
-                    "or the z_offset is large enough to require refocusing. "
-                    "Attempting to use donut radii for refocus."
+                    "The z_offset computed from donut radii "
+                    "is large enough to require automatic refocusing."
                 )
                 max_dz = self.dz_threshold_max
                 dz_clipped = np.clip(dz, -max_dz, max_dz)
@@ -1389,10 +1418,10 @@ class Model:
                         f"Refocus using corner offsets accepted: "
                         f"dz={dz:.2f} um, rx={drx:.4f} deg, ry={dry:.4f} deg."
                     )
-
             else:
                 self.log.info(
-                    "Enough wavefront error measurements were found. "
+                    f"{wfe.shape[0]}/4 wavefront error measurements were found. "
+                    "If fewer than 3 are found, this image will be skipped."
                     "Proceeding to estimate the corrections with OFC."
                 )
                 self._calculate_corrections(
@@ -1403,7 +1432,7 @@ class Model:
             # Clear the queue
             self._clear_wfe_collections()
 
-    def get_offset_from_radius(self, radius):
+    def get_offset_from_radius(self, radius: float) -> float:
         """Get the offset from the donut radius.
 
         Parameters
@@ -1427,7 +1456,12 @@ class Model:
 
         return offset
 
-    def get_corner_offsets(self, refs, butler, run_name):
+    def get_corner_offsets(
+        self,
+        refs: list,
+        butler: Butler,
+        run_name: str,
+    ) -> np.ndarray:
         """Get the donut radius from the butler.
 
         Parameters
@@ -1436,6 +1470,8 @@ class Model:
             List of references to the corner wavefront sensors.
         butler : `lsst.daf.Butler`
             Butler instance to access the data.
+        run_name : `str`
+            Name of the run to query the data from.
 
         Returns
         -------
@@ -1520,7 +1556,9 @@ class Model:
 
         return np.array(corner_offsets)
 
-    def fit_camera_z_tip_tilt(self, corner_offsets):
+    def fit_camera_z_tip_tilt(
+        self, corner_offsets: np.ndarray
+    ) -> tuple[float, float, float]:
         """Fit the camera z, tip, and tilt from the corner offsets.
 
         Parameters
@@ -1552,7 +1590,7 @@ class Model:
 
         return z_offset, tip_x, tip_y
 
-    def get_wavefront_errors(self):
+    def get_wavefront_errors(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get wavefront errors.
 
         Returns
@@ -1564,31 +1602,39 @@ class Model:
         wfe : `np.ndarray`
             Array of arrays with the zernike coeficients for each field index.
         """
-
         wfe_data_container = (
             self.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
         )
 
         return self.get_sensor_ids_wfe_from_data_container(wfe_data_container)
 
-    def get_rejected_wavefront_errors(self):
+    def get_rejected_wavefront_errors(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get rejected wavefront errors.
 
         Returns
         -------
         sensor_ids : `np.ndarray [int]`
             Array with sensor ids.
+        zk_indices: `np.ndarray [int]`
+            Array with the zernike noll indices used.
         wfe : `np.ndarray`
             Array of arrays with the zernike coeficients for each field index.
         """
-
         wfe_data_container = (
             self.rejected_wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
         )
 
         return self.get_sensor_ids_wfe_from_data_container(wfe_data_container)
 
-    def _calculate_corrections(self, wfe, zk_indices, sensor_ids, **kwargs):
+    def _calculate_corrections(
+        self,
+        wfe: np.ndarray,
+        zk_indices: np.ndarray,
+        sensor_ids: np.ndarray,
+        **kwargs: Any,
+    ) -> None:
         """Compute corrections from input wavefront errors.
 
         Parameters
@@ -1648,7 +1694,11 @@ class Model:
             f"{self.m2_correction=}."
         )
 
-    def add_correction(self, wavefront_errors, config=None):
+    def add_correction(
+        self,
+        wavefront_errors: np.ndarray | list[float],
+        config: dict | None = None,
+    ) -> None:
         """Compute ofc corrections from user-defined wavefront erros.
 
         Parameters
@@ -1665,11 +1715,12 @@ class Model:
         RuntimeError
             No sensor ids to use.
         """
-
         self.log.debug(f"Currently configured with {self.instrument} instrument.")
 
         # Get the sensor ids, filter_name and rotation_angle from config.
         # If sensor_ids are not available raise an error.
+        if config is None:
+            config = dict()
         filter_name = config.get("filter_name", "")
         rotation_angle = config.get("rotation_angle", 0.0)
         sensor_ids = config.get("sensor_ids", None)
@@ -1706,7 +1757,7 @@ class Model:
             **(config if config is not None else dict()),
         )
 
-    async def set_ofc_data_values(self, **kwargs):
+    async def set_ofc_data_values(self, **kwargs: Any) -> dict:
         """Set ofc data values.
 
         Parameters
@@ -1730,7 +1781,6 @@ class Model:
         Uppon success, return the original values so users can restore it
         later.
         """
-
         original_ofc_data_values = dict()
 
         try:
@@ -1807,14 +1857,17 @@ class Model:
         else:
             return original_ofc_data_values
 
-    async def log_stream(self, stream: asyncio.subprocess.PIPE) -> None:
+    async def log_stream(self, stream: asyncio.StreamReader | None) -> None:
         """Log messages from input stream asynchronously.
 
         Parameters
         ----------
-        stream : `asyncio.subprocess.PIPE`
+        stream : `asyncio.StreamReader`
             Output stream pipe to process and log.
         """
+        if stream is None:
+            self.log.warning("No stream provided to log.")
+            return
 
         while not stream.at_eof():
             new_line = await stream.readline()
@@ -1822,7 +1875,9 @@ class Model:
                 self.log.debug(new_line.decode().strip())
 
     @staticmethod
-    def get_sensor_ids_wfe_from_data_container(data_container):
+    def get_sensor_ids_wfe_from_data_container(
+        data_container: dict,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Parse data container generated from calling
         `WavefrontCollection.getListOfWavefrontErrorAvgInTakenData` into an
         array with field indices and an array of wavefront errors.
@@ -1859,7 +1914,6 @@ class Model:
         task : `asyncio.Task`
             Task to close.
         """
-
         if not task.done():
             task.cancel()
 

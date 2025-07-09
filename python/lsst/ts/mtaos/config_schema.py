@@ -37,7 +37,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v7
+title: MTAOS v8
 description: Schema for MTAOS configuration files
 type: object
 
@@ -215,6 +215,12 @@ properties:
         description: >-
           Truncation index for the closed loop OFC.
         type: integer
+
+  max_ofc_consecutive_failures:
+    description: >-
+      Maximum number of consecutive OFC failures before the closed loop is stopped.
+    type: integer
+    default: 3
 
 
 required:
@@ -413,14 +419,14 @@ ISR_CONFIG = yaml.safe_load(
   properties:
     class:
       type: string
-      default: lsst.ip.isr.isrTask.IsrTask
+      default: lsst.ip.isr.IsrTaskLSST
     config:
       additionalProperties: false
       type: object
       properties:
         connections.outputExposure:
           type: string
-          default: postISRCCD
+          default: post_isr_image
         doBias:
           type: boolean
           default: False
