@@ -410,6 +410,8 @@ class MTAOS(salobj.ConfigurableCsc):
         self.elevation_angle_limit = config.elevation_delta_limit_max
         self.rotation_angle_limit = config.rotation_delta_limit
 
+        self.max_ofc_consecutive_failures = config.max_ofc_consecutive_failures
+
         self.log.debug("MTAOS configuration completed.")
 
     async def end_enable(self, data: type_hints.BaseMsgType) -> None:
@@ -489,7 +491,8 @@ class MTAOS(salobj.ConfigurableCsc):
             self.log.info("Storing previous state.")
             self.previous_dofs = self.model.ofc.controller.aggregated_state
 
-        elif self.summary_state is salobj.State.ENABLED:
+        elif self.summary_state == salobj.State.ENABLED:
+            await self.evt_closedLoopState.set_write(state=ClosedLoopState.IDLE)
             self.log.info("Restoring previous state.")
             try:
                 if (
@@ -730,8 +733,6 @@ class MTAOS(salobj.ConfigurableCsc):
             timeout=self.LONG_TIMEOUT,
             result="runWEP started.",
         )
-
-        print(data.visitId, data.extraId, data.useOCPS)
 
         await self._execute_wavefront_estimation(
             visit_id=data.visitId,
@@ -1127,6 +1128,7 @@ class MTAOS(salobj.ConfigurableCsc):
         self.log.info(f"Starting closed loop for {oods_name}.")
 
         processed_images: collections.deque = collections.deque(maxlen=100)
+        skipped_images: collections.deque = collections.deque(maxlen=100)
         self.current_rotator_position = None
         self.current_elevation_position = None
 
@@ -1163,6 +1165,7 @@ class MTAOS(salobj.ConfigurableCsc):
             mtmount.tel_elevation.callback = self.follow_elevation_position
 
             oods.evt_imageInOODS.flush()
+            ofc_failure_count = 0
             while self.summary_state == salobj.State.ENABLED:
                 try:
                     await self.evt_closedLoopState.set_write(
@@ -1176,8 +1179,10 @@ class MTAOS(salobj.ConfigurableCsc):
                         continue
                     visit_id = int(f"{day_obs}{index[1:]}")
 
-                    if visit_id in processed_images:
-                        self.log.info(f"Visit {visit_id} already processed, skipping.")
+                    if visit_id in processed_images or visit_id in skipped_images:
+                        self.log.info(
+                            f"Visit {visit_id} already processed or skipped, continuing."
+                        )
                         continue
 
                     filter_label, elevation = await self.model.get_image_info(
@@ -1185,10 +1190,15 @@ class MTAOS(salobj.ConfigurableCsc):
                         self.camera_name,
                     )
 
-                    rotation_angle = float(
-                        np.mean(np.array(self.image_rotator[image_in_oods.obsid]))
-                    )
-
+                    if image_in_oods.obsid in self.image_rotator:
+                        rotation_angle = float(
+                            np.mean(np.array(self.image_rotator[image_in_oods.obsid]))
+                        )
+                    else:
+                        raise RuntimeError(
+                            f"No rotation angle data found for obsid {image_in_oods.obsid}. "
+                            "MTRotator may not be reporting rotation angle."
+                        )
                     # Since the current rotator and elevation positions
                     # are being updated in the background, we need to
                     # create a local copy and assume it's static
@@ -1228,6 +1238,8 @@ class MTAOS(salobj.ConfigurableCsc):
                             f"el_limit={self.elevation_angle_limit}. "
                             "Skipping."
                         )
+                        skipped_images.append(visit_id)
+                        await asyncio.sleep(self.heartbeat_interval)
                         continue
 
                     processed_images.append(visit_id)
@@ -1273,11 +1285,27 @@ class MTAOS(salobj.ConfigurableCsc):
 
                         config_yaml = yaml.safe_dump(config)
 
-                        await self._execute_ofc(
-                            userGain=gain,
-                            config=config_yaml,
-                            timeout=self.CMD_TIMEOUT,
-                        )
+                        try:
+                            await self._execute_ofc(
+                                userGain=gain,
+                                config=config_yaml,
+                                timeout=self.CMD_TIMEOUT,
+                            )
+                            ofc_failure_count = 0
+                        except Exception as e:
+                            ofc_failure_count += 1
+                            if ofc_failure_count >= self.max_ofc_consecutive_failures:
+                                raise RuntimeError(
+                                    f"Maximum OFC failures ({ofc_failure_count} "
+                                    f"of {self.max_ofc_consecutive_failures}) "
+                                    "reached. Maybe clouds are blocking or AOS ran away?"
+                                ) from e
+                            else:
+                                self.log.warning(
+                                    "OFC execution failed. Failures: "
+                                    f"{ofc_failure_count}/{self.max_ofc_consecutive_failures}."
+                                )
+                                continue
 
                         await self.evt_closedLoopState.set_write(
                             state=ClosedLoopState.WAITING_APPLY
