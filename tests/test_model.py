@@ -307,7 +307,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         expected_donut_catalog_wcs_config: dict = dict()
 
         expected_isr_config = {
-            "connections.outputExposure": "postISRCCD",
+            "connections.outputExposure": "post_isr_image",
             "doBias": False,
             "doVariance": False,
             "doLinearize": False,
@@ -355,7 +355,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         expected_donut_catalog_cwfs_config["connections.refCatalogs"] = "cal_ref_cat"
 
         expected_isr_config = {
-            "connections.outputExposure": "postISRCCD",
+            "connections.outputExposure": "post_isr_image",
             "doBias": False,
             "doVariance": False,
             "doLinearize": False,
@@ -400,7 +400,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
 
         expected_donut_catalog_cwfs_config: dict = dict()
         expected_isr_config = {
-            "connections.outputExposure": "postISRCCD",
+            "connections.outputExposure": "post_isr_image",
             "doBias": True,
             "doVariance": False,
             "doLinearize": False,
@@ -443,7 +443,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
 
         expected_donut_catalog_cwfs_config: dict = dict()
         expected_isr_config = {
-            "connections.outputExposure": "postISRCCD",
+            "connections.outputExposure": "post_isr_image",
             "doBias": False,
             "doVariance": False,
             "doLinearize": False,
