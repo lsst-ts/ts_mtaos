@@ -27,3 +27,5 @@ dz_threshold_max: 1500.0
 max_ofc_consecutive_failures: 3
 use_ocps: False
 used_dofs: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+raise_on_large_defocus: True
+closed_loop_timeout_without_images: 900.0 # seconds (15 minutes)
