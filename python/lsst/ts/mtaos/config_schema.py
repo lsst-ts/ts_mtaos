@@ -222,6 +222,23 @@ properties:
     type: integer
     default: 3
 
+  raise_on_large_defocus:
+    description: >-
+      If `True`, raise an exception if the defocus is larger than the
+      threshold while running the closed loop task.
+    type: boolean
+    default: false
+
+  closed_loop_timeout_without_images:
+    description: >-
+      Timeout for the closed loop task without images
+      in seconds. If the closed loop task does not
+      receive images for this amount of time, it will
+      stop the closed loop.
+    anyOf:
+      - type: number
+      - type: "null"
+    default: 900.0
 
 required:
   - camera

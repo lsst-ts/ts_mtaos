@@ -2,6 +2,13 @@
 Version History
 ===============
 
+v0.21.1
+--------
+
+* Add `raise_on_large_defocus` configuration option to `mtaos.py` to raise an exception when the defocus exceeds the threshold when running closed loop task.
+
+* Add `closed_loop_timeout_without_images` configuration option to `mtaos.py` to set a timeout for the closed loop task when no images are received.
+
 v0.21.0
 --------
 

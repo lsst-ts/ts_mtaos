@@ -1355,12 +1355,18 @@ class Model:
         return []
 
     @timeit
-    def calculate_corrections(self, **kwargs: Any) -> None:
+    def calculate_corrections(
+        self, raise_on_large_defocus: bool, **kwargs: Any
+    ) -> None:
         """Calculate the correction of subsystems based on the average
         wavefront error of multiple exposure images in a single visit.
 
         Parameters
         ----------
+        raise_on_large_defocus : `bool`
+            If `True`, raise an exception if the defocus is larger than the
+            threshold. If `False`, log a warning and do the automatic
+            refocus.
         kwargs :
             Additional keyword arguments, required by the timer decorator.
 
@@ -1389,6 +1395,12 @@ class Model:
                 or np.abs(drx) > self.tilt_offset_threshold
                 or np.abs(dry) > self.tilt_offset_threshold
             ):
+                if raise_on_large_defocus:
+                    raise RuntimeError(
+                        f"Large defocus detected: dz={dz:.2f} um, "
+                        f"AOS closed loop will be disabled. "
+                        "Refocus and enable_aos_closed_loop again."
+                    )
                 self.log.info(
                     "The z_offset computed from donut radii "
                     "is large enough to require automatic refocusing."

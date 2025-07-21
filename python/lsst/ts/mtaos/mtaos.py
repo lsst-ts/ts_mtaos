@@ -411,6 +411,10 @@ class MTAOS(salobj.ConfigurableCsc):
         self.rotation_angle_limit = config.rotation_delta_limit
 
         self.max_ofc_consecutive_failures = config.max_ofc_consecutive_failures
+        self.raise_on_large_defocus = config.raise_on_large_defocus
+        self.closed_loop_timeout_without_images = (
+            config.closed_loop_timeout_without_images
+        )
 
         self.log.debug("MTAOS configuration completed.")
 
@@ -890,6 +894,7 @@ class MTAOS(salobj.ConfigurableCsc):
         userGain: float,
         config: str,
         timeout: float,
+        raise_on_large_defocus: bool = False,
     ) -> None:
         """Handles the core logic of running the OFC,
         sending calls to the model to compute corrections.
@@ -927,7 +932,9 @@ class MTAOS(salobj.ConfigurableCsc):
                 # This is not a coroutine so it will block the event loop. Need
                 # to think about how to fix it, maybe run in executor?
                 self.model.calculate_corrections(
-                    log_time=self.execution_times, **loaded_config
+                    raise_on_large_defocus=raise_on_large_defocus,
+                    log_time=self.execution_times,
+                    **loaded_config,
                 )
                 self.model.wavefront_errors.clear()
             finally:
@@ -1172,7 +1179,16 @@ class MTAOS(salobj.ConfigurableCsc):
                         state=ClosedLoopState.WAITING_IMAGE
                     )
 
-                    image_in_oods = await oods.evt_imageInOODS.next(flush=False)
+                    try:
+                        image_in_oods = await oods.evt_imageInOODS.next(
+                            flush=False, timeout=self.closed_loop_timeout_without_images
+                        )
+                    except asyncio.TimeoutError:
+                        raise TimeoutError(
+                            f"No images received in {self.closed_loop_timeout_without_images/60} min. "
+                            "Closed loop task in the background will stop."
+                        )
+
                     try:
                         _, _, day_obs, index = image_in_oods.obsid.split("_")
                     except ValueError:
@@ -1290,6 +1306,7 @@ class MTAOS(salobj.ConfigurableCsc):
                                 userGain=gain,
                                 config=config_yaml,
                                 timeout=self.CMD_TIMEOUT,
+                                raise_on_large_defocus=self.raise_on_large_defocus,
                             )
                             ofc_failure_count = 0
                         except Exception as e:
