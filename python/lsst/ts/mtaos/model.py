@@ -1499,64 +1499,42 @@ class Model:
                 dataId=ref.dataId,
                 collections=[run_name],
             )
-            if (
-                "RADIUS" in donuts_intra.metadata
-                and "RADIUS_FAIL_FLAG" in donuts_intra.metadata
-            ):
-                intra_radius = np.array(donuts_intra.metadata.getArray("RADIUS"))
-                intra_radius_fail_flags = np.array(
-                    donuts_intra.metadata.getArray("RADIUS_FAIL_FLAG")
-                ).astype(bool)
-                valid_intra_radius = intra_radius[~intra_radius_fail_flags]
-                if len(valid_intra_radius) > 0:
-                    median_intra_radius = np.median(valid_intra_radius)
-                else:
+            if "RADIUS" in donuts_intra.metadata:
+                intra_radius = donuts_intra.metadata.get("RADIUS")
+                if intra_radius <= 0:
                     self.log.warning("No valid RADIUS values found in donuts_intra.")
-                    median_intra_radius = np.nan
+                    intra_radius = np.nan
             else:
-                self.log.warning(
-                    f"Missing RADIUS or RADIUS_FAIL_FLAG in donuts_intra for {ref.dataId}."
-                )
-                median_intra_radius = np.nan
+                self.log.warning(f"Missing RADIUS in donuts_intra for {ref.dataId}.")
+                intra_radius = np.nan
 
             donuts_extra = butler.get(
                 "donutStampsExtra",
                 dataId=ref.dataId,
                 collections=[run_name],
             )
-            if (
-                "RADIUS" in donuts_extra.metadata
-                and "RADIUS_FAIL_FLAG" in donuts_extra.metadata
-            ):
-                extra_radius = np.array(donuts_extra.metadata.getArray("RADIUS"))
-                extra_radius_fail_flags = np.array(
-                    donuts_extra.metadata.getArray("RADIUS_FAIL_FLAG")
-                ).astype(bool)
-                valid_extra_radius = extra_radius[~extra_radius_fail_flags]
-                if len(valid_extra_radius) > 0:
-                    median_extra_radius = np.median(valid_extra_radius)
-                else:
+            if "RADIUS" in donuts_extra.metadata:
+                extra_radius = donuts_extra.metadata.get("RADIUS")
+                if extra_radius <= 0:
                     self.log.warning("No valid RADIUS values found in donuts_extra.")
-                    median_extra_radius = np.nan
+                    extra_radius = np.nan
             else:
-                self.log.warning(
-                    f"Missing RADIUS or RADIUS_FAIL_FLAG in donuts_intra for {ref.dataId}."
-                )
-                median_extra_radius = np.nan
+                self.log.warning(f"Missing RADIUS in donuts_extra for {ref.dataId}.")
+                extra_radius = np.nan
 
             self.log.info(
                 f"Donut median radii for {ref.dataId['detector']}: "
-                f"intra={median_intra_radius:.2f} px, "
-                f"extra={median_extra_radius:.2f} px. "
+                f"intra={intra_radius:.2f} px, "
+                f"extra={extra_radius:.2f} px. "
             )
 
-            median_min_radius = np.nanmin([median_intra_radius, median_extra_radius])
-            detector_offset = self.get_offset_from_radius(median_min_radius)
+            max_radius = np.nanmax([intra_radius, extra_radius])
+            detector_offset = self.get_offset_from_radius(max_radius)
             self.log.info(
-                "Computed out-of-focus offsets from smallest radii: "
+                "Computed out-of-focus offsets from donuts: "
                 f"{detector_offset:.2f} um."
             )
-            if median_min_radius == median_intra_radius:
+            if max_radius == extra_radius:
                 detector_offset *= -1
 
             camera = LsstCam().getCamera()
