@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.22.2
+--------
+
+* Use donutCorrelator for RADIUS measurement, remove RADIUS_FAIL_FLAG and simplify model logic.
+
 v0.22.1
 --------
 
