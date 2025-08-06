@@ -2,7 +2,17 @@
 Version History
 ===============
 
-v0.21.1
+v0.22.2
+--------
+
+* Use donutCorrelator for RADIUS measurement, remove RADIUS_FAIL_FLAG and simplify model logic.
+
+v0.22.1
+--------
+
+* Fix `test_mtaosCscWithSimulators` `test test_addAberration_issueCorrection_xref_x0` to work with a configuration that has integral gain different from zero.
+
+v0.22.0
 --------
 
 * Add `raise_on_large_defocus` configuration option to `mtaos.py` to raise an exception when the defocus exceeds the threshold when running closed loop task.

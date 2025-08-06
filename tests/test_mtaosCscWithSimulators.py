@@ -275,6 +275,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             # set control algorithm
             config = dict(xref="x0", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+            # Need to turn the integral gain off
+            self.csc.model.ofc.controller.ki = 0.0
 
             remote.evt_degreeOfFreedom.flush()
             # Calculate the DOF and issue the correction for first time
