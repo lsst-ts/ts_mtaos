@@ -33,6 +33,7 @@ import typing
 from typing import Any
 
 import eups
+import functools
 import numpy as np
 import yaml
 from astropy import units as u
@@ -204,6 +205,12 @@ class MTAOS(salobj.ConfigurableCsc):
         self.remotes: dict = dict()
 
         self.execution_times: dict = dict()
+
+        # Track the image context used by the latest WEP and OFC results
+        self.last_wep_visit_id: int | None = None
+        self.last_wep_extra_id: int | None = None
+        self.last_ofc_visit_id: int | None = None
+        self.last_ofc_extra_id: int | None = None
 
         # Set with the name of the component in self.remote that also makes the
         # name of the method to issue the correction, e.g.
@@ -851,6 +858,11 @@ class MTAOS(salobj.ConfigurableCsc):
             while len(self.execution_times["RUN_WEP"]) > self.MAX_TIME_SAMPLE:
                 self.execution_times["RUN_WEP"].pop(0)
 
+        # Set the WEP image context only after WEP results are available
+        self.last_wep_visit_id = intra_visit_id
+        # Keep "no extra" as None internally; convert to 0 only at publish time
+        self.last_wep_extra_id = extra_visit_id if extra_visit_id is not None else None
+
         await self.pubEvent_wavefrontError()
         await self.pubEvent_rejectedWavefrontError()
         await self.pubEvent_wepDuration()
@@ -909,6 +921,16 @@ class MTAOS(salobj.ConfigurableCsc):
             Timeout for the OFC process.
         """
         async with self.issue_correction_lock:
+
+            # Ensure WEP context exists before running OFC
+            if self.last_wep_visit_id is None:
+                self.log.warning("OFC requested but no WEP results available; rejecting.")
+                raise salobj.ExpectedError("No WEP results available to run OFC.")
+
+            # Snapshot the image context used to derive DoF/corrections
+            ofc_visit_id = self.last_wep_visit_id
+            ofc_extra_id = self.last_wep_extra_id
+
             kp = self.model.ofc.controller.kp
             if userGain != 0.0:
                 self.model.ofc.controller.kp = userGain
@@ -931,11 +953,16 @@ class MTAOS(salobj.ConfigurableCsc):
                 # rejected.
                 # This is not a coroutine so it will block the event loop. Need
                 # to think about how to fix it, maybe run in executor?
-                self.model.calculate_corrections(
-                    raise_on_large_defocus=raise_on_large_defocus,
-                    log_time=self.execution_times,
+                loop = asyncio.get_event_loop()
+
+                func = functools.partial(
+                    self.model.calculate_corrections,
+                    raise_on_large_defocus,
+                    self.execution_times,
                     **loaded_config,
                 )
+                await loop.run_in_executor(None, func)
+
                 self.model.wavefront_errors.clear()
             finally:
                 self.log.info("Restore ofc data values.")
@@ -949,6 +976,10 @@ class MTAOS(salobj.ConfigurableCsc):
                 self.execution_times["CALCULATE_CORRECTIONS"].pop(0)
 
             self.log.debug("Calculate the subsystem correction successfully.")
+
+            # Commit the OFC image context only after successful calculation
+            self.last_ofc_visit_id = ofc_visit_id
+            self.last_ofc_extra_id = ofc_extra_id
 
             await self.pubEvent_degreeOfFreedom()
             await self.pubEvent_mirrorStresses()
@@ -1750,6 +1781,9 @@ class MTAOS(salobj.ConfigurableCsc):
         model = self.model
         model.get_wfe()
 
+        visit_id = self.last_wep_visit_id or 0
+        extra_id = self.last_wep_extra_id or 0
+
         for sensor_id, zernike_indices, zernike_values in zip(
             *model.get_wavefront_errors()
         ):
@@ -1762,6 +1796,8 @@ class MTAOS(salobj.ConfigurableCsc):
                 sensorId=sensor_id,
                 nollZernikeIndices=zernike_indices_extended,
                 nollZernikeValues=zernike_values_extended,
+                visitId=visit_id,
+                extraId=extra_id,
                 force_output=True,
             )
             await asyncio.sleep(0.1)
@@ -1775,6 +1811,9 @@ class MTAOS(salobj.ConfigurableCsc):
         model = self.model
         model.get_rejected_wfe()
 
+        visit_id = self.last_wep_visit_id or 0
+        extra_id = self.last_wep_extra_id or 0
+
         for sensor_id, zernike_indices, zernike_values in zip(
             *model.get_rejected_wavefront_errors()
         ):
@@ -1787,6 +1826,8 @@ class MTAOS(salobj.ConfigurableCsc):
                 sensorId=sensor_id,
                 nollZernikeIndices=zernike_indices_extended,
                 nollZernikeValues=zernike_values_extended,
+                visitId=visit_id,
+                extraId=extra_id,
                 force_output=True,
             )
             await asyncio.sleep(0.1)
@@ -1801,9 +1842,20 @@ class MTAOS(salobj.ConfigurableCsc):
 
         dofAggr = model.get_dof_aggr()
         dofVisit = model.get_dof_lv()
+        kp = float(getattr(self.model.ofc.controller, "kp", 0.0))
+        ki = float(getattr(self.model.ofc.controller, "ki", 0.0))
+        kd = float(getattr(self.model.ofc.controller, "kd", 0.0))
+        visit_id = self.last_ofc_visit_id or 0
+        extra_id = self.last_ofc_extra_id or 0
+
         await self.evt_degreeOfFreedom.set_write(
             aggregatedDoF=dofAggr,
             visitDoF=dofVisit,
+            kpGain=kp,
+            kiGain=ki,
+            kdGain=kd,
+            visitId=visit_id,
+            extraId=extra_id,
             force_output=True,
         )
 
@@ -1843,9 +1895,20 @@ class MTAOS(salobj.ConfigurableCsc):
         model = self.model
         dofAggr = model.get_dof_aggr()
         dofVisit = model.get_dof_lv()
+        kp = float(getattr(self.model.ofc.controller, "kp", 0.0))
+        ki = float(getattr(self.model.ofc.controller, "ki", 0.0))
+        kd = float(getattr(self.model.ofc.controller, "kd", 0.0))
+        visit_id = self.last_ofc_visit_id or 0
+        extra_id = self.last_ofc_extra_id or 0
+
         await self.evt_rejectedDegreeOfFreedom.set_write(
             aggregatedDoF=dofAggr,
             visitDoF=dofVisit,
+            kpGain=kp,
+            kiGain=ki,
+            kdGain=kd,
+            visitId=visit_id,
+            extraId=extra_id,
             force_output=True,
         )
 
@@ -1857,8 +1920,10 @@ class MTAOS(salobj.ConfigurableCsc):
 
         model = self.model
         x, y, z, u, v, w = model.m2_hexapod_correction()
+        visit_id = self.last_ofc_visit_id or 0
+        extra_id = self.last_ofc_extra_id or 0
         await self.evt_m2HexapodCorrection.set_write(
-            x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
+            x=x, y=y, z=z, u=u, v=v, w=w, visitId=visit_id, extraId=extra_id, force_output=True
         )
 
     async def pubEvent_rejectedM2HexapodCorrection(self) -> None:
@@ -1869,8 +1934,10 @@ class MTAOS(salobj.ConfigurableCsc):
 
         model = self.model
         x, y, z, u, v, w = model.m2_hexapod_correction()
+        visit_id = self.last_ofc_visit_id or 0
+        extra_id = self.last_ofc_extra_id or 0
         await self.evt_rejectedM2HexapodCorrection.set_write(
-            x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
+            x=x, y=y, z=z, u=u, v=v, w=w, visitId=visit_id, extraId=extra_id, force_output=True
         )
 
     async def pubEvent_cameraHexapodCorrection(self) -> None:
@@ -1881,8 +1948,10 @@ class MTAOS(salobj.ConfigurableCsc):
 
         model = self.model
         x, y, z, u, v, w = model.cam_hexapod_correction()
+        visit_id = self.last_ofc_visit_id or 0
+        extra_id = self.last_ofc_extra_id or 0
         await self.evt_cameraHexapodCorrection.set_write(
-            x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
+            x=x, y=y, z=z, u=u, v=v, w=w, visitId=visit_id, extraId=extra_id, force_output=True
         )
 
     async def pubEvent_rejectedCameraHexapodCorrection(self) -> None:
@@ -1893,8 +1962,10 @@ class MTAOS(salobj.ConfigurableCsc):
 
         model = self.model
         x, y, z, u, v, w = model.cam_hexapod_correction()
+        visit_id = self.last_ofc_visit_id or 0
+        extra_id = self.last_ofc_extra_id or 0
         await self.evt_rejectedCameraHexapodCorrection.set_write(
-            x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
+            x=x, y=y, z=z, u=u, v=v, w=w, visitId=visit_id, extraId=extra_id, force_output=True
         )
 
     async def pubEvent_m1m3Correction(self) -> None:
@@ -1905,7 +1976,11 @@ class MTAOS(salobj.ConfigurableCsc):
 
         model = self.model
         zForces = model.m1m3_correction()
-        await self.evt_m1m3Correction.set_write(zForces=zForces, force_output=True)
+        visit_id = self.last_ofc_visit_id or 0
+        extra_id = self.last_ofc_extra_id or 0
+        await self.evt_m1m3Correction.set_write(
+            zForces=zForces, visitId=visit_id, extraId=extra_id, force_output=True
+        )
 
     async def pubEvent_rejectedM1M3Correction(self) -> None:
         """Publish the rejected M1M3 correction that would be commanded if the
@@ -1915,8 +1990,10 @@ class MTAOS(salobj.ConfigurableCsc):
 
         model = self.model
         zForces = model.m1m3_correction()
+        visit_id = self.last_ofc_visit_id or 0
+        extra_id = self.last_ofc_extra_id or 0
         await self.evt_rejectedM1M3Correction.set_write(
-            zForces=zForces, force_output=True
+            zForces=zForces, visitId=visit_id, extraId=extra_id, force_output=True
         )
 
     async def pubEvent_m2Correction(self) -> None:
@@ -1927,7 +2004,11 @@ class MTAOS(salobj.ConfigurableCsc):
 
         model = self.model
         zForces = model.m2_correction()
-        await self.evt_m2Correction.set_write(zForces=zForces, force_output=True)
+        visit_id = self.last_ofc_visit_id or 0
+        extra_id = self.last_ofc_extra_id or 0
+        await self.evt_m2Correction.set_write(
+            zForces=zForces, visitId=visit_id, extraId=extra_id, force_output=True
+        )
 
     async def pubEvent_rejectedM2Correction(self) -> None:
         """Publish the rejected M2 correction that would be commanded if the
@@ -1937,8 +2018,10 @@ class MTAOS(salobj.ConfigurableCsc):
 
         model = self.model
         zForces = model.m2_correction()
+        visit_id = self.last_ofc_visit_id or 0
+        extra_id = self.last_ofc_extra_id or 0
         await self.evt_rejectedM2Correction.set_write(
-            zForces=zForces, force_output=True
+            zForces=zForces, visitId=visit_id, extraId=extra_id, force_output=True
         )
 
     async def pubEvent_wepDuration(self) -> None:
