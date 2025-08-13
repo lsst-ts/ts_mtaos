@@ -75,6 +75,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         os.environ["ISRDIRPATH"] = self.isrDir.as_posix()
         self._makeDir(self.isrDir)
         self.model = self.__class__.model
+        self.model.ofc_data.motion_penalty = 0.01
 
     def _makeDir(self, directory: Path) -> None:
         directory.mkdir(parents=True, exist_ok=True)

@@ -88,6 +88,11 @@ class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.model = self.__class__.model
 
+        self.model.set_visit_ids(
+            intra_id=4021123106000,
+            extra_id=None,
+        )
+
     @classmethod
     def tearDownClass(cls) -> None:
         # Check that run doesn't already exist due to previous improper cleanup
@@ -98,7 +103,6 @@ class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
 
     async def test_process_lsstcam_corner_wfs(self) -> None:
         await self.model.process_lsstcam_corner_wfs(
-            visit_id=4021123106000,
             config=dict(),
         )
 

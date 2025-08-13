@@ -93,6 +93,11 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.model = self.__class__.model
 
+        self.model.set_visit_ids(
+            intra_id=4021123106001,
+            extra_id=4021123106002,
+        )
+
     @classmethod
     def tearDownClass(cls) -> None:
         # Check that run doesn't already exist due to previous improper cleanup
@@ -103,8 +108,6 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
 
     async def test_process_comcam(self) -> None:
         await self.model.process_comcam(
-            4021123106001,
-            4021123106002,
             dict(),
         )
 
@@ -149,8 +152,6 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
     async def test_interrupt_wep_process(self) -> None:
         task = asyncio.create_task(
             self.model.process_comcam(
-                4021123106001,
-                4021123106002,
                 dict(),
             )
         )
@@ -169,13 +170,9 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             await asyncio.gather(
                 self.model.process_comcam(
-                    4021123106001,
-                    4021123106002,
                     dict(),
                 ),
                 self.model.process_comcam(
-                    4021123106001,
-                    4021123106002,
                     dict(),
                 ),
             )
@@ -183,8 +180,6 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
     async def test_wep_process_fail_bad_config(self) -> None:
         task = asyncio.create_task(
             self.model.process_comcam(
-                4021123106001,
-                4021123106002,
                 dict(),
             )
         )
