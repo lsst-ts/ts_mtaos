@@ -299,6 +299,9 @@ class Model:
         self.wep_process: asyncio.subprocess.Process | None = None
         self.wep_process_started_task = make_done_future()
 
+        self.intra_id = 0
+        self.extra_id: int | None = None
+
         # This asyncio.Lock is used to synchronize the initialization of a new
         # wep pipeline task process. The idea is that we want to limit the
         # number of executing processes to 1. If more than one call to
@@ -422,6 +425,45 @@ class Model:
             DOF correction from the last visit.
         """
         return self.ofc.lv_dof
+
+    def get_visit_ids(self) -> tuple[int, int]:
+        """Get the visit ids of the processed exposure
+
+        Returns
+        -------
+        intra_id : `int`
+            Id of the intra-focal image.
+        extra_id : `int`
+            Id of the extra-focal image.
+        """
+        extra_id = self.extra_id if self.extra_id is not None else 0
+        return self.intra_id, extra_id
+
+    def set_visit_ids(self, intra_id: int, extra_id: int | None) -> None:
+        """Set the visit ids of the exposure processed
+
+        Parameters
+        ----------
+        intra_id : `int`
+            Id of the intra-focal image.
+        extra_id : `int` or `None`
+            Id of the extra-focal image.
+        """
+        self.intra_id = intra_id
+        self.extra_id = extra_id
+
+    def get_gains(self) -> tuple[float, float, float]:
+        """Get the gains used when deriving ofc corrections
+        Returns
+        -------
+        kp_gain : `float`
+            Proportional gain
+        ki_gain : `float`
+            Integral gain
+        kd_gain : `float`
+            Derivative gain
+        """
+        return self.ofc.controller.kp, self.ofc.controller.ki, self.ofc.controller.kd
 
     def get_m1m3_bending_mode_stresses(self) -> np.ndarray:
         """Get the total M1M3 mirror stresses per bending mode.
@@ -580,8 +622,6 @@ class Model:
     @timeit
     async def run_wep(
         self,
-        visit_id: int,
-        extra_id: int | None,
         config: dict,
         run_name_extention: str = "",
         **kwargs: Any,
@@ -590,23 +630,16 @@ class Model:
 
         Parameters
         ----------
-        visit_id : `int`
-            Image visit id number.
-        extra_id : `None` or `int`
-            Additional image visit id number. If `None`, assume it is
-            processing corner wavefront sensors data. This option is only valid
-            if data is for the main camera.
         config : `dict`
             Configuration for the wavefront estimation pipeline.
         kwargs :
             Additional keyword arguments, required by the timer decorator.
         """
-        if extra_id is None:
+        if self.extra_id is None:
             self.log.debug(
-                f"Processing MainCamera corner wavefront sensor on image {visit_id}."
+                f"Processing MainCamera corner wavefront sensor on image {self.intra_id}."
             )
             await self.process_lsstcam_corner_wfs(
-                visit_id=visit_id,
                 config=config,
                 run_name_extention=run_name_extention,
             )
@@ -614,19 +647,16 @@ class Model:
             # If data is intra/extra it must be ComCam at this point. Main
             # camera intra/extra data will be processed exclusively using OCPS.
             self.log.debug(
-                f"Processing intra/extra pair: {visit_id}/{extra_id}. Expecting ComCam data."
+                f"Processing intra/extra pair: {self.intra_id}/{self.extra_id}. Expecting ComCam data."
             )
 
             await self.process_comcam(
-                intra_id=visit_id,
-                extra_id=extra_id,
                 config=config,
                 run_name_extention=run_name_extention,
             )
 
     async def process_lsstcam_corner_wfs(
         self,
-        visit_id: int,
         config: dict,
         run_name_extention: str = "",
     ) -> None:
@@ -634,8 +664,6 @@ class Model:
 
         Parameters
         ----------
-        visit_id : `int`
-            Id of the image to process corner wavefront sensor.
         config : `dict`
             A dictionary with additional configuration for the pipeline task.
         run_name_extention : `str`, optional
@@ -651,13 +679,13 @@ class Model:
         --------
         interrupt_wep_process : Interrupt an ongoing wep process.
         """
-        self.log.debug(f"Processing LSSTCam corner wavefront sensor: {visit_id}.")
+        self.log.debug(f"Processing LSSTCam corner wavefront sensor: {self.intra_id}.")
 
         run_name = f"{self.run_name}{run_name_extention}"
 
         async with self.handle_wep_process(
             instrument="lsstCam",
-            exposures_str=f"exposure IN ({visit_id}) "
+            exposures_str=f"exposure IN ({self.intra_id}) "
             f"AND detector IN ({get_formatted_corner_wavefront_sensors_ids()})"
             " AND instrument = 'LSSTCam'",
             run_name=run_name,
@@ -668,7 +696,6 @@ class Model:
 
         wavefront_errors, radii_data = self._gather_outputs(
             run_name=run_name,
-            visit_id=visit_id,
             instrument="lsstCam",
         )
 
@@ -676,8 +703,6 @@ class Model:
 
     async def process_comcam(
         self,
-        intra_id: int,
-        extra_id: int,
         config: dict,
         run_name_extention: str = "",
     ) -> None:
@@ -685,10 +710,6 @@ class Model:
 
         Parameters
         ----------
-        intra_id : `int`
-            Id of the intra-focal image.
-        extra_id : `int`
-            Id of the extra-focal image.
         config : `dict`
             A dictionary with additional configuration for the pipeline task.
         run_name_extention : `str`, optional
@@ -703,13 +724,15 @@ class Model:
         --------
         interrupt_wep_process : Interrupt an ongoing wep process.
         """
-        self.log.debug(f"Processing ComCam intra/extra pair: {intra_id}/{extra_id}.")
+        self.log.debug(
+            f"Processing ComCam intra/extra pair: {self.intra_id}/{self.extra_id}."
+        )
 
         run_name = f"{self.run_name}{run_name_extention}"
 
         async with self.handle_wep_process(
             instrument="comcam",
-            exposures_str=f"exposure IN ({intra_id}, {extra_id})",
+            exposures_str=f"exposure IN ({self.intra_id}, {self.extra_id})",
             run_name=run_name,
             config=config,
         ):
@@ -718,7 +741,6 @@ class Model:
 
         wavefront_errors, radii_data = self._gather_outputs(
             run_name=run_name,
-            visit_id=intra_id,
             instrument="comcam",
         )
 
@@ -727,8 +749,6 @@ class Model:
     async def query_ocps_results(
         self,
         instrument: str,
-        intra_id: int,
-        extra_id: int | None,
         timeout: int = 300,
     ) -> None:
         """Query the OCPS results.
@@ -737,16 +757,10 @@ class Model:
         ----------
         instrument : `str`
             Name of the instrument to query results for.
-        intra_id : `int`
-            Id of the intra-focal image.
-        extra_id : `int` or `None`
-            Id of the extra-focal image.
         timeout : `int`, optional
             Timeout in seconds for the query. Default is 300 seconds.
         """
         wavefront_results, radii_results = await self._poll_butler_outputs(
-            intra_id=intra_id,
-            extra_id=extra_id,
             instrument=instrument,
             timeout=timeout,
         )
@@ -1080,15 +1094,12 @@ class Model:
 
     async def get_image_info(
         self,
-        visit_id: int,
         instrument: str,
     ) -> tuple[str, float]:
         """Get image information from the butler.
 
         Parameters
         ----------
-        visit_id : `int`
-            Visit id of the image.
         instrument : `str`
             Name of the instrument.
 
@@ -1109,7 +1120,8 @@ class Model:
             instrument="LSSTCam",
             collections=[self.run_name, "LSSTCam/raw/all"],
         )  # type: ignore
-        refs = butler.query_datasets("raw", where=f"visit={visit_id}")
+        pair_id = self.extra_id if self.extra_id is not None else self.intra_id
+        refs = butler.query_datasets("raw", where=f"visit={pair_id}")
 
         image = butler.get(refs[0])
         filter_label = image.getFilter().bandLabel
@@ -1121,7 +1133,6 @@ class Model:
 
     async def get_correction_gain(
         self,
-        visit_id: int,
         previous_elevation: float | None,
         camera_name: str,
     ) -> float:
@@ -1129,8 +1140,6 @@ class Model:
 
         Parameters
         ----------
-        visit_id : `int`
-            Visit id of the image.
         previous_elevation : `float` or `None`
             Elevation of the previous image in deg.
 
@@ -1140,7 +1149,6 @@ class Model:
             Gain to apply to the corrections.
         """
         _, elevation = await self.get_image_info(
-            visit_id,
             camera_name,
         )
 
@@ -1174,8 +1182,6 @@ class Model:
 
     async def _poll_butler_outputs(
         self,
-        intra_id: int,
-        extra_id: int | None,
         instrument: str,
         timeout: int,
         poll_interval: int = 5,
@@ -1186,10 +1192,6 @@ class Model:
 
         Parameters
         ----------
-        intra_id : `int`
-            Id of the intra-focal image.
-        extra_id : `int`
-            Id of the extra-focal image.
         instrument : `str`
             Camera used to take the data.
         timeout : `int`, optional
@@ -1217,9 +1219,8 @@ class Model:
         start_time = time.time()
         elapsed_time = 0.0
 
-        pair_id = extra_id if extra_id is not None else intra_id
-
-        if extra_id is not None:
+        pair_id = self.extra_id if self.extra_id is not None else self.intra_id
+        if self.extra_id is not None:
             n_tables = 189
             n_tables_min = 100
         else:
@@ -1292,7 +1293,6 @@ class Model:
     def _gather_outputs(
         self,
         run_name: str,
-        visit_id: int,
         instrument: str,
     ) -> tuple[list, list]:
         """Gather outputs from the given run for a given visit id.
@@ -1301,8 +1301,6 @@ class Model:
         ----------
         run_name : `str`
             Name of the run.
-        visit_id : `int`
-            Id of the visit.
         instrument : `str`
             Camera used to take the data.
 
@@ -1323,7 +1321,9 @@ class Model:
             self.zernike_table_name,
             collections=[run_name],
         )
-        self.log.debug(f"run_name: {run_name}, visit_id: {visit_id} yielded: {refs}")
+        self.log.debug(
+            f"run_name: {run_name}, intra_id: {self.intra_id}, extra_id: {self.extra_id} yielded: {refs}"
+        )
 
         wavefront_errors = [
             (
