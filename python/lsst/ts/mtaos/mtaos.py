@@ -785,14 +785,13 @@ class MTAOS(salobj.ConfigurableCsc):
             if extra_id is not None and extra_id > 0
             else None
         )
+        self.model.set_visit_ids(intra_id=intra_visit_id, extra_id=extra_visit_id)
 
         if use_ocps:
             try:
                 self.log.debug("Check if visit was already processed.")
                 await self.model.query_ocps_results(
                     self.model.instrument,
-                    intra_visit_id,
-                    extra_visit_id,
                     timeout=1,
                 )
             except asyncio.TimeoutError:
@@ -817,9 +816,7 @@ class MTAOS(salobj.ConfigurableCsc):
                     self.execution_times["RUN_WEP"] = []
                 self.execution_times["RUN_WEP"].append(time.time() - start_time)
 
-                await self.model.query_ocps_results(
-                    self.model.instrument, intra_visit_id, extra_visit_id
-                )
+                await self.model.query_ocps_results(self.model.instrument)
         else:
             if timestamp is None or identity is None:
                 raise ValueError(
@@ -841,8 +838,6 @@ class MTAOS(salobj.ConfigurableCsc):
             # TODO (DM-31365): Remove workaround to visitId being of type long
             # in MTAOS runWEP command.
             await self.model.run_wep(
-                visit_id=intra_visit_id,
-                extra_id=extra_visit_id,
                 config=(yaml.safe_load(config) if len(config) > 0 else self.wep_config),
                 run_name_extention=run_name_extention,
                 log_time=self.execution_times,
@@ -1193,16 +1188,17 @@ class MTAOS(salobj.ConfigurableCsc):
                         _, _, day_obs, index = image_in_oods.obsid.split("_")
                     except ValueError:
                         continue
-                    visit_id = int(f"{day_obs}{index[1:]}")
 
+                    visit_id = int(f"{day_obs}{index[1:]}")
                     if visit_id in processed_images or visit_id in skipped_images:
                         self.log.info(
                             f"Visit {visit_id} already processed or skipped, continuing."
                         )
                         continue
 
+                    self.model.set_visit_ids(intra_id=visit_id, extra_id=None)
+
                     filter_label, elevation = await self.model.get_image_info(
-                        visit_id,
                         self.camera_name,
                     )
 
@@ -1277,7 +1273,6 @@ class MTAOS(salobj.ConfigurableCsc):
                     )
 
                     gain = await self.model.get_correction_gain(
-                        visit_id,
                         prev_elevation,
                         self.camera_name,
                     )
@@ -1750,6 +1745,7 @@ class MTAOS(salobj.ConfigurableCsc):
         model = self.model
         model.get_wfe()
 
+        visit_id, extra_id = model.get_visit_ids()
         for sensor_id, zernike_indices, zernike_values in zip(
             *model.get_wavefront_errors()
         ):
@@ -1762,6 +1758,8 @@ class MTAOS(salobj.ConfigurableCsc):
                 sensorId=sensor_id,
                 nollZernikeIndices=zernike_indices_extended,
                 nollZernikeValues=zernike_values_extended,
+                visitId=visit_id % 100000,
+                extraId=extra_id,
                 force_output=True,
             )
             await asyncio.sleep(0.1)
@@ -1775,6 +1773,7 @@ class MTAOS(salobj.ConfigurableCsc):
         model = self.model
         model.get_rejected_wfe()
 
+        visit_id, extra_id = model.get_visit_ids()
         for sensor_id, zernike_indices, zernike_values in zip(
             *model.get_rejected_wavefront_errors()
         ):
@@ -1787,6 +1786,8 @@ class MTAOS(salobj.ConfigurableCsc):
                 sensorId=sensor_id,
                 nollZernikeIndices=zernike_indices_extended,
                 nollZernikeValues=zernike_values_extended,
+                visitId=visit_id % 100000,
+                extraId=extra_id,
                 force_output=True,
             )
             await asyncio.sleep(0.1)
@@ -1799,11 +1800,18 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
         model = self.model
 
-        dofAggr = model.get_dof_aggr()
-        dofVisit = model.get_dof_lv()
+        dof_aggr = model.get_dof_aggr()
+        dof_visit = model.get_dof_lv()
+        visit_id, extra_id = model.get_visit_ids()
+        kp_gain, ki_gain, kd_gain = model.get_gains()
         await self.evt_degreeOfFreedom.set_write(
-            aggregatedDoF=dofAggr,
-            visitDoF=dofVisit,
+            aggregatedDoF=dof_aggr,
+            visitDoF=dof_visit,
+            visitId=visit_id % 100000,
+            extraId=extra_id,
+            kpGain=kp_gain,
+            kiGain=ki_gain,
+            kdGain=kd_gain,
             force_output=True,
         )
 
@@ -1841,11 +1849,18 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         model = self.model
-        dofAggr = model.get_dof_aggr()
-        dofVisit = model.get_dof_lv()
+        dof_aggr = model.get_dof_aggr()
+        dof_visit = model.get_dof_lv()
+        visit_id, extra_id = model.get_visit_ids()
+        kp_gain, ki_gain, kd_gain = model.get_gains()
         await self.evt_rejectedDegreeOfFreedom.set_write(
-            aggregatedDoF=dofAggr,
-            visitDoF=dofVisit,
+            aggregatedDoF=dof_aggr,
+            visitDoF=dof_visit,
+            visitId=visit_id % 100000,
+            extraId=extra_id,
+            kpGain=kp_gain,
+            kiGain=ki_gain,
+            kdGain=kd_gain,
             force_output=True,
         )
 
@@ -1857,8 +1872,17 @@ class MTAOS(salobj.ConfigurableCsc):
 
         model = self.model
         x, y, z, u, v, w = model.m2_hexapod_correction()
+        visit_id, extra_id = model.get_visit_ids()
         await self.evt_m2HexapodCorrection.set_write(
-            x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
+            x=x,
+            y=y,
+            z=z,
+            u=u,
+            v=v,
+            w=w,
+            visitId=visit_id % 100000,
+            extraId=extra_id,
+            force_output=True,
         )
 
     async def pubEvent_rejectedM2HexapodCorrection(self) -> None:
@@ -1869,8 +1893,17 @@ class MTAOS(salobj.ConfigurableCsc):
 
         model = self.model
         x, y, z, u, v, w = model.m2_hexapod_correction()
+        visit_id, extra_id = model.get_visit_ids()
         await self.evt_rejectedM2HexapodCorrection.set_write(
-            x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
+            x=x,
+            y=y,
+            z=z,
+            u=u,
+            v=v,
+            w=w,
+            visitId=visit_id % 100000,
+            extraId=extra_id,
+            force_output=True,
         )
 
     async def pubEvent_cameraHexapodCorrection(self) -> None:
@@ -1881,8 +1914,17 @@ class MTAOS(salobj.ConfigurableCsc):
 
         model = self.model
         x, y, z, u, v, w = model.cam_hexapod_correction()
+        visit_id, extra_id = model.get_visit_ids()
         await self.evt_cameraHexapodCorrection.set_write(
-            x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
+            x=x,
+            y=y,
+            z=z,
+            u=u,
+            v=v,
+            w=w,
+            visitId=visit_id % 100000,
+            extraId=extra_id,
+            force_output=True,
         )
 
     async def pubEvent_rejectedCameraHexapodCorrection(self) -> None:
@@ -1893,8 +1935,17 @@ class MTAOS(salobj.ConfigurableCsc):
 
         model = self.model
         x, y, z, u, v, w = model.cam_hexapod_correction()
+        visit_id, extra_id = model.get_visit_ids()
         await self.evt_rejectedCameraHexapodCorrection.set_write(
-            x=x, y=y, z=z, u=u, v=v, w=w, force_output=True
+            x=x,
+            y=y,
+            z=z,
+            u=u,
+            v=v,
+            w=w,
+            visitId=visit_id % 100000,
+            extraId=extra_id,
+            force_output=True,
         )
 
     async def pubEvent_m1m3Correction(self) -> None:
@@ -1904,8 +1955,14 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         model = self.model
-        zForces = model.m1m3_correction()
-        await self.evt_m1m3Correction.set_write(zForces=zForces, force_output=True)
+        z_forces = model.m1m3_correction()
+        visit_id, extra_id = model.get_visit_ids()
+        await self.evt_m1m3Correction.set_write(
+            zForces=z_forces,
+            visitId=visit_id % 100000,
+            extraId=extra_id,
+            force_output=True,
+        )
 
     async def pubEvent_rejectedM1M3Correction(self) -> None:
         """Publish the rejected M1M3 correction that would be commanded if the
@@ -1914,9 +1971,13 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         model = self.model
-        zForces = model.m1m3_correction()
+        z_forces = model.m1m3_correction()
+        visit_id, extra_id = model.get_visit_ids()
         await self.evt_rejectedM1M3Correction.set_write(
-            zForces=zForces, force_output=True
+            zForces=z_forces,
+            visitId=visit_id % 100000,
+            extraId=extra_id,
+            force_output=True,
         )
 
     async def pubEvent_m2Correction(self) -> None:
@@ -1926,8 +1987,14 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         model = self.model
-        zForces = model.m2_correction()
-        await self.evt_m2Correction.set_write(zForces=zForces, force_output=True)
+        z_forces = model.m2_correction()
+        visit_id, extra_id = model.get_visit_ids()
+        await self.evt_m2Correction.set_write(
+            zForces=z_forces,
+            visitId=visit_id % 100000,
+            extraId=extra_id,
+            force_output=True,
+        )
 
     async def pubEvent_rejectedM2Correction(self) -> None:
         """Publish the rejected M2 correction that would be commanded if the
@@ -1936,9 +2003,13 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         model = self.model
-        zForces = model.m2_correction()
+        z_forces = model.m2_correction()
+        visit_id, extra_id = model.get_visit_ids()
         await self.evt_rejectedM2Correction.set_write(
-            zForces=zForces, force_output=True
+            zForces=z_forces,
+            visitId=visit_id % 100000,
+            extraId=extra_id,
+            force_output=True,
         )
 
     async def pubEvent_wepDuration(self) -> None:
