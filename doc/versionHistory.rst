@@ -2,6 +2,15 @@
 Version History
 ===============
 
+v0.23.0
+--------
+
+* Add intra_id and extra_id topics in wavefront, corrections and degree of freedom events.
+
+* Make intra_id and extra_id attributes of class `Model`
+
+* Add gains topics in degree of freedom events.
+  
 v0.22.2
 --------
 
