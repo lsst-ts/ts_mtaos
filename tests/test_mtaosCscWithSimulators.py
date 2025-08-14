@@ -472,6 +472,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self) -> None:
         await self._cancelCSCs()
+        await super().asyncTearDown()
 
     async def _simulateCSCs(self) -> None:
         self.cscM2Hex = salobj.Controller(
