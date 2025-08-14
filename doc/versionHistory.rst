@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.23.1
+--------
+
+* In `tests/test_mtaosCscWithSimulators.py` add base `asyncTearDown` function to bring back topic cleanup process.
+
 v0.23.0
 --------
 
