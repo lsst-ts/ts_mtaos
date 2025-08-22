@@ -6,6 +6,7 @@ v0.23.1
 --------
 
 * In `tests/test_mtaosCscWithSimulators.py` add base `asyncTearDown` function to bring back topic cleanup process.
+* In `mtaos.py`, replace direct `model.calculate_corrections` call with `loop.run_in_executor` to avoid blocking the event loop.
 
 v0.23.0
 --------

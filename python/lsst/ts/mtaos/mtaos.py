@@ -24,6 +24,7 @@ __all__ = ["MTAOS"]
 import argparse
 import asyncio
 import collections
+import functools
 import inspect
 import json
 import logging
@@ -926,11 +927,20 @@ class MTAOS(salobj.ConfigurableCsc):
                 # rejected.
                 # This is not a coroutine so it will block the event loop. Need
                 # to think about how to fix it, maybe run in executor?
-                self.model.calculate_corrections(
-                    raise_on_large_defocus=raise_on_large_defocus,
-                    log_time=self.execution_times,
+                #
+                # Adding a executor to run the blocking call in a separate
+                # thread to avoid blocking the running loop.
+                loop = asyncio.get_running_loop()
+
+                func = functools.partial(
+                    self.model.calculate_corrections,
+                    raise_on_large_defocus,
+                    self.execution_times,
                     **loaded_config,
                 )
+
+                await loop.run_in_executor(None, func)
+
                 self.model.wavefront_errors.clear()
             finally:
                 self.log.info("Restore ofc data values.")
