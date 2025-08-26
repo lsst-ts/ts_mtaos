@@ -1379,22 +1379,16 @@ class Model:
             sensor_ids, zk_indices, wfe = self.get_wavefront_errors()
             corner_offsets = self.wavefront_errors.getListOfRadiiInTakenData()
 
-            dz, drx, dry = np.nan, np.nan, np.nan
+            dz = np.nan
             if len(corner_offsets) > 0:
-                dz, drx, dry = self.fit_camera_z_tip_tilt(corner_offsets)
+                dz = np.median([c[2] for c in corner_offsets])
                 self.log.info(
-                    f"Corner offsets to refocus camera would be: "
-                    f"dz={dz} um, "
-                    f"drx={drx} deg, dry={dry} deg."
+                    f"Corner offsets to refocus camera would be: " f"dz={dz} um."
                 )
             else:
                 self.log.warning("No corner offsets found in the wavefront errors.")
 
-            if (
-                np.abs(dz) > self.dz_threshold_min
-                or np.abs(drx) > self.tilt_offset_threshold
-                or np.abs(dry) > self.tilt_offset_threshold
-            ):
+            if np.abs(dz) > self.dz_threshold_min:
                 if raise_on_large_defocus:
                     raise RuntimeError(
                         f"Large defocus detected: dz={dz:.2f} um, "
@@ -1421,14 +1415,11 @@ class Model:
                     self.log.warning(
                         f"dz exceeded threshold and was clipped: "
                         f"original dz={dz:.2f} um → clipped to {dz_clipped:.2f} um "
-                        f"(threshold: ±{max_dz} um). "
-                        f"rx={drx:.4f} deg, ry={dry:.4f} deg "
-                        f"(tip/tilt threshold: ±{self.tilt_offset_threshold} deg)."
+                        f"(threshold: ±{max_dz} um)."
                     )
                 else:
                     self.log.info(
-                        f"Refocus using corner offsets accepted: "
-                        f"dz={dz:.2f} um, rx={drx:.4f} deg, ry={dry:.4f} deg."
+                        f"Refocus using corner offsets accepted: " f"dz={dz:.2f} um"
                     )
             else:
                 self.log.info(
@@ -1545,40 +1536,6 @@ class Model:
             corner_offsets.append((x_pos_um, y_pos_um, detector_offset))
 
         return np.array(corner_offsets)
-
-    def fit_camera_z_tip_tilt(
-        self, corner_offsets: np.ndarray
-    ) -> tuple[float, float, float]:
-        """Fit the camera z, tip, and tilt from the corner offsets.
-
-        Parameters
-        ----------
-        corner_offsets : `numpy.ndarray`
-            Array with corner offsets in microns. Each element is a tuple
-            (x, y, z) where x and y are the pixel coordinates of the corner
-            and z is the offset in microns.
-
-        Returns
-        -------
-        z_offset : `float`
-            The z offset in microns.
-        tip_x : `float`
-            The rotation about x in degrees
-        tip_y : `float`
-            The rotation about y in degrees
-        """
-        # Build design matrix: 1 for piston, x for tip, y for tilt
-        A = np.array([[1, x, y] for (x, y, _) in corner_offsets])
-        b = np.array([z for (_, _, z) in corner_offsets])
-
-        # Least squares solution: [z, tip, tilt]
-        coeffs, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
-        z_offset, dzdx, dzdy = coeffs
-
-        tip_x = np.rad2deg(np.arctan(dzdx))
-        tip_y = np.rad2deg(np.arctan(dzdy))
-
-        return z_offset, tip_x, tip_y
 
     def get_wavefront_errors(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get wavefront errors.
@@ -1827,9 +1784,9 @@ class Model:
                         )
                         self.ofc.ofc_data.comp_dof_idx = new_comp_dof_idx
                         self.ofc.controller.reset_history()
-                        original_ofc_data_values[key] = (
-                            self.ofc.ofc_data.default_comp_dof_idx
-                        )
+                        original_ofc_data_values[
+                            key
+                        ] = self.ofc.ofc_data.default_comp_dof_idx
 
                     elif key == "xref":
                         self.ofc.ofc_data.xref = kwargs[key]
