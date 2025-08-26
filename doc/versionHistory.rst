@@ -2,6 +2,12 @@
 Version History
 ===============
 
+v0.23.2
+--------
+
+* In `_execute_ofc.py` publish degree of freedom event before restoring ofc data values.
+* In `model.py` remove the plane fitting for the corner offsets and use median for the defocus instead.
+
 v0.23.1
 --------
 
