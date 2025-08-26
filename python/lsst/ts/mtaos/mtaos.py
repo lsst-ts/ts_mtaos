@@ -943,6 +943,14 @@ class MTAOS(salobj.ConfigurableCsc):
 
                 self.model.wavefront_errors.clear()
             finally:
+                await self.pubEvent_degreeOfFreedom()
+                await self.pubEvent_mirrorStresses()
+                await self.pubEvent_m2HexapodCorrection()
+                await self.pubEvent_cameraHexapodCorrection()
+                await self.pubEvent_m1m3Correction()
+                await self.pubEvent_m2Correction()
+                await self.pubEvent_ofcDuration()
+
                 self.log.info("Restore ofc data values.")
                 await self.model.set_ofc_data_values(**original_ofc_data_values)
                 self.model.ofc.controller.kp = kp
@@ -954,14 +962,6 @@ class MTAOS(salobj.ConfigurableCsc):
                 self.execution_times["CALCULATE_CORRECTIONS"].pop(0)
 
             self.log.debug("Calculate the subsystem correction successfully.")
-
-            await self.pubEvent_degreeOfFreedom()
-            await self.pubEvent_mirrorStresses()
-            await self.pubEvent_m2HexapodCorrection()
-            await self.pubEvent_cameraHexapodCorrection()
-            await self.pubEvent_m1m3Correction()
-            await self.pubEvent_m2Correction()
-            await self.pubEvent_ofcDuration()
 
     async def do_addAberration(self, data: type_hints.BaseMsgType) -> None:
         """Utility command to add aberration to the system based on user
@@ -1168,7 +1168,6 @@ class MTAOS(salobj.ConfigurableCsc):
             readonly=True,
             include=["summaryState", "elevation"],
         ) as mtmount:
-
             self.log.info("Closed loop task ready.")
 
             camera.evt_startIntegration.callback = self.follow_start_integration
@@ -1290,7 +1289,6 @@ class MTAOS(salobj.ConfigurableCsc):
                     prev_elevation = elevation
 
                     if gain > 0.0:
-
                         config = (
                             yaml.safe_load(self.last_run_ofc_configuration)
                             if self.last_run_ofc_configuration
