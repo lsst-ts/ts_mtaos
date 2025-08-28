@@ -1318,7 +1318,7 @@ class MTAOS(salobj.ConfigurableCsc):
                                 raise RuntimeError(
                                     f"Maximum OFC failures ({ofc_failure_count} "
                                     f"of {self.max_ofc_consecutive_failures}) "
-                                    "reached. Maybe clouds are blocking or AOS ran away?"
+                                    "reached."
                                 ) from e
                             else:
                                 self.log.warning(
