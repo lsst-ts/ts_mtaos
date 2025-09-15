@@ -934,8 +934,8 @@ class MTAOS(salobj.ConfigurableCsc):
 
                 func = functools.partial(
                     self.model.calculate_corrections,
-                    raise_on_large_defocus,
-                    self.execution_times,
+                    raise_on_large_defocus=raise_on_large_defocus,
+                    log_time=self.execution_times,
                     **loaded_config,
                 )
 
