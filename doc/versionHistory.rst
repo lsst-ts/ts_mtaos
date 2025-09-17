@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.25.0
+--------
+
+* Introduce optional pointing correction functionality to refine telescope pointing after applying AOS corrections.
+
 v0.24.0
 --------
 
