@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.23.3
+--------
+
+* Use ``Hexapod.moveInSteps`` with the ``overwriteStepSizeFromConfig=True``.
+
 v0.23.2
 --------
 
