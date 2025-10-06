@@ -1584,8 +1584,16 @@ class MTAOS(salobj.ConfigurableCsc):
             x, y, z, u, v, w = -x, -y, -z, -u, -v, -w
 
         try:
-            await self.remotes["m2hex"].cmd_move.set_start(
-                timeout=self.DEFAULT_TIMEOUT, x=x, y=y, z=z, u=u, v=v, w=w, sync=True
+            await self.remotes["m2hex"].cmd_moveInSteps.set_start(
+                timeout=self.DEFAULT_TIMEOUT,
+                x=x,
+                y=y,
+                z=z,
+                u=u,
+                v=v,
+                w=w,
+                overwriteStepSizeFromConfig=True,
+                sync=True,
             )
 
             self.log.debug("Issue the M2 hexapod correction successfully.")
@@ -1610,8 +1618,16 @@ class MTAOS(salobj.ConfigurableCsc):
             x, y, z, u, v, w = -x, -y, -z, -u, -v, -w
 
         try:
-            await self.remotes["camhex"].cmd_move.set_start(
-                timeout=self.DEFAULT_TIMEOUT, x=x, y=y, z=z, u=u, v=v, w=w, sync=True
+            await self.remotes["camhex"].cmd_moveInSteps.set_start(
+                timeout=self.DEFAULT_TIMEOUT,
+                x=x,
+                y=y,
+                z=z,
+                u=u,
+                v=v,
+                w=w,
+                overwriteStepSizeFromConfig=True,
+                sync=True,
             )
 
             self.log.debug("Issue the camera hexapod correction successfully.")

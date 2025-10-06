@@ -496,8 +496,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             ]
         )
 
-        self.cscM2Hex.cmd_move.callback = self.hexapod_move_callbck
-        self.cscCamHex.cmd_move.callback = self.hexapod_move_callbck
+        self.cscM2Hex.cmd_moveInSteps.callback = self.hexapod_move_callbck
+        self.cscCamHex.cmd_moveInSteps.callback = self.hexapod_move_callbck
         self.cscM1M3.cmd_clearActiveOpticForces.callback = (
             self.m1m3_clear_active_optic_forces_callback
         )
