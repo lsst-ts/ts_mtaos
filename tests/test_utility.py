@@ -42,9 +42,7 @@ class TestUtility(unittest.TestCase):
     """Test the Utility functions."""
 
     def setUp(self) -> None:
-        self.dataDir = tempfile.TemporaryDirectory(
-            dir=mtaos.getModulePath().joinpath("tests").as_posix()
-        )
+        self.dataDir = tempfile.TemporaryDirectory(dir=mtaos.getModulePath().joinpath("tests").as_posix())
 
     def tearDown(self) -> None:
         self.dataDir.cleanup()
@@ -84,9 +82,7 @@ class TestUtility(unittest.TestCase):
         log = logging.Logger("test")
         dataDirPath = self.dataDir.name
         filePath = Path(dataDirPath).joinpath("test.log")
-        mtaos.addRotFileHandler(
-            log, filePath, logging.DEBUG, maxBytes=1e3, backupCount=5
-        )
+        mtaos.addRotFileHandler(log, filePath, logging.DEBUG, maxBytes=1e3, backupCount=5)
 
         handlers = log.handlers
         self.assertEqual(len(handlers), 1)
@@ -109,9 +105,7 @@ class TestUtility(unittest.TestCase):
         mtaos_cwfs_detector_ids = set(
             [
                 int(detector_id)
-                for detector_id in mtaos.get_formatted_corner_wavefront_sensors_ids().split(
-                    ","
-                )
+                for detector_id in mtaos.get_formatted_corner_wavefront_sensors_ids().split(",")
             ]
         )
 
@@ -122,8 +116,7 @@ class TestUtility(unittest.TestCase):
         expected_cwfs_detector_ids = set(
             [
                 detector_mapping[cwfs_detector_name][0]
-                for cwfs_detector_name in cwfs_task.extraFocalNames
-                + cwfs_task.intraFocalNames
+                for cwfs_detector_name in cwfs_task.extraFocalNames + cwfs_task.intraFocalNames
             ]
         )
 
@@ -131,9 +124,7 @@ class TestUtility(unittest.TestCase):
 
     def test_timeit(self) -> None:
         @mtaos.timeit
-        def my_retval(
-            arg1: str, arg2: str, arg3: str, arg4: str, sleep_time: float, **kwargs: Any
-        ) -> tuple:
+        def my_retval(arg1: str, arg2: str, arg3: str, arg4: str, sleep_time: float, **kwargs: Any) -> tuple:
             time.sleep(sleep_time)
             return arg1, arg2, arg3, arg4
 
@@ -188,9 +179,7 @@ class TestUtility(unittest.TestCase):
         raises=DatabaseConflictError,
     )
     def test_define_visit(self) -> None:
-        data_path = os.path.join(
-            getModulePathWep(), "tests", "testData", "gen3TestRepo"
-        )
+        data_path = os.path.join(getModulePathWep(), "tests", "testData", "gen3TestRepo")
 
         mtaos.define_visit(
             data_path=data_path,

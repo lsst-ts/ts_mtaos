@@ -240,9 +240,7 @@ class Model:
 
         science_sensor_config_schema = copy.deepcopy(WEP_HEADER_CONFIG)
         science_sensor_config_schema["properties"]["tasks"]["properties"] = dict()
-        science_sensor_config_schema["properties"]["tasks"]["properties"].update(
-            ISR_CONFIG
-        )
+        science_sensor_config_schema["properties"]["tasks"]["properties"].update(ISR_CONFIG)
         science_sensor_config_schema["properties"]["tasks"]["properties"].update(
             GENERATE_DONUT_CATALOG_CONFIG
         )
@@ -253,17 +251,11 @@ class Model:
         cwfs_config_schema = copy.deepcopy(WEP_HEADER_CONFIG)
         cwfs_config_schema["properties"]["tasks"]["properties"] = dict()
         cwfs_config_schema["properties"]["tasks"]["properties"].update(ISR_CONFIG)
-        cwfs_config_schema["properties"]["tasks"]["properties"].update(
-            GENERATE_DONUT_CATALOG_CONFIG
-        )
+        cwfs_config_schema["properties"]["tasks"]["properties"].update(GENERATE_DONUT_CATALOG_CONFIG)
         if instrument == "comcam":
-            cwfs_config_schema["properties"]["tasks"]["properties"].update(
-                COMCAM_PIPELINE_CONFIG
-            )
+            cwfs_config_schema["properties"]["tasks"]["properties"].update(COMCAM_PIPELINE_CONFIG)
         else:
-            cwfs_config_schema["properties"]["tasks"]["properties"].update(
-                CWFS_PIPELINE_CONFIG
-            )
+            cwfs_config_schema["properties"]["tasks"]["properties"].update(CWFS_PIPELINE_CONFIG)
 
         self.wep_configuration_validation = dict(
             comcam=DefaultingValidator(science_sensor_config_schema),
@@ -636,9 +628,7 @@ class Model:
             Additional keyword arguments, required by the timer decorator.
         """
         if self.extra_id is None:
-            self.log.debug(
-                f"Processing MainCamera corner wavefront sensor on image {self.intra_id}."
-            )
+            self.log.debug(f"Processing MainCamera corner wavefront sensor on image {self.intra_id}.")
             await self.process_lsstcam_corner_wfs(
                 config=config,
                 run_name_extention=run_name_extention,
@@ -724,9 +714,7 @@ class Model:
         --------
         interrupt_wep_process : Interrupt an ongoing wep process.
         """
-        self.log.debug(
-            f"Processing ComCam intra/extra pair: {self.intra_id}/{self.extra_id}."
-        )
+        self.log.debug(f"Processing ComCam intra/extra pair: {self.intra_id}/{self.extra_id}.")
 
         run_name = f"{self.run_name}{run_name_extention}"
 
@@ -874,9 +862,7 @@ class Model:
                 config=config,
             )
 
-            self.log.debug(
-                f"Run name: {run_name}. Pipeline configuration in {config_file.name}."
-            )
+            self.log.debug(f"Run name: {run_name}. Pipeline configuration in {config_file.name}.")
 
             run_pipetask_cmd = self._generate_pipetask_command(
                 run_name=run_name,
@@ -1041,9 +1027,7 @@ class Model:
 
         # TODO: Implement configuration when user runs select_sources
         # beforehand.
-        wep_configuration = self.generate_wep_configuration(
-            instrument=instrument, config=config
-        )
+        wep_configuration = self.generate_wep_configuration(instrument=instrument, config=config)
 
         config_file = tempfile.NamedTemporaryFile(suffix=".yaml")
 
@@ -1125,9 +1109,7 @@ class Model:
 
         image = butler.get(refs[0])
         filter_label = image.getFilter().bandLabel
-        elevation = (
-            image.getMetadata().get("ELSTART") + image.getMetadata().get("ELEND")
-        ) / 2
+        elevation = (image.getMetadata().get("ELSTART") + image.getMetadata().get("ELEND")) / 2
 
         return filter_label, elevation
 
@@ -1152,11 +1134,7 @@ class Model:
             camera_name,
         )
 
-        elevation_diff = (
-            np.abs(elevation - previous_elevation)
-            if previous_elevation is not None
-            else 0.0
-        )
+        elevation_diff = np.abs(elevation - previous_elevation) if previous_elevation is not None else 0.0
         if elevation_diff >= self.elevation_delta_limit_max:
             self.log.warning(
                 f"Large elevation change detected: {elevation} - {previous_elevation} = {elevation_diff}. "
@@ -1213,9 +1191,7 @@ class Model:
         """
         self.log.debug("Polling butler for WEP outputs.")
 
-        butler = Butler(
-            self.data_path, collections=[self.run_name], instrument="LSSTCam"
-        )  # type: ignore
+        butler = Butler(self.data_path, collections=[self.run_name], instrument="LSSTCam")  # type: ignore
         start_time = time.time()
         elapsed_time = 0.0
 
@@ -1227,9 +1203,7 @@ class Model:
             n_tables = 4
             n_tables_min = 3
 
-        self.log.debug(
-            f"Polling for {n_tables} tables. Minimum number of tables: {n_tables_min}."
-        )
+        self.log.debug(f"Polling for {n_tables} tables. Minimum number of tables: {n_tables_min}.")
 
         refs = []
         while elapsed_time < timeout:
@@ -1247,13 +1221,9 @@ class Model:
                     self.log.debug(f"Query returned {len(refs)} results.")
                     break
                 else:
-                    self.log.debug(
-                        f"Query returned {len(refs)} entries, waiting for {n_tables}. Continuing."
-                    )
+                    self.log.debug(f"Query returned {len(refs)} entries, waiting for {n_tables}. Continuing.")
             except EmptyQueryResultError:
-                self.log.debug(
-                    f"Collection '{self.run_name}' not found. Waiting {poll_interval}s."
-                )
+                self.log.debug(f"Collection '{self.run_name}' not found. Waiting {poll_interval}s.")
                 continue
             finally:
                 await asyncio.sleep(poll_interval)
@@ -1271,9 +1241,7 @@ class Model:
                     "Probably, not enough donut cutouts found."
                 )
 
-        self.log.debug(
-            f"run_name: {self.run_name}, visit_id: {pair_id} yielded: {refs}"
-        )
+        self.log.debug(f"run_name: {self.run_name}, visit_id: {pair_id} yielded: {refs}")
 
         wavefront_errors = [
             (
@@ -1355,9 +1323,7 @@ class Model:
         return []
 
     @timeit
-    def calculate_corrections(
-        self, raise_on_large_defocus: bool, **kwargs: Any
-    ) -> None:
+    def calculate_corrections(self, raise_on_large_defocus: bool, **kwargs: Any) -> None:
         """Calculate the correction of subsystems based on the average
         wavefront error of multiple exposure images in a single visit.
 
@@ -1382,9 +1348,7 @@ class Model:
             dz = np.nan
             if len(corner_offsets) > 0:
                 dz = np.median([c[2] for c in corner_offsets])
-                self.log.info(
-                    f"Corner offsets to refocus camera would be: " f"dz={dz} um."
-                )
+                self.log.info(f"Corner offsets to refocus camera would be: dz={dz} um.")
             else:
                 self.log.warning("No corner offsets found in the wavefront errors.")
 
@@ -1396,8 +1360,7 @@ class Model:
                         "Refocus and enable_aos_closed_loop again."
                     )
                 self.log.info(
-                    "The z_offset computed from donut radii "
-                    "is large enough to require automatic refocusing."
+                    "The z_offset computed from donut radii is large enough to require automatic refocusing."
                 )
                 max_dz = self.dz_threshold_max
                 dz_clipped = np.clip(dz, -max_dz, max_dz)
@@ -1418,18 +1381,14 @@ class Model:
                         f"(threshold: ±{max_dz} um)."
                     )
                 else:
-                    self.log.info(
-                        f"Refocus using corner offsets accepted: " f"dz={dz:.2f} um"
-                    )
+                    self.log.info(f"Refocus using corner offsets accepted: dz={dz:.2f} um")
             else:
                 self.log.info(
                     f"{wfe.shape[0]}/4 wavefront error measurements were found. "
                     "If fewer than 3 are found, this image will be skipped."
                     "Proceeding to estimate the corrections with OFC."
                 )
-                self._calculate_corrections(
-                    wfe=wfe, zk_indices=zk_indices, sensor_ids=sensor_ids, **kwargs
-                )
+                self._calculate_corrections(wfe=wfe, zk_indices=zk_indices, sensor_ids=sensor_ids, **kwargs)
 
         finally:
             # Clear the queue
@@ -1452,10 +1411,7 @@ class Model:
         # We multiply by sqrt(4 * f^2 - 1) * pixel_scale to get the defocus
         # offset in meters, and subtract the nominal defocus of the wavefront
         # sensors.
-        offset = (
-            radius * np.sqrt(4 * self.FOCAL_RATIO**2 - 1) * self.PIXEL_SIZE
-            - self.NOMINAL_DEFOCUS
-        )
+        offset = radius * np.sqrt(4 * self.FOCAL_RATIO**2 - 1) * self.PIXEL_SIZE - self.NOMINAL_DEFOCUS
 
         return offset
 
@@ -1521,10 +1477,7 @@ class Model:
 
             max_radius = np.nanmax([intra_radius, extra_radius])
             detector_offset = self.get_offset_from_radius(max_radius)
-            self.log.info(
-                "Computed out-of-focus offsets from donuts: "
-                f"{detector_offset:.2f} um."
-            )
+            self.log.info(f"Computed out-of-focus offsets from donuts: {detector_offset:.2f} um.")
             if max_radius == extra_radius:
                 detector_offset *= -1
 
@@ -1549,9 +1502,7 @@ class Model:
         wfe : `np.ndarray`
             Array of arrays with the zernike coeficients for each field index.
         """
-        wfe_data_container = (
-            self.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
-        )
+        wfe_data_container = self.wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
 
         return self.get_sensor_ids_wfe_from_data_container(wfe_data_container)
 
@@ -1569,9 +1520,7 @@ class Model:
         wfe : `np.ndarray`
             Array of arrays with the zernike coeficients for each field index.
         """
-        wfe_data_container = (
-            self.rejected_wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
-        )
+        wfe_data_container = self.rejected_wavefront_errors.getListOfWavefrontErrorAvgInTakenData()
 
         return self.get_sensor_ids_wfe_from_data_container(wfe_data_container)
 
@@ -1743,9 +1692,7 @@ class Model:
 
                 elif hasattr(self.ofc.ofc_data, key):
                     self.log.debug(f"Overriding ofc_data parameter {key}.")
-                    original_ofc_data_values[key] = copy.copy(
-                        getattr(self.ofc.ofc_data, key)
-                    )
+                    original_ofc_data_values[key] = copy.copy(getattr(self.ofc.ofc_data, key))
 
                     # Check if there is a type annotation and try to cast the
                     # values as such.
@@ -1769,9 +1716,7 @@ class Model:
 
                     elif key == "comp_dof_idx":
                         if not isinstance(kwargs[key], dict):
-                            raise RuntimeError(
-                                f"comp_dof_idx must be a dictionary. Got {type(kwargs[key])}."
-                            )
+                            raise RuntimeError(f"comp_dof_idx must be a dictionary. Got {type(kwargs[key])}.")
 
                         new_comp_dof_idx = kwargs[key]
 
@@ -1779,14 +1724,10 @@ class Model:
                             new_comp_dof_idx[comp_dof_idx_key] = np.array(
                                 kwargs[key][comp_dof_idx_key], dtype=bool
                             )
-                        self.log.info(
-                            f"{self.ofc.ofc_data.comp_dof_idx=}\n{new_comp_dof_idx=}"
-                        )
+                        self.log.info(f"{self.ofc.ofc_data.comp_dof_idx=}\n{new_comp_dof_idx=}")
                         self.ofc.ofc_data.comp_dof_idx = new_comp_dof_idx
                         self.ofc.controller.reset_history()
-                        original_ofc_data_values[key] = (
-                            self.ofc.ofc_data.default_comp_dof_idx
-                        )
+                        original_ofc_data_values[key] = self.ofc.ofc_data.default_comp_dof_idx
 
                     elif key == "xref":
                         self.ofc.ofc_data.xref = kwargs[key]
@@ -1795,9 +1736,7 @@ class Model:
                         self.ofc.ofc_data.zn_selected = np.array(kwargs[key])
 
         except Exception:
-            self.log.error(
-                "Error setting value in ofc_data. Restoring original values."
-            )
+            self.log.error("Error setting value in ofc_data. Restoring original values.")
             for key in original_ofc_data_values:
                 setattr(self.ofc.ofc_data, key, original_ofc_data_values[key])
             raise
@@ -1846,9 +1785,7 @@ class Model:
         """
         sensor_ids = np.array([sensor_id for sensor_id in data_container])
 
-        zk_indices = np.array(
-            [data_container[sensor_id][0] for sensor_id in data_container]
-        )
+        zk_indices = np.array([data_container[sensor_id][0] for sensor_id in data_container])
         wfe = np.array([data_container[sensor_id][1] for sensor_id in data_container])
 
         return sensor_ids, zk_indices, wfe

@@ -56,17 +56,12 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         ofc_data = OFCData("comcam")
 
         dof_state0 = yaml.safe_load(
-            mtaos.getModulePath()
-            .joinpath("tests", "testData", "state0inDof.yaml")
-            .open()
-            .read()
+            mtaos.getModulePath().joinpath("tests", "testData", "state0inDof.yaml").open().read()
         )
         ofc_data.dof_state0 = dof_state0
         ofc_data.zn_selected = np.arange(4, 23)  # Use only from zk4-zk22
 
-        cls.model = mtaos.Model(
-            instrument=ofc_data.name, data_path=None, ofc_data=ofc_data
-        )
+        cls.model = mtaos.Model(instrument=ofc_data.name, data_path=None, ofc_data=ofc_data)
 
         # patch _get_visit_info for unit testing
         cls.model._get_visit_info = Mock(side_effect=cls._get_visit_info_mock)
@@ -253,9 +248,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
 
     def test_m2_hexapod_correction(self) -> None:
         x, y, z, u, v, w = self.model.m2_hexapod_correction()
-        self.assertEqual(
-            self.model.m2_hexapod_correction.correction_type, CorrectionType.POSITION
-        )
+        self.assertEqual(self.model.m2_hexapod_correction.correction_type, CorrectionType.POSITION)
         self.assertEqual(x, 0)
         self.assertEqual(y, 0)
         self.assertEqual(z, 0)
@@ -264,9 +257,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(w, 0)
 
     def test_cam_hexapod_correction(self) -> None:
-        self.assertEqual(
-            self.model.cam_hexapod_correction.correction_type, CorrectionType.POSITION
-        )
+        self.assertEqual(self.model.cam_hexapod_correction.correction_type, CorrectionType.POSITION)
         x, y, z, u, v, w = self.model.cam_hexapod_correction()
         self.assertEqual(x, 0)
         self.assertEqual(y, 0)
@@ -276,9 +267,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(w, 0)
 
     def test_m1m3_correction(self) -> None:
-        self.assertEqual(
-            self.model.m1m3_correction.correction_type, CorrectionType.FORCE
-        )
+        self.assertEqual(self.model.m1m3_correction.correction_type, CorrectionType.FORCE)
         self.assertEqual(len(self.model.m1m3_correction()), 156)
 
     def test_m2_correction(self) -> None:
@@ -521,17 +510,10 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         if len(expected_donut_catalog_wcs_task_config) > 0:
             assert "config" in wep_configuration["tasks"]["generateDonutCatalogWcsTask"]
             for config in expected_donut_catalog_wcs_task_config:
-                assert (
-                    config
-                    in wep_configuration["tasks"]["generateDonutCatalogWcsTask"][
-                        "config"
-                    ]
-                )
+                assert config in wep_configuration["tasks"]["generateDonutCatalogWcsTask"]["config"]
 
                 assert (
-                    wep_configuration["tasks"]["generateDonutCatalogWcsTask"]["config"][
-                        config
-                    ]
+                    wep_configuration["tasks"]["generateDonutCatalogWcsTask"]["config"][config]
                     == expected_donut_catalog_wcs_task_config[config]
                 )
 
@@ -571,10 +553,9 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         ).union(expected_isr_config.keys()):
             assert config in wep_configuration["tasks"]["isr"]["config"]
 
-            assert (
-                wep_configuration["tasks"]["isr"]["config"][config]
-                == expected_isr_config[config]
-            ), f"Expected {config}"
+            assert wep_configuration["tasks"]["isr"]["config"][config] == expected_isr_config[config], (
+                f"Expected {config}"
+            )
 
     def assert_estimate_zernikes_science_sensor_task(
         self,
@@ -596,15 +577,10 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         for config in set(("donutStampSize", "initialCutoutPadding")).union(
             expected_zernike_science_sensor_config
         ):
-            assert (
-                config
-                in wep_configuration["tasks"]["CutOutDonutsScienceSensorTask"]["config"]
-            )
+            assert config in wep_configuration["tasks"]["CutOutDonutsScienceSensorTask"]["config"]
 
             assert (
-                wep_configuration["tasks"]["CutOutDonutsScienceSensorTask"]["config"][
-                    config
-                ]
+                wep_configuration["tasks"]["CutOutDonutsScienceSensorTask"]["config"][config]
                 == expected_zernike_science_sensor_config[config]
             )
 
