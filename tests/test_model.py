@@ -72,6 +72,11 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.model = self.__class__.model
         self.model.ofc_data.motion_penalty = 0.01
 
+        # Set control gains to default values
+        self.model.ofc.controller.kp = 1.0
+        self.model.ofc.controller.ki = 0.0
+        self.model.ofc.controller.kd = 0.0
+
     def _makeDir(self, directory: Path) -> None:
         directory.mkdir(parents=True, exist_ok=True)
 
