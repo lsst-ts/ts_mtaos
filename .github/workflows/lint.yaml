@@ -13,11 +13,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install
         run: |
-          $CONDA/bin/conda install -c lsstts python=3.11 ts-pre-commit-config -y
+          $CONDA/bin/conda install -c lsstts python=3.12 ts-pre-commit-config -y
 
       - name: Generate pre commit configuration
         run: |
