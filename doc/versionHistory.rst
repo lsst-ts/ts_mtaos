@@ -2,6 +2,10 @@
 Version History
 ===============
 
+v0.23.4
+--------
+* In `mtaos.py`, update the `model.calculate_corrections` call to use keyword arguments for compatibility with the `timeit` decorator.
+
 v0.23.3
 --------
 

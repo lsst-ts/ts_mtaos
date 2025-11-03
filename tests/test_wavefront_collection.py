@@ -111,9 +111,7 @@ class TestWavefrontCollection(unittest.TestCase):
         self._collectListOfWfErrForAvgTest()
         self.wavefront_collection.pop()
 
-        listOfWfErrAvg = (
-            self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData()
-        )
+        listOfWfErrAvg = self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData()
 
         self.assertEqual(len(listOfWfErrAvg), 3)
         for sensor_id in listOfWfErrAvg:
@@ -124,9 +122,7 @@ class TestWavefrontCollection(unittest.TestCase):
         self._collectListOfWfErrForAvgTestSgl([2, 1, 3], [np.zeros(19)] * 3)
         self._collectListOfWfErrForAvgTestSgl([3, 2, 1], [np.ones(19) * 5] * 3)
 
-    def _collectListOfWfErrForAvgTestSgl(
-        self, listSensorId: list, listSensorZk: list
-    ) -> None:
+    def _collectListOfWfErrForAvgTestSgl(self, listSensorId: list, listSensorZk: list) -> None:
         listOfWfErr = self._getListOfWfErr(listSensorId, listSensorZk)
         listOfRadii = [1.0, 2.0]
         self.wavefront_collection.append(listOfWfErr, listOfRadii)
@@ -136,9 +132,7 @@ class TestWavefrontCollection(unittest.TestCase):
         for idx in range(3):
             self.wavefront_collection.pop()
 
-        listOfWfErrAvg = (
-            self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData()
-        )
+        listOfWfErrAvg = self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData()
 
         self.assertEqual(len(listOfWfErrAvg), 3)
         for sensor_id in listOfWfErrAvg:
@@ -157,9 +151,7 @@ class TestWavefrontCollection(unittest.TestCase):
         for idx in range(4):
             self.wavefront_collection.pop()
 
-        listOfWfErrAvg = (
-            self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData()
-        )
+        listOfWfErrAvg = self.wavefront_collection.getListOfWavefrontErrorAvgInTakenData()
 
         self.assertEqual(len(listOfWfErrAvg), 3)
         for idx in {1, 2, 3}:

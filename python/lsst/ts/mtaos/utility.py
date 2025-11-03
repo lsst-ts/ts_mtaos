@@ -311,9 +311,7 @@ def define_visit(
 
     butler = Butler(data_path, collections=collections, writeable=True)  # type: ignore
 
-    exposure_data_ids = set(
-        butler.registry.queryDataIds(["exposure"], where=exposures_str)
-    )
+    exposure_data_ids = set(butler.registry.queryDataIds(["exposure"], where=exposures_str))
 
     Instrument.fromName(instrument_name, registry=butler.registry)
 

@@ -179,15 +179,11 @@ class MTAOS(salobj.ConfigurableCsc):
         if log_to_file:
             log_dir = utility.getLogDir()
             log_path = log_dir.joinpath(self.LOG_FILE_NAME)
-            utility.addRotFileHandler(
-                self.log, log_path, logging.DEBUG if log_level is None else log_level
-            )
+            utility.addRotFileHandler(self.log, log_path, logging.DEBUG if log_level is None else log_level)
 
         self.log.info("Prepare MTAOS CSC.")
 
-        self.state0DofValidator = salobj.DefaultingValidator(
-            schema=TELESCOPE_DOF_SCHEMA
-        )
+        self.state0DofValidator = salobj.DefaultingValidator(schema=TELESCOPE_DOF_SCHEMA)
 
         # TODO (DM-31365): Remove workaround to visitId being of type long in
         # MTAOS runWEP command.
@@ -311,9 +307,7 @@ class MTAOS(salobj.ConfigurableCsc):
                     async with asyncio.timeout(self.DEFAULT_TIMEOUT):
                         await self.remotes[remote_name].start_task
                 except asyncio.TimeoutError:
-                    self.log.warning(
-                        "Timeout while waiting for remote to start. Continuing."
-                    )
+                    self.log.warning("Timeout while waiting for remote to start. Continuing.")
                 finally:
                     await asyncio.sleep(self.heartbeat_interval)
             self.log.info("All remotes ready.")
@@ -353,9 +347,7 @@ class MTAOS(salobj.ConfigurableCsc):
             run_name=config.run_name,
             collections=config.collections,
             pipeline_instrument=(
-                config.pipeline_instrument
-                if hasattr(config, "pipeline_instrument")
-                else None
+                config.pipeline_instrument if hasattr(config, "pipeline_instrument") else None
             ),
             pipeline_n_processes=config.pipeline_n_processes,
             zernike_table_name=config.zernike_table_name,
@@ -365,9 +357,7 @@ class MTAOS(salobj.ConfigurableCsc):
             dz_threshold_min=config.dz_threshold_min,
             dz_threshold_max=config.dz_threshold_max,
             data_instrument_name=(
-                config.data_instrument_name
-                if hasattr(config, "data_instrument_name")
-                else None
+                config.data_instrument_name if hasattr(config, "data_instrument_name") else None
             ),
         )
 
@@ -380,14 +370,11 @@ class MTAOS(salobj.ConfigurableCsc):
             with open(self.config_dir / config.wep_config) as fp:
                 self.wep_config = yaml.safe_load(fp)
                 try:
-                    self.model.wep_configuration_validation[config.instrument].validate(
-                        self.wep_config
-                    )
+                    self.model.wep_configuration_validation[config.instrument].validate(self.wep_config)
                 except Exception as e:
                     self.log.exception("Failed to validate WEP configuration.")
                     raise salobj.ExpectedError(
-                        f"Failed to validate WEP configuration with {e}. "
-                        "Check CSC logs for more information."
+                        f"Failed to validate WEP configuration with {e}. Check CSC logs for more information."
                     )
         else:
             self.wep_config = dict()
@@ -413,9 +400,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         self.max_ofc_consecutive_failures = config.max_ofc_consecutive_failures
         self.raise_on_large_defocus = config.raise_on_large_defocus
-        self.closed_loop_timeout_without_images = (
-            config.closed_loop_timeout_without_images
-        )
+        self.closed_loop_timeout_without_images = config.closed_loop_timeout_without_images
 
         self.log.debug("MTAOS configuration completed.")
 
@@ -500,19 +485,12 @@ class MTAOS(salobj.ConfigurableCsc):
             await self.evt_closedLoopState.set_write(state=ClosedLoopState.IDLE)
             self.log.info("Restoring previous state.")
             try:
-                if (
-                    await self.check_components_alive()
-                    and await self.check_components_enabled()
-                ):
+                if await self.check_components_alive() and await self.check_components_enabled():
                     await self._execute_issue_correction()
                 else:
-                    self.log.warning(
-                        "One or more CSCs are not alive or enabled, skip issuing correction."
-                    )
+                    self.log.warning("One or more CSCs are not alive or enabled, skip issuing correction.")
             except Exception:
-                self.log.exception(
-                    "MTAOS unable to apply initial corrections. Ignoring."
-                )
+                self.log.exception("MTAOS unable to apply initial corrections. Ignoring.")
 
     async def check_components_enabled(self) -> bool:
         """Checks if all components are ENABLED.
@@ -527,11 +505,7 @@ class MTAOS(salobj.ConfigurableCsc):
         RunTimeError:
             If either component is not ENABLED
         """
-        return all(
-            await asyncio.gather(
-                *[self._check_enabled(remote) for remote in self.remotes]
-            )
-        )
+        return all(await asyncio.gather(*[self._check_enabled(remote) for remote in self.remotes]))
 
     async def _check_enabled(self, remote: str) -> bool:
         """Check if a specific remote component is enabled.
@@ -557,11 +531,7 @@ class MTAOS(salobj.ConfigurableCsc):
         `bool`
             True if all components are alive, False otherwise
         """
-        return all(
-            await asyncio.gather(
-                *[self._check_liveliness(remote) for remote in self.remotes]
-            )
-        )
+        return all(await asyncio.gather(*[self._check_liveliness(remote) for remote in self.remotes]))
 
     async def _check_liveliness(self, remote: str) -> bool:
         """Check if a specific remote component is alive.
@@ -578,9 +548,7 @@ class MTAOS(salobj.ConfigurableCsc):
             otherwise.
         """
         try:
-            await self.remotes[remote].evt_heartbeat.next(
-                flush=True, timeout=self.DEFAULT_TIMEOUT
-            )
+            await self.remotes[remote].evt_heartbeat.next(flush=True, timeout=self.DEFAULT_TIMEOUT)
         except asyncio.TimeoutError:
             return False
         else:
@@ -781,11 +749,7 @@ class MTAOS(salobj.ConfigurableCsc):
             If timestamp and identity are not provided when not using OCPS.
         """
         intra_visit_id = self.visit_id_offset + visit_id
-        extra_visit_id = (
-            self.visit_id_offset + extra_id
-            if extra_id is not None and extra_id > 0
-            else None
-        )
+        extra_visit_id = self.visit_id_offset + extra_id if extra_id is not None and extra_id > 0 else None
         self.model.set_visit_ids(intra_id=intra_visit_id, extra_id=extra_visit_id)
 
         if use_ocps:
@@ -799,9 +763,7 @@ class MTAOS(salobj.ConfigurableCsc):
                 self.log.debug("Image not processed yet.")
 
                 if extra_visit_id is None:
-                    ocps_config = {
-                        f"{self.camera_name}-FROM-OCS_CWFS": f"{intra_visit_id}"
-                    }
+                    ocps_config = {f"{self.camera_name}-FROM-OCS_CWFS": f"{intra_visit_id}"}
                 else:
                     ocps_config = {
                         f"{self.camera_name}-FROM-OCS_DONUTPAIR": f"{intra_visit_id},{extra_visit_id}"
@@ -820,17 +782,12 @@ class MTAOS(salobj.ConfigurableCsc):
                 await self.model.query_ocps_results(self.model.instrument)
         else:
             if timestamp is None or identity is None:
-                raise ValueError(
-                    "Timestamp and identity must be provided when not using OCPS."
-                )
+                raise ValueError("Timestamp and identity must be provided when not using OCPS.")
 
             # timestamp command was sent in ISO 8601 compliant date-time format
             # (YYYY-MM-DDTHH:MM:SS.sss), removing invalid characters.
             timestamp_sent_isot = (
-                astropy_time_from_tai_unix(timestamp)
-                .isot.replace("-", "")
-                .replace(":", "")
-                .replace(".", "")
+                astropy_time_from_tai_unix(timestamp).isot.replace("-", "").replace(":", "").replace(".", "")
             )
             private_identity = identity.replace("@", "_").replace("-", "_")
 
@@ -881,9 +838,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         self.log.debug(f"Running with config={data.config}.")
 
-        await self._execute_ofc(
-            userGain=data.userGain, config=data.config, timeout=self.LONG_TIMEOUT
-        )
+        await self._execute_ofc(userGain=data.userGain, config=data.config, timeout=self.LONG_TIMEOUT)
 
     async def _execute_ofc(
         self,
@@ -914,12 +869,9 @@ class MTAOS(salobj.ConfigurableCsc):
             # Set the ofc_data values based on configuration
             # This is needed to set what degrees of freedom will be used,
             # how many zernikes, etc.
-            original_ofc_data_values = await self.model.set_ofc_data_values(
-                **loaded_config
-            )
+            original_ofc_data_values = await self.model.set_ofc_data_values(**loaded_config)
             self.log.debug(
-                f"Customizing OFC parameters: {loaded_config}. "
-                f"original {original_ofc_data_values}"
+                f"Customizing OFC parameters: {loaded_config}. original {original_ofc_data_values}"
             )
 
             try:
@@ -934,8 +886,8 @@ class MTAOS(salobj.ConfigurableCsc):
 
                 func = functools.partial(
                     self.model.calculate_corrections,
-                    raise_on_large_defocus,
-                    self.execution_times,
+                    raise_on_large_defocus=raise_on_large_defocus,
+                    log_time=self.execution_times,
                     **loaded_config,
                 )
 
@@ -955,10 +907,7 @@ class MTAOS(salobj.ConfigurableCsc):
                 await self.model.set_ofc_data_values(**original_ofc_data_values)
                 self.model.ofc.controller.kp = kp
 
-            while (
-                len(self.execution_times["CALCULATE_CORRECTIONS"])
-                > self.MAX_TIME_SAMPLE
-            ):
+            while len(self.execution_times["CALCULATE_CORRECTIONS"]) > self.MAX_TIME_SAMPLE:
                 self.execution_times["CALCULATE_CORRECTIONS"].pop(0)
 
             self.log.debug("Calculate the subsystem correction successfully.")
@@ -991,9 +940,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
             if config is not None:
                 self.log.debug("Customizing OFC parameters.")
-                original_ofc_data_values = await self.model.set_ofc_data_values(
-                    **config
-                )
+                original_ofc_data_values = await self.model.set_ofc_data_values(**config)
             else:
                 original_ofc_data_values = dict()
 
@@ -1144,31 +1091,35 @@ class MTAOS(salobj.ConfigurableCsc):
         self.current_rotator_position = None
         self.current_elevation_position = None
 
-        async with salobj.Remote(
-            self.domain,
-            oods_name,
-            readonly=True,
-        ) as oods, salobj.Remote(
-            self.domain,
-            camera_name,
-            readonly=True,
-            include=[
-                "shutterDetailedState",
-                "startIntegration",
-                "endOfImageTelemetry",
-            ],
-        ) as camera, salobj.Remote(
-            self.domain,
-            "MTRotator",
-            readonly=True,
-            include=["summaryState", "rotation"],
-        ) as mtrotator, salobj.Remote(
-            self.domain,
-            "MTMount",
-            readonly=True,
-            include=["summaryState", "elevation"],
-        ) as mtmount:
-
+        async with (
+            salobj.Remote(
+                self.domain,
+                oods_name,
+                readonly=True,
+            ) as oods,
+            salobj.Remote(
+                self.domain,
+                camera_name,
+                readonly=True,
+                include=[
+                    "shutterDetailedState",
+                    "startIntegration",
+                    "endOfImageTelemetry",
+                ],
+            ) as camera,
+            salobj.Remote(
+                self.domain,
+                "MTRotator",
+                readonly=True,
+                include=["summaryState", "rotation"],
+            ) as mtrotator,
+            salobj.Remote(
+                self.domain,
+                "MTMount",
+                readonly=True,
+                include=["summaryState", "elevation"],
+            ) as mtmount,
+        ):
             self.log.info("Closed loop task ready.")
 
             camera.evt_startIntegration.callback = self.follow_start_integration
@@ -1180,9 +1131,7 @@ class MTAOS(salobj.ConfigurableCsc):
             ofc_failure_count = 0
             while self.summary_state == salobj.State.ENABLED:
                 try:
-                    await self.evt_closedLoopState.set_write(
-                        state=ClosedLoopState.WAITING_IMAGE
-                    )
+                    await self.evt_closedLoopState.set_write(state=ClosedLoopState.WAITING_IMAGE)
 
                     try:
                         image_in_oods = await oods.evt_imageInOODS.next(
@@ -1190,7 +1139,7 @@ class MTAOS(salobj.ConfigurableCsc):
                         )
                     except asyncio.TimeoutError:
                         raise TimeoutError(
-                            f"No images received in {self.closed_loop_timeout_without_images/60} min. "
+                            f"No images received in {self.closed_loop_timeout_without_images / 60} min. "
                             "Closed loop task in the background will stop."
                         )
 
@@ -1201,9 +1150,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
                     visit_id = int(f"{day_obs}{index[1:]}")
                     if visit_id in processed_images or visit_id in skipped_images:
-                        self.log.info(
-                            f"Visit {visit_id} already processed or skipped, continuing."
-                        )
+                        self.log.info(f"Visit {visit_id} already processed or skipped, continuing.")
                         continue
 
                     self.model.set_visit_ids(intra_id=visit_id, extra_id=None)
@@ -1213,9 +1160,7 @@ class MTAOS(salobj.ConfigurableCsc):
                     )
 
                     if image_in_oods.obsid in self.image_rotator:
-                        rotation_angle = float(
-                            np.mean(np.array(self.image_rotator[image_in_oods.obsid]))
-                        )
+                        rotation_angle = float(np.mean(np.array(self.image_rotator[image_in_oods.obsid])))
                     else:
                         raise RuntimeError(
                             f"No rotation angle data found for obsid {image_in_oods.obsid}. "
@@ -1232,14 +1177,8 @@ class MTAOS(salobj.ConfigurableCsc):
                         current_elevation_position is None
                         or current_rotator_position is None
                         or (
-                            (
-                                np.abs(rotation_angle - current_rotator_position)
-                                > self.rotation_angle_limit
-                            )
-                            or (
-                                np.abs(elevation - current_elevation_position)
-                                > self.elevation_angle_limit
-                            )
+                            (np.abs(rotation_angle - current_rotator_position) > self.rotation_angle_limit)
+                            or (np.abs(elevation - current_elevation_position) > self.elevation_angle_limit)
                         )
                     ):
                         report_elevation = (
@@ -1271,9 +1210,7 @@ class MTAOS(salobj.ConfigurableCsc):
                         f"{visit_id=} ingested."
                     )
 
-                    await self.evt_closedLoopState.set_write(
-                        state=ClosedLoopState.PROCESSING
-                    )
+                    await self.evt_closedLoopState.set_write(state=ClosedLoopState.PROCESSING)
 
                     await self._execute_wavefront_estimation(
                         visit_id=visit_id,
@@ -1290,7 +1227,6 @@ class MTAOS(salobj.ConfigurableCsc):
                     prev_elevation = elevation
 
                     if gain > 0.0:
-
                         config = (
                             yaml.safe_load(self.last_run_ofc_configuration)
                             if self.last_run_ofc_configuration
@@ -1329,22 +1265,18 @@ class MTAOS(salobj.ConfigurableCsc):
                                 )
                                 continue
 
-                        await self.evt_closedLoopState.set_write(
-                            state=ClosedLoopState.WAITING_APPLY
-                        )
+                        await self.evt_closedLoopState.set_write(state=ClosedLoopState.WAITING_APPLY)
                         camera.evt_shutterDetailedState.flush()
-                        camera_shutter_detailed_state = (
-                            await camera.evt_shutterDetailedState.aget(
-                                timeout=self.CMD_TIMEOUT
-                            )
+                        camera_shutter_detailed_state = await camera.evt_shutterDetailedState.aget(
+                            timeout=self.CMD_TIMEOUT
                         )
                         while camera_shutter_detailed_state.substate != 1:
                             self.log.info(
                                 "Camera shutter detailed state: "
                                 f"{camera_shutter_detailed_state.substate}, waiting until it is 1."
                             )
-                            camera_shutter_detailed_state = (
-                                await camera.evt_shutterDetailedState.next(flush=False)
+                            camera_shutter_detailed_state = await camera.evt_shutterDetailedState.next(
+                                flush=False
                             )
 
                         self.log.info(
@@ -1354,9 +1286,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
                         await self._execute_issue_correction()
                     else:
-                        self.log.info(
-                            "Skipping correction but proceeding with closed-loop execution."
-                        )
+                        self.log.info("Skipping correction but proceeding with closed-loop execution.")
 
                 except asyncio.CancelledError:
                     self.log.info("Closed loop task cancelled.")
@@ -1368,12 +1298,8 @@ class MTAOS(salobj.ConfigurableCsc):
                         report="Error in closed loop.",
                         traceback=traceback.format_exc(),
                     )
-                    self.log.exception(
-                        "Closed loop failed; turning off closed loop mode"
-                    )
-                    await self.evt_closedLoopState.set_write(
-                        state=ClosedLoopState.ERROR
-                    )
+                    self.log.exception("Closed loop failed; turning off closed loop mode")
+                    await self.evt_closedLoopState.set_write(state=ClosedLoopState.ERROR)
                     raise
 
     def apply_stress_correction(
@@ -1439,9 +1365,7 @@ class MTAOS(salobj.ConfigurableCsc):
                     bending_modes[i] = 0
 
                     # Recalculate RSS with the truncated modes
-                    stress = self.stress_scale_factor * np.sqrt(
-                        np.sum(np.square(stresses))
-                    )
+                    stress = self.stress_scale_factor * np.sqrt(np.sum(np.square(stresses)))
 
                 self.log.warning(
                     f"After truncating, the new total stress is {stress:.2f} psi, "
@@ -1508,9 +1432,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # Check if there was any exception. If so, undo all successfull
         # corrections and reject command.
-        if any(
-            [task.exception() is not None for task in issue_corrections_tasks.values()]
-        ):
+        if any([task.exception() is not None for task in issue_corrections_tasks.values()]):
             await self.pubEvent_rejectedDegreeOfFreedom()
             self.model.reject_correction()
             await self.pubEvent_degreeOfFreedom()
@@ -1520,9 +1442,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
             raise RuntimeError(error_repor)
 
-    async def handle_undo_corrections(
-        self, issued_corrections: dict[str, asyncio.Task]
-    ) -> str:
+    async def handle_undo_corrections(self, issued_corrections: dict[str, asyncio.Task]) -> str:
         """Handle undoing corrections.
 
         The method will inspect the `issued_corrections` list of tasks, will
@@ -1555,9 +1475,7 @@ class MTAOS(salobj.ConfigurableCsc):
                 try:
                     await getattr(self, f"issue_{comp}_correction")()
                 except Exception:
-                    self.log.exception(
-                        f"Failed to undo successful correction in {comp}."
-                    )
+                    self.log.exception(f"Failed to undo successful correction in {comp}.")
                     failed_to_undo.append(comp)
             else:
                 # Correction failed, store it as failed and continue.
@@ -1655,28 +1573,21 @@ class MTAOS(salobj.ConfigurableCsc):
         try:
             should_apply = True
             try:
-                applied_active_optics_forces = await self.remotes[
-                    "m1m3"
-                ].evt_appliedActiveOpticForces.aget(timeout=self.DEFAULT_TIMEOUT)
-                delta_z_forces = z_forces - applied_active_optics_forces.zForces
-                should_apply = np.any(
-                    np.abs(delta_z_forces) > self.m1m3_min_forces_to_apply
+                applied_active_optics_forces = await self.remotes["m1m3"].evt_appliedActiveOpticForces.aget(
+                    timeout=self.DEFAULT_TIMEOUT
                 )
+                delta_z_forces = z_forces - applied_active_optics_forces.zForces
+                should_apply = np.any(np.abs(delta_z_forces) > self.m1m3_min_forces_to_apply)
             except asyncio.TimeoutError:
                 self.log.warning(
-                    "Could not determine currently applied AOS forces for M1M3. "
-                    "Applying full figure."
+                    "Could not determine currently applied AOS forces for M1M3. Applying full figure."
                 )
                 should_apply = True
             if should_apply:
                 for retry in range(self.n_retries):
-                    self.log.info(
-                        f"Trying to apply M1M3 correction: {retry+1} of {self.n_retries}."
-                    )
+                    self.log.info(f"Trying to apply M1M3 correction: {retry + 1} of {self.n_retries}.")
                     try:
-                        ack_cmd = await self.remotes[
-                            "m1m3"
-                        ].cmd_applyActiveOpticForces.set_start(
+                        ack_cmd = await self.remotes["m1m3"].cmd_applyActiveOpticForces.set_start(
                             timeout=self.DEFAULT_TIMEOUT,
                             zForces=z_forces,
                             wait_done=False,
@@ -1690,9 +1601,7 @@ class MTAOS(salobj.ConfigurableCsc):
                                     f"[ack_cmd={ack_cmd.ack!r}]: {ack_cmd.result}."
                                 )
                             try:
-                                ack_cmd = await self.remotes[
-                                    "m1m3"
-                                ].cmd_applyActiveOpticForces.next_ackcmd(
+                                ack_cmd = await self.remotes["m1m3"].cmd_applyActiveOpticForces.next_ackcmd(
                                     ack_cmd, timeout=self.DEFAULT_TIMEOUT
                                 )
                             except RuntimeError:
@@ -1737,9 +1646,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         try:
             try:
-                axial_forces = await self.remotes["m2"].tel_axialForce.aget(
-                    timeout=self.DEFAULT_TIMEOUT
-                )
+                axial_forces = await self.remotes["m2"].tel_axialForce.aget(timeout=self.DEFAULT_TIMEOUT)
                 delta_forces = z_forces - axial_forces.applied
                 if np.all(np.abs(delta_forces) < self.m2_min_forces_to_apply):
                     self.log.info(
@@ -1747,13 +1654,9 @@ class MTAOS(salobj.ConfigurableCsc):
                     )
                     return
             except asyncio.TimeoutError:
-                self.log.info(
-                    "Could not determine the current M2 axial forces. Applying full figure."
-                )
+                self.log.info("Could not determine the current M2 axial forces. Applying full figure.")
 
-            await self.remotes["m2"].cmd_applyForces.set_start(
-                timeout=self.DEFAULT_TIMEOUT, axial=z_forces
-            )
+            await self.remotes["m2"].cmd_applyForces.set_start(timeout=self.DEFAULT_TIMEOUT, axial=z_forces)
 
             self.log.debug("Issue the M2 correction successfully.")
 
@@ -1772,9 +1675,7 @@ class MTAOS(salobj.ConfigurableCsc):
         model.get_wfe()
 
         visit_id, extra_id = model.get_visit_ids()
-        for sensor_id, zernike_indices, zernike_values in zip(
-            *model.get_wavefront_errors()
-        ):
+        for sensor_id, zernike_indices, zernike_values in zip(*model.get_wavefront_errors()):
             zernike_indices_extended = np.zeros(100, dtype=int)
             zernike_values_extended = np.full(100, np.nan)
             zernike_indices_extended[: zernike_indices.size] = zernike_indices
@@ -1800,9 +1701,7 @@ class MTAOS(salobj.ConfigurableCsc):
         model.get_rejected_wfe()
 
         visit_id, extra_id = model.get_visit_ids()
-        for sensor_id, zernike_indices, zernike_values in zip(
-            *model.get_rejected_wavefront_errors()
-        ):
+        for sensor_id, zernike_indices, zernike_values in zip(*model.get_rejected_wavefront_errors()):
             zernike_indices_extended = np.zeros(100, dtype=int)
             zernike_values_extended = np.full(100, np.nan)
             zernike_indices_extended[: zernike_indices.size] = zernike_indices
@@ -1854,12 +1753,8 @@ class MTAOS(salobj.ConfigurableCsc):
         m2_stresses = model.get_m2_bending_mode_stresses()
 
         # Calculate the total stress on the mirror
-        m1m3_total_stress = self.stress_scale_factor * np.sqrt(
-            np.sum(np.square(m1m3_stresses))
-        )
-        m2_total_stress = self.stress_scale_factor * np.sqrt(
-            np.sum(np.square(m2_stresses))
-        )
+        m1m3_total_stress = self.stress_scale_factor * np.sqrt(np.sum(np.square(m1m3_stresses)))
+        m2_total_stress = self.stress_scale_factor * np.sqrt(np.sum(np.square(m2_stresses)))
 
         await self.evt_mirrorStresses.set_write(
             stressM2=m2_total_stress,
@@ -2044,8 +1939,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         duration = (
             np.mean(self.execution_times["RUN_WEP"])
-            if "RUN_WEP" in self.execution_times
-            and len(self.execution_times["RUN_WEP"]) > 0
+            if "RUN_WEP" in self.execution_times and len(self.execution_times["RUN_WEP"]) > 0
             else 0.0
         )
         await self.evt_wepDuration.set_write(calcTime=duration)
@@ -2098,9 +1992,7 @@ class MTAOS(salobj.ConfigurableCsc):
             A comma delimited list of key=value pairs relating subsystem name
             (key) to its version number (value).
         """
-        lsst_distrib_version = ":".join(
-            eups.Eups().findSetupProduct("lsst_distrib").tags
-        )
+        lsst_distrib_version = ":".join(eups.Eups().findSetupProduct("lsst_distrib").tags)
 
         return f"ts_ofc={__ofc_version__},ts_wep={__wep_version__},lsst_distrib={lsst_distrib_version}"
 

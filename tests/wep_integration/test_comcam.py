@@ -53,17 +53,12 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         ofc_data = OFCData("comcam")
 
         dof_state0 = yaml.safe_load(
-            mtaos.getModulePath()
-            .joinpath("tests", "testData", "state0inDof.yaml")
-            .open()
-            .read()
+            mtaos.getModulePath().joinpath("tests", "testData", "state0inDof.yaml").open().read()
         )
         ofc_data.dof_state0 = dof_state0
         ofc_data.zn_selected = np.arange(4, 29)  # Use only from zk4-zk22
 
-        data_path = os.path.join(
-            getModulePathWep(), "tests", "testData", "gen3TestRepo"
-        )
+        data_path = os.path.join(getModulePathWep(), "tests", "testData", "gen3TestRepo")
         run_name = "run1"
 
         # Check that run doesn't already exist due to previous improper cleanup
@@ -134,19 +129,13 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
             len(self.model.ofc.ofc_data.zn_idx),
             msg="Wrong size of zernike coefficients in sensor 93.",
         )
-        self.assertTrue(
-            np.argmax(np.abs(zk_avg[93][1]))
-            in self.zernike_coefficient_maximum_expected
-        )
+        self.assertTrue(np.argmax(np.abs(zk_avg[93][1])) in self.zernike_coefficient_maximum_expected)
         self.assertEqual(
             len(zk_avg[94][1]),
             len(self.model.ofc.ofc_data.zn_idx),
             msg="Wrong size of zernike coefficients in sensor 94.",
         )
-        self.assertTrue(
-            np.argmax(np.abs(zk_avg[94][1]))
-            in self.zernike_coefficient_maximum_expected
-        )
+        self.assertTrue(np.argmax(np.abs(zk_avg[94][1])) in self.zernike_coefficient_maximum_expected)
         self.assertTrue(len(zk_avg[94][0]) == len(zk_avg[94][1]))
 
     async def test_interrupt_wep_process(self) -> None:

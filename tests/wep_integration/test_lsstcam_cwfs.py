@@ -51,16 +51,11 @@ class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
         ofc_data = OFCData("lsstfam")
 
         dof_state0 = yaml.safe_load(
-            mtaos.getModulePath()
-            .joinpath("tests", "testData", "state0inDof.yaml")
-            .open()
-            .read()
+            mtaos.getModulePath().joinpath("tests", "testData", "state0inDof.yaml").open().read()
         )
         ofc_data.dof_state0 = dof_state0
 
-        data_path = os.path.join(
-            getModulePathWep(), "tests", "testData", "gen3TestRepo"
-        )
+        data_path = os.path.join(getModulePathWep(), "tests", "testData", "gen3TestRepo")
         run_name = "run2"
 
         # Check that run doesn't already exist due to previous improper cleanup
