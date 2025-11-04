@@ -4,7 +4,13 @@ Version History
 
 v0.23.4
 --------
+
 * In `mtaos.py`, update the `model.calculate_corrections` call to use keyword arguments for compatibility with the `timeit` decorator.
+* In ``mtaos.py``, keep track of the images that are being followed (when received start integration from the camera) and update the close loop to skip images if they are not in the following list, up to a maximum number of consecutive misses.
+
+  This is mainly to work around an issue when the close loops starts during an exposure.
+  In these cases the MTAOS will not receive the start integration and will not be recording the rotation angles for said images.
+  We add a tolerance to the number of consecutive misses in case there is some metadata mismatch or communication issue preventing the CSC for receiving the events.
 
 v0.23.3
 --------

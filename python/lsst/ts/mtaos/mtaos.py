@@ -241,7 +241,10 @@ class MTAOS(salobj.ConfigurableCsc):
         # the runOFC command. This is used for the closed
         # loop.
         self.last_run_ofc_configuration = ""
+        # Store rotator position for images during closed loop.
         self.image_rotator: dict = dict()
+        # Keep track of the images that are followed in closed loop.
+        self.following_images: collections.deque = collections.deque(maxlen=100)
         self.current_elevation_position = None
         self.current_rotator_position = None
 
@@ -1129,6 +1132,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
             oods.evt_imageInOODS.flush()
             ofc_failure_count = 0
+            consecutive_missed_exposures = 0
             while self.summary_state == salobj.State.ENABLED:
                 try:
                     await self.evt_closedLoopState.set_write(state=ClosedLoopState.WAITING_IMAGE)
@@ -1145,10 +1149,37 @@ class MTAOS(salobj.ConfigurableCsc):
 
                     try:
                         _, _, day_obs, index = image_in_oods.obsid.split("_")
+                        visit_id = int(f"{day_obs}{index[1:]}")
+                        if (
+                            image_in_oods.obsid not in self.following_images
+                            and consecutive_missed_exposures < self.max_ofc_consecutive_failures
+                            and visit_id not in skipped_images
+                        ):
+                            consecutive_missed_exposures += 1
+                            skipped_images.append(visit_id)
+                            self.log.warning(
+                                f"Not following image {image_in_oods.obsid}. "
+                                "This usually happens when the close loop starts during an exposure. "
+                                f"Missed {consecutive_missed_exposures} of a maximum tolerance of "
+                                f"{self.max_ofc_consecutive_failures}."
+                            )
+                            continue
+                        elif consecutive_missed_exposures >= self.max_ofc_consecutive_failures:
+                            following_images = ", ".join(self.following_images)
+                            raise RuntimeError(
+                                f"Not following image {image_in_oods.obsid}. "
+                                f"Too many consecutive missed images ({consecutive_missed_exposures}). "
+                                "This means MTAOS is not receiving start integration events from the camera "
+                                "or there is a metadata mismatch between Camera and OODS."
+                                f"Images in the following list: {following_images}."
+                            )
+                        elif visit_id in skipped_images:
+                            self.log.debug(f"Visit {visit_id} skipped because it was not being followed.")
+                            continue
+                        consecutive_missed_exposures = 0
                     except ValueError:
                         continue
 
-                    visit_id = int(f"{day_obs}{index[1:]}")
                     if visit_id in processed_images or visit_id in skipped_images:
                         self.log.info(f"Visit {visit_id} already processed or skipped, continuing.")
                         continue
@@ -1959,6 +1990,8 @@ class MTAOS(salobj.ConfigurableCsc):
     async def follow_start_integration(self, data: type_hints.BaseMsgType) -> None:
         self.log.info(f"{data.imageName} started.")
         self.current_image = data.imageName
+        if data.imageName not in self.following_images:
+            self.following_images.append(data.imageName)
         self.image_rotator[data.imageName] = []
 
     async def follow_end_integration(self, data: type_hints.BaseMsgType) -> None:
