@@ -56,8 +56,7 @@ class Config(object):
         """
         if not hasattr(self.configObj, "instrument"):
             raise RuntimeError(
-                "No 'instrument' attribute in the configuration. "
-                "Please check the configuration file."
+                "No 'instrument' attribute in the configuration. Please check the configuration file."
             )
         return self.configObj.instrument
 
@@ -77,8 +76,7 @@ class Config(object):
         if isrDir is None:
             if not hasattr(self.configObj, "defaultIsrDir"):
                 raise RuntimeError(
-                    "No 'defaultIsrDir' attribute in the configuration. "
-                    "Please check the configuration file."
+                    "No 'defaultIsrDir' attribute in the configuration. Please check the configuration file."
                 )
 
             isrDir = self.configObj.defaultIsrDir
@@ -103,8 +101,7 @@ class Config(object):
         """
         if not hasattr(self.configObj, "defaultSkyFilePath"):
             warnings.warn(
-                "No 'defaultSkyFilePath' attribute in the configuration. "
-                "Please check the configuration file."
+                "No 'defaultSkyFilePath' attribute in the configuration. Please check the configuration file."
             )
             return None
 
@@ -122,8 +119,7 @@ class Config(object):
         """
         if not hasattr(self.configObj, "state0DofFilePath"):
             warnings.warn(
-                "No 'state0DofFilePath' attribute in the configuration. "
-                "Please check the configuration file."
+                "No 'state0DofFilePath' attribute in the configuration. Please check the configuration file."
             )
             return None
         relativePath = self.configObj.state0DofFilePath

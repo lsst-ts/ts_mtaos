@@ -66,9 +66,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             logFile.unlink()
 
     async def test_addAberration_issueCorrection(self) -> None:
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
-        ):
+        async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
             await self._simulateCSCs()
 
             await self._startCsc()
@@ -95,18 +93,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
             # Get the expected corrections.
-            m2_hex_corrections = await remote.evt_m2HexapodCorrection.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
+            m2_hex_corrections = await remote.evt_m2HexapodCorrection.next(flush=False, timeout=STD_TIMEOUT)
             cam_hex_corrections = await remote.evt_cameraHexapodCorrection.next(
                 flush=False, timeout=STD_TIMEOUT
             )
-            m1m3_corrections = await remote.evt_m1m3Correction.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
-            m2_corrections = await remote.evt_m2Correction.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
+            m1m3_corrections = await remote.evt_m1m3Correction.next(flush=False, timeout=STD_TIMEOUT)
+            m2_corrections = await remote.evt_m2Correction.next(flush=False, timeout=STD_TIMEOUT)
 
             # Add aberration does not send the corrections, we need to send
             # run issueCorrections
@@ -152,15 +144,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # add random values for aberrations (19 zernikes)
             wf = np.random.rand(19) * 0.1
 
-            dof_add_aberration_before = await remote.evt_degreeOfFreedom.aget(
-                timeout=SHORT_TIMEOUT
-            )
+            dof_add_aberration_before = await remote.evt_degreeOfFreedom.aget(timeout=SHORT_TIMEOUT)
 
             remote.evt_degreeOfFreedom.flush()
 
-            await remote.cmd_addAberration.set_start(
-                wf=wf, config=yaml.safe_dump(config), timeout=10.0
-            )
+            await remote.cmd_addAberration.set_start(wf=wf, config=yaml.safe_dump(config), timeout=10.0)
 
             dof_add_aberration_after = await remote.evt_degreeOfFreedom.next(
                 flush=False, timeout=SHORT_TIMEOUT
@@ -187,9 +175,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
             # Test it works if one of the forces get rejected
-            self.cscM1M3.cmd_applyActiveOpticForces.callback = (
-                self.m1m3_apply_forces_fail_callbck
-            )
+            self.cscM1M3.cmd_applyActiveOpticForces.callback = self.m1m3_apply_forces_fail_callbck
 
             remote.evt_degreeOfFreedom.flush()
 
@@ -251,9 +237,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_addAberration_issueCorrection_xref_x0(self) -> None:
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
-        ):
+        async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
             await self._simulateCSCs()
 
             await self._startCsc()
@@ -285,9 +269,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             await remote.cmd_issueCorrection.start(timeout=STD_TIMEOUT)
 
-            dof_first = await remote.evt_degreeOfFreedom.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
+            dof_first = await remote.evt_degreeOfFreedom.next(flush=False, timeout=STD_TIMEOUT)
 
             # Calculate the DOF and issue the correction for second time
             await remote.cmd_addAberration.set_start(
@@ -295,17 +277,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             await remote.cmd_issueCorrection.start(timeout=STD_TIMEOUT)
 
-            dof_second = await remote.evt_degreeOfFreedom.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
+            dof_second = await remote.evt_degreeOfFreedom.next(flush=False, timeout=STD_TIMEOUT)
 
             # The two times calculation of visit DOF should be eqaul under "x0"
             np.testing.assert_array_equal(dof_first.visitDoF, dof_second.visitDoF)
 
     async def test_offsetDOF(self) -> None:
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0
-        ):
+        async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
             await self._simulateCSCs()
 
             await self._startCsc()
@@ -334,22 +312,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             await remote.cmd_offsetDOF.set_start(value=dof_offset, timeout=STD_TIMEOUT)
 
-            dof_second = await remote.evt_degreeOfFreedom.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
+            dof_second = await remote.evt_degreeOfFreedom.next(flush=False, timeout=STD_TIMEOUT)
 
-            assert dof_second.aggregatedDoF[0] - dof_first.aggregatedDoF[
-                0
-            ] == pytest.approx(0.1)
-            assert dof_second.aggregatedDoF[5] - dof_first.aggregatedDoF[
-                5
-            ] == pytest.approx(0.1)
-            assert dof_second.aggregatedDoF[10] - dof_first.aggregatedDoF[
-                10
-            ] == pytest.approx(0.1)
-            assert dof_second.aggregatedDoF[30] - dof_first.aggregatedDoF[
-                30
-            ] == pytest.approx(0.1)
+            assert dof_second.aggregatedDoF[0] - dof_first.aggregatedDoF[0] == pytest.approx(0.1)
+            assert dof_second.aggregatedDoF[5] - dof_first.aggregatedDoF[5] == pytest.approx(0.1)
+            assert dof_second.aggregatedDoF[10] - dof_first.aggregatedDoF[10] == pytest.approx(0.1)
+            assert dof_second.aggregatedDoF[30] - dof_first.aggregatedDoF[30] == pytest.approx(0.1)
 
             assert len(self.m2_hex_corrections) == 1
             assert len(self.cam_hex_corrections) == 1
@@ -381,12 +349,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             np.testing.assert_array_equal(updated_dof.aggregatedDoF, dof_aggr)
 
             # Check final total stress is smaller or equal than the limit
-            final_total_stress = await self.assert_next_sample(
-                remote.evt_mirrorStresses
-            )
-            self.assertLessEqual(
-                final_total_stress.stressM1M3, self.csc.m1m3_stress_limit
-            )
+            final_total_stress = await self.assert_next_sample(remote.evt_mirrorStresses)
+            self.assertLessEqual(final_total_stress.stressM1M3, self.csc.m1m3_stress_limit)
 
     async def test_stress_above_limit_scale(self) -> None:
         # Scenario where stress is above the
@@ -400,15 +364,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self._simulateCSCs()
             remote = self._getRemote()
 
-            await remote.cmd_start.set_start(
-                configurationOverride="valid_scale.yaml", timeout=STD_TIMEOUT
-            )
+            await remote.cmd_start.set_start(configurationOverride="valid_scale.yaml", timeout=STD_TIMEOUT)
 
             await self._startCsc()
 
-            bending_stresses = self.csc.model.ofc.ofc_data.bending_mode_stresses[
-                "M1M3"
-            ]["bending_mode_stress_positive"]
+            bending_stresses = self.csc.model.ofc.ofc_data.bending_mode_stresses["M1M3"][
+                "bending_mode_stress_positive"
+            ]
 
             dof_aggr = np.zeros(50)
             dof_aggr[15] = 100.0
@@ -422,18 +384,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             self.assertAlmostEqual(
                 updated_dof.aggregatedDoF[15],
-                self.csc.m1m3_stress_limit
-                / (self.csc.stress_scale_factor * bending_stresses[5]),
+                self.csc.m1m3_stress_limit / (self.csc.stress_scale_factor * bending_stresses[5]),
                 places=7,
             )
 
             # Check final total stress is smaller or equal than the limit
-            final_total_stress = await self.assert_next_sample(
-                remote.evt_mirrorStresses
-            )
-            self.assertLessEqual(
-                final_total_stress.stressM1M3, self.csc.m1m3_stress_limit
-            )
+            final_total_stress = await self.assert_next_sample(remote.evt_mirrorStresses)
+            self.assertLessEqual(final_total_stress.stressM1M3, self.csc.m1m3_stress_limit)
 
     async def test_stress_above_limit_truncate(self) -> None:
         # Scenario where stress is above the
@@ -463,24 +420,16 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.assertEqual(updated_dof.aggregatedDoF[10], 10.0)
 
             # Check final total stress is smaller or equal than the limit
-            final_total_stress = await self.assert_next_sample(
-                remote.evt_mirrorStresses
-            )
-            self.assertLessEqual(
-                final_total_stress.stressM1M3, self.csc.m1m3_stress_limit
-            )
+            final_total_stress = await self.assert_next_sample(remote.evt_mirrorStresses)
+            self.assertLessEqual(final_total_stress.stressM1M3, self.csc.m1m3_stress_limit)
 
     async def asyncTearDown(self) -> None:
         await self._cancelCSCs()
         await super().asyncTearDown()
 
     async def _simulateCSCs(self) -> None:
-        self.cscM2Hex = salobj.Controller(
-            "MTHexapod", index=mtaos.utility.MTHexapodIndex.M2.value
-        )
-        self.cscCamHex = salobj.Controller(
-            "MTHexapod", index=mtaos.utility.MTHexapodIndex.Camera.value
-        )
+        self.cscM2Hex = salobj.Controller("MTHexapod", index=mtaos.utility.MTHexapodIndex.M2.value)
+        self.cscCamHex = salobj.Controller("MTHexapod", index=mtaos.utility.MTHexapodIndex.Camera.value)
         self.cscM1M3 = salobj.Controller("MTM1M3")
         self.cscM2 = salobj.Controller("MTM2")
 
@@ -498,12 +447,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
         self.cscM2Hex.cmd_moveInSteps.callback = self.hexapod_move_callbck
         self.cscCamHex.cmd_moveInSteps.callback = self.hexapod_move_callbck
-        self.cscM1M3.cmd_clearActiveOpticForces.callback = (
-            self.m1m3_clear_active_optic_forces_callback
-        )
-        self.cscM1M3.cmd_applyActiveOpticForces.callback = (
-            self.m1m3_apply_forces_callbck
-        )
+        self.cscM1M3.cmd_clearActiveOpticForces.callback = self.m1m3_clear_active_optic_forces_callback
+        self.cscM1M3.cmd_applyActiveOpticForces.callback = self.m1m3_apply_forces_callbck
         self.cscM2.cmd_applyForces.callback = self.m2_apply_forces_callbck
         self.cscM2.cmd_resetForceOffsets.callback = self.m2_reset_force_offsets_callback
 
@@ -513,22 +458,16 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         else:
             self.cam_hex_corrections.append(data)
 
-    async def m1m3_clear_active_optic_forces_callback(
-        self, data: type_hints.BaseMsgType
-    ) -> None:
+    async def m1m3_clear_active_optic_forces_callback(self, data: type_hints.BaseMsgType) -> None:
         await asyncio.sleep(1.0)
 
     async def m1m3_apply_forces_callbck(self, data: type_hints.BaseMsgType) -> None:
         self.m1m3_corrections.append(data)
 
-    async def m1m3_apply_forces_fail_callbck(
-        self, data: type_hints.BaseMsgType
-    ) -> None:
+    async def m1m3_apply_forces_fail_callbck(self, data: type_hints.BaseMsgType) -> None:
         raise RuntimeError("This is a test.")
 
-    async def m2_reset_force_offsets_callback(
-        self, data: type_hints.BaseMsgType
-    ) -> None:
+    async def m2_reset_force_offsets_callback(self, data: type_hints.BaseMsgType) -> None:
         await asyncio.sleep(1.0)
 
     async def m2_apply_forces_callbck(self, data: type_hints.BaseMsgType) -> None:
@@ -543,12 +482,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         return self.remote
 
     async def _cancelCSCs(self) -> None:
-        if (
-            self.cscM2Hex is None
-            or self.cscCamHex is None
-            or self.cscM1M3 is None
-            or self.cscM2 is None
-        ):
+        if self.cscM2Hex is None or self.cscCamHex is None or self.cscM1M3 is None or self.cscM2 is None:
             raise RuntimeError("CSCs are not initialized.")
         await asyncio.gather(
             self.cscM2Hex.close(),

@@ -92,11 +92,7 @@ class WavefrontCollection(object):
             x_position, y_position of the sensor, and the radius of
             the donuts in that sensor.
         """
-        zernikes_array = [
-            (sensor_id, zernikes)
-            for sensor_id, zernikes in zernikes_data
-            if len(zernikes) > 0
-        ]
+        zernikes_array = [(sensor_id, zernikes) for sensor_id, zernikes in zernikes_data if len(zernikes) > 0]
         self._collectionData.append(zernikes_array)
         self._collectionRadii.append(radius_data)
 
@@ -116,20 +112,12 @@ class WavefrontCollection(object):
             for sensor_id, zernikes_data in data:
                 if isinstance(zernikes_data, QTable):
                     zk_indices = np.array(
-                        [
-                            int(col[1:])
-                            for col in zernikes_data.colnames
-                            if col.startswith("Z")
-                        ]
+                        [int(col[1:]) for col in zernikes_data.colnames if col.startswith("Z")]
                     )
 
-                    z_columns = [
-                        col for col in zernikes_data.colnames if col.startswith("Z")
-                    ]
+                    z_columns = [col for col in zernikes_data.colnames if col.startswith("Z")]
                     average_row = zernikes_data[zernikes_data["label"] == "average"][0]
-                    zk_values = np.array(
-                        [average_row[col].to(u.um).value for col in z_columns]
-                    )
+                    zk_values = np.array([average_row[col].to(u.um).value for col in z_columns])
 
                     self._collectionDataTaken[sensor_id] = (zk_indices, zk_values)
 
@@ -139,9 +127,7 @@ class WavefrontCollection(object):
                             (self._collectionDataTaken[sensor_id], zernikes_data)
                         )
                     else:
-                        self._collectionDataTaken[sensor_id] = np.array(
-                            zernikes_data, ndmin=2
-                        )
+                        self._collectionDataTaken[sensor_id] = np.array(zernikes_data, ndmin=2)
             self._numDataTaken += 1
         except IndexError:
             data = []
@@ -211,12 +197,8 @@ class WavefrontCollection(object):
                     (
                         sensor_id,
                         (
-                            np.arange(
-                                4, len(self._collectionDataTaken[sensor_id][0]) + 4
-                            ),
-                            np.mean(
-                                np.array(self._collectionDataTaken[sensor_id]), axis=0
-                            ),
+                            np.arange(4, len(self._collectionDataTaken[sensor_id][0]) + 4),
+                            np.mean(np.array(self._collectionDataTaken[sensor_id]), axis=0),
                         ),
                     )
                     for sensor_id in self._collectionDataTaken
