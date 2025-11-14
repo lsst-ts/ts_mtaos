@@ -310,7 +310,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             remote.evt_m2Correction.flush()
 
             # set control algorithm
-            config = dict(filter_name="G", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+            config = dict(name="lsstfam", filter_name="G", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
 
             await remote.cmd_addAberration.set_start(
                 wf=np.zeros(19), config=yaml.safe_dump(config), timeout=STD_TIMEOUT
@@ -343,7 +343,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             remote.evt_m2Correction.flush()
 
             # set control algorithm
-            config = dict(xref="x0", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+            config = dict(name="lsstfam", xref="x0", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
 
             await remote.cmd_addAberration.set_start(
                 wf=np.zeros(19), config=yaml.safe_dump(config), timeout=STD_TIMEOUT
@@ -434,7 +434,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 data_path=self.data_path,
                 ofc_data=ofc_data,
                 run_name=self.run_name,
-                collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all",
+                collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all,LSSTCam/aos/intrinsic",
                 pipeline_instrument=dict(comcam="lsst.obs.lsst.LsstCam"),
                 data_instrument_name=dict(comcam="LSSTCam"),
                 reference_detector=94,
@@ -481,7 +481,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 data_path=self.data_path,
                 ofc_data=ofc_data,
                 run_name=self.run_name,
-                collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all",
+                collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all,LSSTCam/aos/intrinsic",
                 pipeline_instrument=dict(comcam="lsst.obs.lsst.LsstCam"),
                 data_instrument_name=dict(comcam="LSSTCam"),
                 reference_detector=94,
@@ -520,7 +520,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 data_path=self.data_path,
                 ofc_data=ofc_data,
                 run_name=self.run_name,
-                collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all",
+                collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all,LSSTCam/aos/intrinsic",
                 reference_detector=94,
             )
 
@@ -564,7 +564,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 data_path=self.data_path,
                 ofc_data=ofc_data,
                 run_name=self.run_name,
-                collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all",
+                collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all,LSSTCam/aos/intrinsic",
                 reference_detector=94,
             )
 
@@ -596,7 +596,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 data_path=self.data_path,
                 ofc_data=ofc_data,
                 run_name=self.run_name,
-                collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all",
+                collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all,LSSTCam/aos/intrinsic",
                 pipeline_instrument=dict(comcam="lsst.obs.lsst.LsstCam"),
                 data_instrument_name=dict(comcam="LSSTCam"),
                 reference_detector=94,

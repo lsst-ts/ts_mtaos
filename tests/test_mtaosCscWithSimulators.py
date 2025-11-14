@@ -87,7 +87,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             remote.evt_m1m3Correction.flush()
             remote.evt_m2Correction.flush()
 
-            config = dict(filter_name="G", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+            config = dict(name="lsstfam", filter_name="G", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
             await remote.cmd_addAberration.set_start(
                 wf=wfe, config=yaml.safe_dump(config), timeout=STD_TIMEOUT
             )
@@ -258,7 +258,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             wfe[7 - 4] = 1
 
             # set control algorithm
-            config = dict(xref="x0", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+            config = dict(name="lsstfam", xref="x0", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
             # Need to turn the integral gain off
             self.csc.model.ofc.controller.ki = 0.0
 

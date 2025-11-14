@@ -342,6 +342,8 @@ class MTAOS(salobj.ConfigurableCsc):
 
         self.log.debug("ofc data ready. Creating model")
 
+        self.zernike_column_pattern = config.zernike_column_pattern
+
         self._model = Model(
             instrument=config.instrument,
             data_path=config.data_path,
@@ -354,6 +356,8 @@ class MTAOS(salobj.ConfigurableCsc):
             ),
             pipeline_n_processes=config.pipeline_n_processes,
             zernike_table_name=config.zernike_table_name,
+            zernike_column_pattern=self.zernike_column_pattern,
+            subtract_intrinsics=config.subtract_intrinsics,
             elevation_delta_limit_max=config.elevation_delta_limit_max,
             elevation_delta_limit_min=config.elevation_delta_limit_min,
             tilt_offset_threshold=config.tilt_offset_threshold,
