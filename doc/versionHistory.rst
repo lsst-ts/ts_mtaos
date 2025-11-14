@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.24.0
+--------
+
+* In `model.py`, update `WavefrontCollection` initialization to use `zernike_column_pattern` from configuration for flexiblity in using wavefront deviation or total wavefront.
+
 v0.23.4
 --------
 

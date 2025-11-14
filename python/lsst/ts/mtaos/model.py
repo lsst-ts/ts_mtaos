@@ -78,6 +78,8 @@ class Model:
         data_instrument_name: dict | None = None,
         reference_detector: int = 0,
         zernike_table_name: str = "zernikes",
+        zernike_column_pattern: str | None = None,
+        subtract_intrinsics: bool = True,
         elevation_delta_limit_max: float = 9.0,
         elevation_delta_limit_min: float = 4.0,
         tilt_offset_threshold: float = 0.1,
@@ -169,6 +171,11 @@ class Model:
         zernike_table_name : `str`, optional
             Name of the table in the butler with zernike coeffients.
             Default is "zernikes".
+        zernike_column_pattern : str, optional
+            Column names to extract zernikes from the zernike table.
+        subtract_intrinsics : `bool`
+            Whether to subtract intrinsic Zernike coefficients from the
+            wavefront error measurements in OFC.
         elevation_delta_limit_max : `float`
             Maximum elevation change allowed before rejecting corrections.
         elevation_delta_limit_min : `float`
@@ -231,6 +238,10 @@ class Model:
             )
         )
         self.zernike_table_name = zernike_table_name
+        self.zernike_column_pattern = (
+            zernike_column_pattern if zernike_column_pattern is not None else "opd_columns"
+        )
+        self.subtract_intrinsics = subtract_intrinsics
         self.reference_detector = reference_detector
         self.elevation_delta_limit_max = elevation_delta_limit_max
         self.elevation_delta_limit_min = elevation_delta_limit_min
@@ -264,10 +275,10 @@ class Model:
         )
 
         # Collection of calculated list of wavefront error
-        self.wavefront_errors = WavefrontCollection(self.MAX_LEN_QUEUE)
+        self.wavefront_errors = WavefrontCollection(self.zernike_column_pattern, self.MAX_LEN_QUEUE)
 
         # Collection of calculated list of rejected wavefront error
-        self.rejected_wavefront_errors = WavefrontCollection(self.MAX_LEN_QUEUE)
+        self.rejected_wavefront_errors = WavefrontCollection(self.zernike_column_pattern, self.MAX_LEN_QUEUE)
 
         # Dictionary of FWHM (full width at half maximum) sensor data
         self._fwhm_data: dict = dict()
@@ -1210,6 +1221,7 @@ class Model:
             try:
                 self.log.info(
                     f"Querying datasets: zernike_table_name={self.zernike_table_name}, "
+                    f"zernike column: {self.zernike_column_pattern}, "
                     f"{self.run_name=} {pair_id=}."
                 )
                 refs = butler.query_datasets(
@@ -1581,6 +1593,7 @@ class Model:
             sensor_ids=sensor_ids,
             filter_name=filter_name,
             rotation_angle=rotation_angle,
+            subtract_intrinsics=self.subtract_intrinsics,
         )
 
         self.log.debug(
@@ -1684,6 +1697,7 @@ class Model:
                 if key == "name":
                     self.log.debug(f"Configuring ofc_data for new instrument: {key}.")
                     await self.ofc.ofc_data.configure_instrument(kwargs[key])
+                    self.ofc.set_state_estimator()
                 elif key == "controller_filename":
                     self.ofc.set_controller_filename(kwargs[key])
 

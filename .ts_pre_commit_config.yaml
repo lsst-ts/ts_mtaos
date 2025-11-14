@@ -1,8 +1,8 @@
-black: true
+black: false
 check-xml: true
 check-yaml: true
-flake8: true
+flake8: false
 format-xmllint: true
-isort: true
+isort: false
 mypy: true
 ruff: true

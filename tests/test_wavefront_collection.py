@@ -22,8 +22,8 @@
 import unittest
 
 import astropy.units as u
-import numpy as np
 from astropy.table import QTable
+import numpy as np
 from lsst.ts.mtaos import WavefrontCollection
 
 
@@ -31,7 +31,7 @@ class TestWavefrontCollection(unittest.TestCase):
     """Test the CollOfListOfWfErr class."""
 
     def setUp(self) -> None:
-        self.wavefront_collection = WavefrontCollection(10)
+        self.wavefront_collection = WavefrontCollection("opd_columns", 10)
 
     def testGetNumOfData(self) -> None:
         self.assertEqual(self.wavefront_collection.getNumOfData(), 0)
@@ -60,6 +60,10 @@ class TestWavefrontCollection(unittest.TestCase):
                 **{f"Z{j}": np.random.rand(1) * u.nm for j in range(4, 22)},
             }
         )
+        table.meta = {
+            "noll_indices": range(4, 22),
+            "opd_columns": [f"Z{j}" for j in range(4, 22)],
+        }
 
         listSensorId = [1, 2]
         tables_list = [table] * 2
