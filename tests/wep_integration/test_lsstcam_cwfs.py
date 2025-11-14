@@ -74,7 +74,7 @@ class TestLsstCamCornerWavefrontSensor(unittest.IsolatedAsyncioTestCase):
             data_path=data_path,
             ofc_data=ofc_data,
             run_name=run_name,
-            collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all",
+            collections="refcats/gen2,LSSTCam/calib,LSSTCam/raw/all,LSSTCam/aos/intrinsic",
             reference_detector=94,
         )
 
