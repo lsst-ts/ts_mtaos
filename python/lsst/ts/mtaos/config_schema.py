@@ -37,7 +37,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v8
+title: MTAOS v9
 description: Schema for MTAOS configuration files
 type: object
 
@@ -101,6 +101,17 @@ properties:
   zernike_table_name:
     description: Name of the table in the butler with zernike coefficients.
     type: string
+
+  zernike_column_pattern:
+    description: Regular expression pattern to match zernike coefficient columns.
+    type: string
+    enum: ['opd_columns', 'deviation_columns', 'intrinsics_columns']
+
+  subtract_intrinsics:
+    description: >-
+      Whether to subtract intrinsic Zernike coefficients from the
+      wavefront error measurements in OFC.
+    type: boolean
 
   reference_detector:
     description: Which detector to use as a reference for determining the boresight information.

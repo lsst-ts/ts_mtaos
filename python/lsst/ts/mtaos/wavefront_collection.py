@@ -30,14 +30,18 @@ from astropy.table import QTable
 
 
 class WavefrontCollection(object):
-    def __init__(self, maxLeng: int) -> None:
+    def __init__(self, zernike_column_pattern: str, maxLeng: int) -> None:
         """Collection of list of wavefront sensor data.
 
         Parameters
         ----------
+        zernike_column_pattern : str
+            Column names to extract zernikes from the zernike table.
         maxLeng : `int`
             Maximum length of collection.
         """
+        self.zernike_column_pattern = zernike_column_pattern
+
         # Collection of list of wavefront error data
         self._collectionData: deque = deque(maxlen=int(maxLeng))
         self._collectionRadii: deque = deque(maxlen=int(maxLeng))
@@ -111,11 +115,16 @@ class WavefrontCollection(object):
             self._collectionRadiiTaken = radii_data
             for sensor_id, zernikes_data in data:
                 if isinstance(zernikes_data, QTable):
-                    zk_indices = np.array(
-                        [int(col[1:]) for col in zernikes_data.colnames if col.startswith("Z")]
-                    )
+                    zk_indices = zernikes_data.meta["noll_indices"]
+                    z_columns = zernikes_data.meta[self.zernike_column_pattern]
 
-                    z_columns = [col for col in zernikes_data.colnames if col.startswith("Z")]
+                    if len(z_columns) == 0:
+                        raise ValueError(
+                            f"No zernike columns found for the selected column "
+                            f"{self.zernike_column_pattern}. "
+                            f"Check WEP is reporting the right columns in the zernikes table."
+                        )
+
                     average_row = zernikes_data[zernikes_data["label"] == "average"][0]
                     zk_values = np.array([average_row[col].to(u.um).value for col in z_columns])
 
