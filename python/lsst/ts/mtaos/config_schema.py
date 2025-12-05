@@ -37,7 +37,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v9
+title: MTAOS v10
 description: Schema for MTAOS configuration files
 type: object
 
@@ -250,6 +250,28 @@ properties:
       - type: number
       - type: "null"
     default: 900.0
+
+  enable_pointing_correction:
+    description: >-
+      Enable applying pointing correction (MTPtg poriginOffset) alongside AOS corrections.
+    type: boolean
+    default: true
+
+  pointing_correction_matrix:
+    description: >-
+      50x2 matrix mapping the applied DoF vector to pointing correction offsets
+      [x_mm, y_mm] in the focal plane. Rows are ordered as
+      [dzM2, dxM2, dyM2, RxM2, RyM2, dzCam, dxCam, dyCam, RxCam, RyCam,
+      M1M3 modes 1..20, M2 modes 1..20]. Columns are [x_mm, y_mm].
+    type: array
+    minItems: 50
+    maxItems: 50
+    items:
+      type: array
+      minItems: 2
+      maxItems: 2
+      items:
+        type: number
 
 required:
   - camera
