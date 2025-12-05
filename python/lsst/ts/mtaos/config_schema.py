@@ -37,7 +37,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v9
+title: MTAOS v10
 description: Schema for MTAOS configuration files
 type: object
 
