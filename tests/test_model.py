@@ -83,8 +83,13 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
     def tearDown(self) -> None:
         self.model.reset_fwhm_data()
         self.model.reset_wfe_correction()
+        try:
+            if self.isrDir.is_symlink():
+                self.isrDir.unlink()
+        except FileNotFoundError:
+            pass
 
-        shutil.rmtree(self.dataDir)
+        shutil.rmtree(self.dataDir, ignore_errors=True)
         try:
             os.environ.pop("ISRDIRPATH")
         except KeyError:
@@ -181,6 +186,27 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
     def test_get_bending_mode_stresses(self) -> None:
         result = self.model.get_m1m3_bending_mode_stresses()
         self.assertEqual(len(result), 20)
+
+    def test_compute_pointing_correction_offset(self) -> None:
+        # Fresh model
+        local_model = mtaos.Model(instrument="comcam", data_path=None, ofc_data=OFCData("comcam"))
+
+        # If matrix not set -> (0, 0)
+        dx, dy = local_model.compute_pointing_correction_offset(np.zeros(50))
+        self.assertEqual((dx, dy), (0.0, 0.0))
+
+        # Set a simple matrix: x = d[0]; y = 2*d[1]
+        mat = np.zeros((50, 2))
+        mat[0, 0] = 1.0
+        mat[1, 1] = 2.0
+        local_model.set_pointing_correction_matrix(mat)
+
+        d = np.zeros(50)
+        d[0] = 3.0
+        d[1] = 5.0
+        dx, dy = local_model.compute_pointing_correction_offset(d)
+        self.assertAlmostEqual(dx, 3.0, places=3)
+        self.assertAlmostEqual(dy, 10.0, places=3)
 
     def test_add_correction(self) -> None:
         wavefront_errors = np.zeros(19)

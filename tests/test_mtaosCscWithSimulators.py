@@ -20,6 +20,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
+import shutil
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -54,11 +56,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         self.cscCamHex: salobj.Controller | None = None
         self.cscM1M3: salobj.Controller | None = None
         self.cscM2: salobj.Controller | None = None
+        self.cscMtptg: salobj.Controller | None = None
 
         self.m2_hex_corrections: list = []
         self.cam_hex_corrections: list = []
         self.m1m3_corrections: list = []
         self.m2_corrections: list = []
+        self.mtptg_porigin: list = []
 
     def tearDown(self) -> None:
         logFile = Path(mtaos.getLogDir()).joinpath("mtaos.log")
@@ -432,18 +436,23 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         self.cscCamHex = salobj.Controller("MTHexapod", index=mtaos.utility.MTHexapodIndex.Camera.value)
         self.cscM1M3 = salobj.Controller("MTM1M3")
         self.cscM2 = salobj.Controller("MTM2")
+        self.cscMtptg = salobj.Controller("MTPtg")
 
         await asyncio.gather(
-            *[
+            *(
                 controller.start_task
-                for controller in {
+                for controller in [
                     self.cscM2Hex,
                     self.cscCamHex,
                     self.cscM1M3,
                     self.cscM2,
-                }
-            ]
+                    self.cscMtptg,
+                ]
+            )
         )
+
+        # Ensure MTPtg reports ENABLED so MTAOS can issue poriginOffset.
+        await self.cscMtptg.evt_summaryState.set_write(summaryState=salobj.State.ENABLED)
 
         self.cscM2Hex.cmd_moveInSteps.callback = self.hexapod_move_callbck
         self.cscCamHex.cmd_moveInSteps.callback = self.hexapod_move_callbck
@@ -451,6 +460,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         self.cscM1M3.cmd_applyActiveOpticForces.callback = self.m1m3_apply_forces_callbck
         self.cscM2.cmd_applyForces.callback = self.m2_apply_forces_callbck
         self.cscM2.cmd_resetForceOffsets.callback = self.m2_reset_force_offsets_callback
+        self.cscMtptg.cmd_poriginOffset.callback = self.mtptg_porigin_offset_callback
 
     async def hexapod_move_callbck(self, data: type_hints.BaseMsgType) -> None:
         if data.salIndex == mtaos.utility.MTHexapodIndex.M2.value:
@@ -473,6 +483,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def m2_apply_forces_callbck(self, data: type_hints.BaseMsgType) -> None:
         self.m2_corrections.append(data)
 
+    async def mtptg_porigin_offset_callback(self, data: type_hints.BaseMsgType) -> None:
+        self.mtptg_porigin.append((float(data.dx), float(data.dy)))
+
     async def _startCsc(self) -> None:
         remote = self._getRemote()
         await salobj.set_summary_state(remote, salobj.State.ENABLED)
@@ -482,14 +495,99 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         return self.remote
 
     async def _cancelCSCs(self) -> None:
-        if self.cscM2Hex is None or self.cscCamHex is None or self.cscM1M3 is None or self.cscM2 is None:
+        if (
+            self.cscM2Hex is None
+            or self.cscCamHex is None
+            or self.cscM1M3 is None
+            or self.cscM2 is None
+            or self.cscMtptg is None
+        ):
             raise RuntimeError("CSCs are not initialized.")
         await asyncio.gather(
             self.cscM2Hex.close(),
             self.cscCamHex.close(),
             self.cscM1M3.close(),
             self.cscM2.close(),
+            self.cscMtptg.close(),
         )
+
+    async def test_pointing_correction(self) -> None:
+        # Validate that MTPtg poriginOffset is issued once after successful
+        # AOS corrections when pointing correction is enabled.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            async with self.make_csc(
+                initial_state=salobj.State.STANDBY,
+                config_dir=tmpdir,
+                simulation_mode=0,
+            ):
+                await self.assert_next_summary_state(salobj.State.STANDBY)
+                await self._simulateCSCs()
+
+                # Build an ephemeral config enabling POC with a simple
+                # (50x2) matrix
+                # Ensure _init.yaml is present in temp config dir
+                shutil.copy(TEST_CONFIG_DIR / "_init.yaml", Path(tmpdir) / "_init.yaml")
+                config_path = TEST_CONFIG_DIR / "valid_comcam.yaml"
+                with open(config_path) as fp:
+                    config_data = yaml.safe_load(fp)
+                config_data["enable_pointing_correction"] = True
+                mat = [[0.0, 0.0] for _ in range(50)]
+                # Use real matrix values
+                mat[0] = [0.0, 0.0]  # 0 dzHex
+                mat[1] = [-6.272222e-06, 0.0]  # 1 dxM2 -> X: m2_dxy # deg per micron
+                mat[2] = [0.0, -6.272222e-06]  # 2 dyM2 -> Y: m2_dxy # deg per micron
+                mat[3] = [0.0, 0.74514]  # 3 RxM2 -> Y: m2_rxy # deg per deg
+                mat[4] = [0.74514, 0.0]  # 4 RyM2 -> X: m2_rxy # deg per deg
+                mat[5] = [0.0, 0.0]  # 5 dzCam
+                mat[6] = [-5.566667e-06, 0.0]  # 6 dxCam -> X: camera_dxy # deg per micron
+                mat[7] = [0.0, -5.566667e-06]  # 7 dyCam -> Y: camera_dxy # deg per micron
+                mat[8] = [0.0, 0.09834]  # 8 RxCam -> Y: camera_rxy # deg per deg
+                mat[9] = [0.09834, 0.0]  # 9 RyCam -> X: camera_rxy # deg per deg
+                config_data["pointing_correction_matrix"] = mat
+
+                tmp_cfg_name = "valid_pointing_correction_matrix.yaml"
+                tmp_cfg_path = Path(tmpdir) / tmp_cfg_name
+                with open(tmp_cfg_path, "w") as f:
+                    yaml.safe_dump(config_data, f)
+
+                remote = self._getRemote()
+                await remote.cmd_start.set_start(configurationOverride=tmp_cfg_name, timeout=STD_TIMEOUT)
+
+                await self._startCsc()
+
+                zlen = len(self.csc.model.ofc.ofc_data.zn_idx)
+                wfe = np.zeros(zlen)
+                wfe[0] = 0.1
+
+                # Flush events and ensure no prior commands captured
+                remote.evt_m2HexapodCorrection.flush()
+                remote.evt_cameraHexapodCorrection.flush()
+                remote.evt_m1m3Correction.flush()
+                remote.evt_m2Correction.flush()
+                self.m2_hex_corrections.clear()
+                self.cam_hex_corrections.clear()
+                self.m1m3_corrections.clear()
+                self.m2_corrections.clear()
+                self.mtptg_porigin.clear()
+
+                config = dict(filter_name="G", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+                await remote.cmd_addAberration.set_start(
+                    wf=wfe, config=yaml.safe_dump(config), timeout=STD_TIMEOUT
+                )
+
+                await remote.cmd_issueCorrection.start(timeout=STD_TIMEOUT)
+
+                # AOS components each get one command
+                self.assertEqual(len(self.m2_hex_corrections), 1)
+                self.assertEqual(len(self.cam_hex_corrections), 1)
+                self.assertEqual(len(self.m1m3_corrections), 1)
+                self.assertEqual(len(self.m2_corrections), 1)
+
+                # MTPtg poriginOffset should be called exactly once
+                self.assertEqual(len(self.mtptg_porigin), 1)
+                dx, dy = self.mtptg_porigin[0]
+                self.assertIsInstance(dx, float)
+                self.assertIsInstance(dy, float)
 
 
 if __name__ == "__main__":

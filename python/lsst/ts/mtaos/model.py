@@ -316,6 +316,51 @@ class Model:
         self._wep_process_start_lock = asyncio.Lock()
 
         self.reset_wfe_correction()
+        # Pointing correction matrix (50x2) if provided by CSC
+        self._pointing_correction_matrix: np.ndarray | None = None
+
+    def set_pointing_correction_matrix(self, matrix: np.ndarray) -> None:
+        """Set the pointing correction matrix.
+
+        Parameters
+        ----------
+        matrix : np.ndarray
+            Array of shape (50, 2) mapping DoF to [x_mm, y_mm].
+        """
+        mat = np.asarray(matrix, dtype=float)
+        if mat.shape != (50, 2):
+            raise ValueError(f"pointing_correction_matrix must have shape (50,2); got {mat.shape}.")
+        self._pointing_correction_matrix = mat
+
+    def compute_pointing_correction_offset(self, dof_vector: np.ndarray) -> tuple[float, float]:
+        """Compute poriginOffset [x_mm, y_mm] from a DoF vector and
+        sensitivity.
+
+        Parameters
+        ----------
+        dof_vector : np.ndarray
+            DoF vector of shape (50,), ordered as [dzM2, dxM2, dyM2, RxM2,
+            RyM2, dzCam, dxCam, dyCam, RxCam, RyCam, M1M3 modes 1..20,
+            M2 modes 1..20]. This can be the per-visit (lv_dof) change
+            scattered to 50 elements or an aggregated/applied DoF vector.
+
+        Returns
+        -------
+        (x_mm, y_mm) : tuple[float, float]
+            Offsets for MTPtg.poriginOffset.
+
+        Notes
+        -----
+        If the sensitivity matrix is not set, returns (0.0, 0.0).
+        """
+        if self._pointing_correction_matrix is None:
+            return 0.0, 0.0
+        vec = np.asarray(dof_vector, dtype=float).reshape(-1)
+        if vec.shape[0] != 50:
+            raise ValueError(f"dof_vector must have 50 elements; got {vec.shape[0]}.")
+        # d^T · S == (S^T · d) -> 2-vector
+        offsets = np.matmul(self._pointing_correction_matrix.T, vec)
+        return float(offsets[0]), float(offsets[1])
 
     def get_fwhm_sensors(self) -> list[int]:
         """Get list of fwhm sensor ids.

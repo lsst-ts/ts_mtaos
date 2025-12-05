@@ -250,6 +250,9 @@ class MTAOS(salobj.ConfigurableCsc):
 
         self.previous_dofs = None
 
+        # Pointing correction flag
+        self.enable_pointing_correction: bool = False
+
         self.log.info("MTAOS CSC is ready.")
 
     @property
@@ -280,6 +283,9 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
         self.log.debug("MTAOS configuration started.")
 
+        # Read feature flag early to decide if we start MTPtg remote
+        enable_pointing_correction = bool(getattr(config, "enable_pointing_correction", True))
+
         if not self.remotes:
             remotes_parameters = {
                 "m2hex": (
@@ -299,6 +305,13 @@ class MTAOS(salobj.ConfigurableCsc):
                 ),
                 "m2": ("MTM2", None, ["summaryState", "heartbeat", "axialForce"]),
             }
+
+            if enable_pointing_correction:
+                remotes_parameters["mtptg"] = (
+                    "MTPtg",
+                    None,
+                    ["summaryState", "heartbeat"],
+                )
 
             for remote_name in remotes_parameters:
                 component, index, include = remotes_parameters[remote_name]
@@ -408,6 +421,31 @@ class MTAOS(salobj.ConfigurableCsc):
         self.max_ofc_consecutive_failures = config.max_ofc_consecutive_failures
         self.raise_on_large_defocus = config.raise_on_large_defocus
         self.closed_loop_timeout_without_images = config.closed_loop_timeout_without_images
+
+        # Pointing correction: store flag and load matrix
+        self.enable_pointing_correction = enable_pointing_correction
+        if self.enable_pointing_correction:
+            mat = getattr(config, "pointing_correction_matrix", None)
+            if mat is None:
+                # TODO: Remove backward-compatibility once ts_config_mttcs
+                # is updated to provide the matrix.
+                # Backward-compatibility: if enabled but matrix is not
+                # provided in the configuration package, disable the feature
+                # for this run and continue. This prevents start failures when
+                # older configs are used that do not yet define the matrix.
+                self.log.warning(
+                    "enable_pointing_correction=True but no "
+                    "pointing_correction_matrix provided; disabling "
+                    "pointing correction for this run."
+                )
+                self.enable_pointing_correction = False
+            else:
+                mat_np = np.array(mat, dtype=float)
+                if mat_np.shape != (50, 2):
+                    raise salobj.ExpectedError(
+                        f"pointing_correction_matrix must have shape (50,2); got {mat_np.shape}."
+                    )
+                self.model.set_pointing_correction_matrix(mat_np)
 
         self.log.debug("MTAOS configuration completed.")
 
@@ -1477,6 +1515,10 @@ class MTAOS(salobj.ConfigurableCsc):
 
             raise RuntimeError(error_repor)
 
+        # All AOS corrections succeeded
+        if self.enable_pointing_correction:
+            await self.issue_pointing_correction()
+
     async def handle_undo_corrections(self, issued_corrections: dict[str, asyncio.Task]) -> str:
         """Handle undoing corrections.
 
@@ -1521,6 +1563,40 @@ class MTAOS(salobj.ConfigurableCsc):
             error_report += f"Failed to undo correction to: {failed_to_undo}"
 
         return error_report
+
+    async def issue_pointing_correction(self) -> None:
+        """Issue the pointing correction offset via MTPtg."""
+        if not self.enable_pointing_correction:
+            return
+        # Ensure MTPtg is ENABLED before issuing the command
+        try:
+            state_msg = await self.remotes["mtptg"].evt_summaryState.aget(timeout=self.DEFAULT_TIMEOUT)
+            actual_state = salobj.State(state_msg.summaryState)
+        except Exception as e:
+            raise RuntimeError(
+                "Failed to query MTPtg summaryState. Expected: ENABLED. Actual: UNKNOWN."
+            ) from e
+        if actual_state != salobj.State.ENABLED:
+            raise RuntimeError(f"MTPtg is not ENABLED. Expected: ENABLED. Actual: {actual_state.name}.")
+        # Get lv_dof vector
+        dof_visit = self.model.get_dof_lv()
+        if not np.any(dof_visit):
+            self.log.info("Skipping pointing correction: per-visit DOF change is zero.")
+            return
+        x_mm, y_mm = self.model.compute_pointing_correction_offset(dof_visit)
+        try:
+            await self.remotes["mtptg"].cmd_poriginOffset.set_start(
+                dx=float(x_mm),
+                dy=float(y_mm),
+                timeout=self.DEFAULT_TIMEOUT,
+            )
+            self.log.info(
+                f"Successfully issued pointing correction to MTPtg (poriginOffset): "
+                f"dx={x_mm} mm, dy={y_mm} mm."
+            )
+        except Exception:
+            self.log.exception("MTPtg poriginOffset command failed.")
+            raise
 
     async def issue_m2hex_correction(self, undo: bool = False) -> None:
         """Issue the correction of M2 hexapod.
