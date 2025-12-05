@@ -1256,7 +1256,7 @@ class Model:
             n_tables = 189
             n_tables_min = 100
         else:
-            n_tables = 4
+            n_tables = 8
             n_tables_min = 3
 
         self.log.debug(f"Polling for {n_tables} tables. Minimum number of tables: {n_tables_min}.")
