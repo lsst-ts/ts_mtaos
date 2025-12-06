@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.25.1
+--------
+
+In `model.py`, expand the degree-of-freedom vector before computing pointing corrections so the pointing matrix consistently receives 50 inputs, avoiding runtime errors when only a subset of DOFs are active.
+
 v0.25.0
 --------
 
