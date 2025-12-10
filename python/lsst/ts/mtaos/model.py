@@ -64,6 +64,7 @@ class Model:
     FOCAL_RATIO = 1.234
     PIXEL_SIZE = 10
     PIXEL_SCALE = 0.2  # arcsec/pixel
+    EXTRA_DETECTORS = [191, 195, 199, 203]
 
     def __init__(
         self,
@@ -72,6 +73,8 @@ class Model:
         ofc_data: OFCData,
         log: logging.Logger | None = None,
         run_name: str = "mtaos_wep",
+        num_expected_tables: int = 8,
+        num_expected_tables_min: int = 3,
         collections: str = "LSSTComCam/raw/all,LSSTComCam/calib",
         pipeline_instrument: dict | None = None,
         pipeline_n_processes: int = 9,
@@ -109,6 +112,10 @@ class Model:
             Which name to use when running the pipeline task. This defines
             the location where the data is written in the butler.
             Default is "mtaos_wep".
+        num_expected_tables : `int`, optional
+            Number of expected tables to poll from the butler.
+        num_expected_tables_min : `int`, optional
+            Minimum number of expected tables to poll from the butler.
         collections : `str`, optional
             String with the data collections to add to the pipeline task.
             Default is "LSSTComCam/raw/all,LSSTComCam/calib".
@@ -216,6 +223,8 @@ class Model:
         self.instrument = instrument
         self.data_path = data_path
         self.run_name = run_name
+        self.num_expected_tables = num_expected_tables
+        self.num_expected_tables_min = num_expected_tables_min
 
         self.collections = collections
         self.pipeline_instrument = (
@@ -1256,8 +1265,8 @@ class Model:
             n_tables = 189
             n_tables_min = 100
         else:
-            n_tables = 8
-            n_tables_min = 3
+            n_tables = self.num_expected_tables
+            n_tables_min = self.num_expected_tables_min
 
         self.log.debug(f"Polling for {n_tables} tables. Minimum number of tables: {n_tables_min}.")
 
@@ -1497,45 +1506,71 @@ class Model:
             and z is the offset in microns.
         """
         corner_offsets = []
+        butler.query_datasets("donutStampsUnpaired", dataId=ref.dataId, collections=[run_name])
         for ref in refs:
-            donuts_intra = butler.get(
+            has_intra = butler.exists(
                 "donutStampsIntra",
-                dataId=ref.dataId,
-                collections=[run_name],
+                data_id=ref.dataId,
             )
-            if "RADIUS" in donuts_intra.metadata:
-                intra_radius = donuts_intra.metadata.get("RADIUS")
-                if intra_radius <= 0:
-                    self.log.warning("No valid RADIUS values found in donuts_intra.")
-                    intra_radius = np.nan
-            else:
-                self.log.warning(f"Missing RADIUS in donuts_intra for {ref.dataId}.")
-                intra_radius = np.nan
-
-            donuts_extra = butler.get(
+            has_extra = butler.exists(
                 "donutStampsExtra",
-                dataId=ref.dataId,
-                collections=[run_name],
+                data_id=ref.dataId,
             )
-            if "RADIUS" in donuts_extra.metadata:
-                extra_radius = donuts_extra.metadata.get("RADIUS")
-                if extra_radius <= 0:
-                    self.log.warning("No valid RADIUS values found in donuts_extra.")
-                    extra_radius = np.nan
+
+            def get_radius(ds, label):
+                if "RADIUS" in ds.metadata:
+                    r = ds.metadata.get("RADIUS")
+                    if r is None or r <= 0:
+                        self.log.warning(f"Invalid RADIUS in {label} for {ref.dataId}.")
+                        return np.nan
+                    return r
+                self.log.warning(f"Missing RADIUS in {label} for {ref.dataId}.")
+                return np.nan
+            
+            if has_intra and has_extra:
+                donuts_intra = butler.get(
+                    "donutStampsIntra",
+                    dataId=ref.dataId,
+                )
+                donuts_extra = butler.get(
+                    "donutStampsExtra",
+                    dataId=ref.dataId,
+                )
+
+                intra_radius = get_radius(donuts_intra, "donuts_intra")
+                extra_radius = get_radius(donuts_extra, "donuts_extra")
+
+                self.log.info(
+                    f"[Paired] Detector {ref.dataId['detector']}: "
+                    f"intra={intra_radius:.2f} px, extra={extra_radius:.2f} px"
+                )
             else:
-                self.log.warning(f"Missing RADIUS in donuts_extra for {ref.dataId}.")
-                extra_radius = np.nan
+                self.log.warning(
+                    f"Missing intra/extra donuts for {ref.dataId}; "
+                    "using donutStampsCwfs fallback."
+                )
 
-            self.log.info(
-                f"Donut median radii for {ref.dataId['detector']}: "
-                f"intra={intra_radius:.2f} px, "
-                f"extra={extra_radius:.2f} px. "
-            )
+                donuts_cwfs = butler.get(
+                    "donutStampsCwfs",
+                    dataId=ref.dataId,
+                )
+                cwfs_radius = get_radius(donuts_cwfs, "donutStampsCwfs")
 
+                # Use same radius in place of both intra/extra
+                intra_radius = cwfs_radius
+                extra_radius = cwfs_radius
+
+                self.log.info(
+                    f"[Cwfs] Detector {ref.dataId['detector']}: "
+                    f"radius={cwfs_radius:.2f} px"
+                )
+            
             max_radius = np.nanmax([intra_radius, extra_radius])
             detector_offset = self.get_offset_from_radius(max_radius)
             self.log.info(f"Computed out-of-focus offsets from donuts: {detector_offset:.2f} um.")
-            if max_radius == extra_radius:
+            if intra_radius == extra_radius and ref.dataId["detector"] in EXTRA_DETECTORS:
+                detector_offset *= -1
+            elif max_radius == extra_radius:
                 detector_offset *= -1
 
             camera = LsstCam().getCamera()
