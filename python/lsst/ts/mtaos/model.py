@@ -1506,7 +1506,6 @@ class Model:
             and z is the offset in microns.
         """
         corner_offsets = []
-        butler.query_datasets("donutStampsUnpaired", dataId=ref.dataId, collections=[run_name])
         for ref in refs:
             has_intra = butler.exists(
                 "donutStampsIntra",
