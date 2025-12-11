@@ -37,6 +37,7 @@ import eups
 import numpy as np
 import yaml
 from astropy import units as u
+
 from lsst.ts import salobj
 from lsst.ts.ofc import OFCData
 from lsst.ts.utils import astropy_time_from_tai_unix, make_done_future

@@ -36,14 +36,15 @@ from typing import IO, Any
 
 import numpy as np
 import yaml
+
 from lsst.afw.cameraGeom import FIELD_ANGLE
 from lsst.daf.butler import Butler, EmptyQueryResultError
 from lsst.obs.lsst import LsstCam
 from lsst.ts.ofc import OFC, BendModeToForce, Correction, OFCData
 from lsst.ts.ofc.utils.ofc_data_helpers import get_intrinsic_zernikes, get_sensor_names
-from lsst.ts.wep.task.donutStamps import DonutStamps
 from lsst.ts.salobj import DefaultingValidator
 from lsst.ts.utils import make_done_future
+from lsst.ts.wep.task.donutStamps import DonutStamps
 from lsst.ts.wep.utils import writePipetaskCmd
 
 from .config_schema import (

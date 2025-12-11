@@ -22,8 +22,9 @@
 import unittest
 
 import astropy.units as u
-from astropy.table import QTable
 import numpy as np
+from astropy.table import QTable
+
 from lsst.ts.mtaos import WavefrontCollection
 
 
