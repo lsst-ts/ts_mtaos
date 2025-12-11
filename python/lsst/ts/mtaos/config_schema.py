@@ -101,7 +101,7 @@ properties:
   zernike_table_name:
     description: Name of the table in the butler with zernike coefficients.
     type: string
-  
+
   num_expected_tables:
     description: Number of expected tables to poll from the butler.
     type: integer

@@ -41,6 +41,7 @@ from lsst.daf.butler import Butler, EmptyQueryResultError
 from lsst.obs.lsst import LsstCam
 from lsst.ts.ofc import OFC, BendModeToForce, Correction, OFCData
 from lsst.ts.ofc.utils.ofc_data_helpers import get_intrinsic_zernikes, get_sensor_names
+from lsst.ts.wep.task.donutStamps import DonutStamps
 from lsst.ts.salobj import DefaultingValidator
 from lsst.ts.utils import make_done_future
 from lsst.ts.wep.utils import writePipetaskCmd
@@ -1516,7 +1517,7 @@ class Model:
                 data_id=ref.dataId,
             )
 
-            def get_radius(ds, label):
+            def get_radius(ds: DonutStamps, label: str) -> float:
                 if "RADIUS" in ds.metadata:
                     r = ds.metadata.get("RADIUS")
                     if r is None or r <= 0:
@@ -1525,7 +1526,7 @@ class Model:
                     return r
                 self.log.warning(f"Missing RADIUS in {label} for {ref.dataId}.")
                 return np.nan
-            
+
             if has_intra and has_extra:
                 donuts_intra = butler.get(
                     "donutStampsIntra",
@@ -1545,8 +1546,7 @@ class Model:
                 )
             else:
                 self.log.warning(
-                    f"Missing intra/extra donuts for {ref.dataId}; "
-                    "using donutStampsCwfs fallback."
+                    f"Missing intra/extra donuts for {ref.dataId}; using donutStampsCwfs fallback."
                 )
 
                 donuts_cwfs = butler.get(
@@ -1559,11 +1559,8 @@ class Model:
                 intra_radius = cwfs_radius
                 extra_radius = cwfs_radius
 
-                self.log.info(
-                    f"[Cwfs] Detector {ref.dataId['detector']}: "
-                    f"radius={cwfs_radius:.2f} px"
-                )
-            
+                self.log.info(f"[Cwfs] Detector {ref.dataId['detector']}: radius={cwfs_radius:.2f} px")
+
             max_radius = np.nanmax([intra_radius, extra_radius])
             detector_offset = self.get_offset_from_radius(max_radius)
             self.log.info(f"Computed out-of-focus offsets from donuts: {detector_offset:.2f} um.")
