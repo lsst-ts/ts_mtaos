@@ -1567,7 +1567,7 @@ class Model:
             max_radius = np.nanmax([intra_radius, extra_radius])
             detector_offset = self.get_offset_from_radius(max_radius)
             self.log.info(f"Computed out-of-focus offsets from donuts: {detector_offset:.2f} um.")
-            if intra_radius == extra_radius and ref.dataId["detector"] in EXTRA_DETECTORS:
+            if intra_radius == extra_radius and ref.dataId["detector"] in self.EXTRA_DETECTORS:
                 detector_offset *= -1
             elif max_radius == extra_radius:
                 detector_offset *= -1
