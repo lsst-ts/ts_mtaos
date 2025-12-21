@@ -730,6 +730,48 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         timeout=STD_TIMEOUT,
                     )
 
+    async def test_pointing_correction_reconfig_adds_mtptg(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a first-pass config with pointing correction explicitly
+            # disabled and no matrix, so the CSC starts without mtptg.
+            base_cfg_path = TEST_CONFIG_DIR / "valid_lsstcam_enable_pointing.yaml"
+            # Seed with the real _init so default-required keys are present
+            shutil.copy(TEST_CONFIG_DIR / "_init.yaml", Path(tmpdir) / "_init.yaml")
+            shutil.copy(base_cfg_path, Path(tmpdir) / "valid_lsstcam_enable_pointing.yaml")
+            with open(base_cfg_path) as fp:
+                cfg = yaml.safe_load(fp)
+            cfg["enable_pointing_correction"] = False
+            cfg.pop("pointing_correction_matrix", None)
+
+            # Ensure required core keys exist for configure()
+            cfg.setdefault("zernike_column_pattern", "opd_columns")
+            cfg.setdefault("subtract_intrinsics", True)
+
+            first_cfg_name = "pointing_disabled.yaml"
+            with open(Path(tmpdir) / first_cfg_name, "w") as f:
+                yaml.safe_dump(cfg, f)
+
+            async with self.make_csc(
+                initial_state=salobj.State.STANDBY,
+                config_dir=tmpdir,
+                simulation_mode=0,
+            ):
+                await self.remote.cmd_start.set_start(
+                    configurationOverride=first_cfg_name,
+                    timeout=STD_TIMEOUT,
+                )
+                self.assertFalse(self.csc.enable_pointing_correction)
+                self.assertNotIn("mtptg", self.csc.remotes)
+
+                await salobj.set_summary_state(self.remote, salobj.State.STANDBY)
+
+                await self.remote.cmd_start.set_start(
+                    configurationOverride="valid_lsstcam_enable_pointing.yaml",
+                    timeout=STD_TIMEOUT,
+                )
+                self.assertTrue(self.csc.enable_pointing_correction)
+                self.assertIn("mtptg", self.csc.remotes)
+
 
 if __name__ == "__main__":
     # Do the unit test
