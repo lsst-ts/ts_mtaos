@@ -37,6 +37,7 @@ import eups
 import numpy as np
 import yaml
 from astropy import units as u
+
 from lsst.ts import salobj
 from lsst.ts.ofc import OFCData
 from lsst.ts.utils import astropy_time_from_tai_unix, make_done_future
@@ -363,6 +364,8 @@ class MTAOS(salobj.ConfigurableCsc):
             ofc_data=ofc_data,
             log=self.log,
             run_name=config.run_name,
+            num_expected_tables=config.num_expected_tables,
+            num_expected_tables_min=config.num_expected_tables_min,
             collections=config.collections,
             pipeline_instrument=(
                 config.pipeline_instrument if hasattr(config, "pipeline_instrument") else None
