@@ -31,6 +31,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+
 from lsst.daf.butler.registry.interfaces import DatabaseConflictError
 from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
 from lsst.ts import mtaos

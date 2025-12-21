@@ -37,7 +37,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v10
+title: MTAOS v11
 description: Schema for MTAOS configuration files
 type: object
 
@@ -101,6 +101,14 @@ properties:
   zernike_table_name:
     description: Name of the table in the butler with zernike coefficients.
     type: string
+
+  num_expected_tables:
+    description: Number of expected tables to poll from the butler.
+    type: integer
+
+  num_expected_tables_min:
+    description: Minimum number of expected tables to poll from the butler.
+    type: integer
 
   zernike_column_pattern:
     description: Regular expression pattern to match zernike coefficient columns.

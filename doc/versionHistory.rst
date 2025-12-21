@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.26.0
+--------
+
+* Make MTAOS expect 8 sensors to allow the unpaired calcZernikeTask to run online.
+
 v0.25.0
 --------
 
