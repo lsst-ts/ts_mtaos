@@ -2,6 +2,8 @@ camera: comcam
 instrument: lsstfam
 data_path: /repo/LSSTComCam
 run_name: mtaos_wep
+num_expected_tables: 8
+num_expected_tables_min: 3
 collections: "LSSTComCam/raw/all,LSSTComCam/calib"
 pipeline_n_processes: 9
 zernike_table_name: zernikeEstimateRaw

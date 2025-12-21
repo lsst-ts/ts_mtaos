@@ -28,6 +28,7 @@ from unittest.mock import Mock
 
 import numpy as np
 import yaml
+
 from lsst.afw.image import VisitInfo
 from lsst.geom import SpherePoint, degrees
 from lsst.ts import mtaos
