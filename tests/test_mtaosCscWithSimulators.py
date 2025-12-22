@@ -20,8 +20,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
-import shutil
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -515,80 +513,54 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_pointing_correction(self) -> None:
         # Validate that MTPtg poriginOffset is issued once after successful
         # AOS corrections when pointing correction is enabled.
-        with tempfile.TemporaryDirectory() as tmpdir:
-            async with self.make_csc(
-                initial_state=salobj.State.STANDBY,
-                config_dir=tmpdir,
-                simulation_mode=0,
-            ):
-                await self.assert_next_summary_state(salobj.State.STANDBY)
-                await self._simulateCSCs()
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await self.assert_next_summary_state(salobj.State.STANDBY)
+            await self._simulateCSCs()
 
-                # Build an ephemeral config enabling POC with a simple
-                # (50x2) matrix
-                # Ensure _init.yaml is present in temp config dir
-                shutil.copy(TEST_CONFIG_DIR / "_init.yaml", Path(tmpdir) / "_init.yaml")
-                config_path = TEST_CONFIG_DIR / "valid_comcam.yaml"
-                with open(config_path) as fp:
-                    config_data = yaml.safe_load(fp)
-                config_data["enable_pointing_correction"] = True
-                mat = [[0.0, 0.0] for _ in range(50)]
-                # Use real matrix values
-                mat[0] = [0.0, 0.0]  # 0 dzHex
-                mat[1] = [-6.272222e-06, 0.0]  # 1 dxM2 -> X: m2_dxy # deg per micron
-                mat[2] = [0.0, -6.272222e-06]  # 2 dyM2 -> Y: m2_dxy # deg per micron
-                mat[3] = [0.0, 0.74514]  # 3 RxM2 -> Y: m2_rxy # deg per deg
-                mat[4] = [0.74514, 0.0]  # 4 RyM2 -> X: m2_rxy # deg per deg
-                mat[5] = [0.0, 0.0]  # 5 dzCam
-                mat[6] = [-5.566667e-06, 0.0]  # 6 dxCam -> X: camera_dxy # deg per micron
-                mat[7] = [0.0, -5.566667e-06]  # 7 dyCam -> Y: camera_dxy # deg per micron
-                mat[8] = [0.0, 0.09834]  # 8 RxCam -> Y: camera_rxy # deg per deg
-                mat[9] = [0.09834, 0.0]  # 9 RyCam -> X: camera_rxy # deg per deg
-                config_data["pointing_correction_matrix"] = mat
+            remote = self._getRemote()
+            await remote.cmd_start.set_start(
+                timeout=STD_TIMEOUT,
+            )
 
-                tmp_cfg_name = "valid_pointing_correction_matrix.yaml"
-                tmp_cfg_path = Path(tmpdir) / tmp_cfg_name
-                with open(tmp_cfg_path, "w") as f:
-                    yaml.safe_dump(config_data, f)
+            await self._startCsc()
 
-                remote = self._getRemote()
-                await remote.cmd_start.set_start(configurationOverride=tmp_cfg_name, timeout=STD_TIMEOUT)
+            zlen = len(self.csc.model.ofc.ofc_data.zn_idx)
+            wfe = np.zeros(zlen)
+            wfe[0] = 0.1
 
-                await self._startCsc()
+            # Flush events and ensure no prior commands captured
+            remote.evt_m2HexapodCorrection.flush()
+            remote.evt_cameraHexapodCorrection.flush()
+            remote.evt_m1m3Correction.flush()
+            remote.evt_m2Correction.flush()
+            self.m2_hex_corrections.clear()
+            self.cam_hex_corrections.clear()
+            self.m1m3_corrections.clear()
+            self.m2_corrections.clear()
+            self.mtptg_porigin.clear()
 
-                zlen = len(self.csc.model.ofc.ofc_data.zn_idx)
-                wfe = np.zeros(zlen)
-                wfe[0] = 0.1
+            config = dict(filter_name="G", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+            await remote.cmd_addAberration.set_start(
+                wf=wfe, config=yaml.safe_dump(config), timeout=STD_TIMEOUT
+            )
 
-                # Flush events and ensure no prior commands captured
-                remote.evt_m2HexapodCorrection.flush()
-                remote.evt_cameraHexapodCorrection.flush()
-                remote.evt_m1m3Correction.flush()
-                remote.evt_m2Correction.flush()
-                self.m2_hex_corrections.clear()
-                self.cam_hex_corrections.clear()
-                self.m1m3_corrections.clear()
-                self.m2_corrections.clear()
-                self.mtptg_porigin.clear()
+            await remote.cmd_issueCorrection.start(timeout=STD_TIMEOUT)
 
-                config = dict(filter_name="G", sensor_ids=[0, 1, 2, 3, 4, 5, 6, 7, 8])
-                await remote.cmd_addAberration.set_start(
-                    wf=wfe, config=yaml.safe_dump(config), timeout=STD_TIMEOUT
-                )
+            # AOS components each get one command
+            self.assertEqual(len(self.m2_hex_corrections), 1)
+            self.assertEqual(len(self.cam_hex_corrections), 1)
+            self.assertEqual(len(self.m1m3_corrections), 1)
+            self.assertEqual(len(self.m2_corrections), 1)
 
-                await remote.cmd_issueCorrection.start(timeout=STD_TIMEOUT)
-
-                # AOS components each get one command
-                self.assertEqual(len(self.m2_hex_corrections), 1)
-                self.assertEqual(len(self.cam_hex_corrections), 1)
-                self.assertEqual(len(self.m1m3_corrections), 1)
-                self.assertEqual(len(self.m2_corrections), 1)
-
-                # MTPtg poriginOffset should be called exactly once
-                self.assertEqual(len(self.mtptg_porigin), 1)
-                dx, dy = self.mtptg_porigin[0]
-                self.assertIsInstance(dx, float)
-                self.assertIsInstance(dy, float)
+            # MTPtg poriginOffset should be called exactly once
+            self.assertEqual(len(self.mtptg_porigin), 1)
+            dx, dy = self.mtptg_porigin[0]
+            self.assertIsInstance(dx, float)
+            self.assertIsInstance(dy, float)
 
 
 if __name__ == "__main__":
