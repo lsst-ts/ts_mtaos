@@ -1560,7 +1560,7 @@ class Model:
                 )
             else:
                 if butler.exists(
-                    "donutStampsNeural",
+                    "donutStamps",
                     data_id=ref.dataId,
                 ):
                     self.log.info(

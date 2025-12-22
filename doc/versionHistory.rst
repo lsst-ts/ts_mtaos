@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.26.1
+--------
+
+* Fix donutStamps dataset name in model.py to work with TARTS.
+
 v0.26.0
 --------
 
