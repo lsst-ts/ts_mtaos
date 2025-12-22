@@ -36,6 +36,7 @@ from typing import IO, Any
 
 import numpy as np
 import yaml
+
 from lsst.afw.cameraGeom import FIELD_ANGLE
 from lsst.daf.butler import Butler, EmptyQueryResultError
 from lsst.obs.lsst import LsstCam
@@ -43,6 +44,7 @@ from lsst.ts.ofc import OFC, BendModeToForce, Correction, OFCData
 from lsst.ts.ofc.utils.ofc_data_helpers import get_intrinsic_zernikes, get_sensor_names
 from lsst.ts.salobj import DefaultingValidator
 from lsst.ts.utils import make_done_future
+from lsst.ts.wep.task.donutStamps import DonutStamps
 from lsst.ts.wep.utils import writePipetaskCmd
 
 from .config_schema import (
@@ -64,6 +66,7 @@ class Model:
     FOCAL_RATIO = 1.234
     PIXEL_SIZE = 10
     PIXEL_SCALE = 0.2  # arcsec/pixel
+    EXTRA_DETECTORS = [191, 195, 199, 203]
 
     def __init__(
         self,
@@ -72,6 +75,8 @@ class Model:
         ofc_data: OFCData,
         log: logging.Logger | None = None,
         run_name: str = "mtaos_wep",
+        num_expected_tables: int = 8,
+        num_expected_tables_min: int = 3,
         collections: str = "LSSTComCam/raw/all,LSSTComCam/calib",
         pipeline_instrument: dict | None = None,
         pipeline_n_processes: int = 9,
@@ -109,6 +114,10 @@ class Model:
             Which name to use when running the pipeline task. This defines
             the location where the data is written in the butler.
             Default is "mtaos_wep".
+        num_expected_tables : `int`, optional
+            Number of expected tables to poll from the butler.
+        num_expected_tables_min : `int`, optional
+            Minimum number of expected tables to poll from the butler.
         collections : `str`, optional
             String with the data collections to add to the pipeline task.
             Default is "LSSTComCam/raw/all,LSSTComCam/calib".
@@ -216,6 +225,8 @@ class Model:
         self.instrument = instrument
         self.data_path = data_path
         self.run_name = run_name
+        self.num_expected_tables = num_expected_tables
+        self.num_expected_tables_min = num_expected_tables_min
 
         self.collections = collections
         self.pipeline_instrument = (
@@ -1256,8 +1267,8 @@ class Model:
             n_tables = 189
             n_tables_min = 100
         else:
-            n_tables = 4
-            n_tables_min = 3
+            n_tables = self.num_expected_tables
+            n_tables_min = self.num_expected_tables_min
 
         self.log.debug(f"Polling for {n_tables} tables. Minimum number of tables: {n_tables_min}.")
 
@@ -1338,14 +1349,11 @@ class Model:
         """
         self.log.debug("Data processing completed successfully. Gathering output.")
 
-        butler = Butler(self.data_path)  # type: ignore
+        butler = Butler(self.data_path, collections=[run_name])  # type: ignore
 
         # We may need to run the following in an executor so we won't block the
         # event loop.
-        refs = butler.query_datasets(
-            self.zernike_table_name,
-            collections=[run_name],
-        )
+        refs = butler.query_datasets(self.zernike_table_name)
         self.log.debug(
             f"run_name: {run_name}, intra_id: {self.intra_id}, extra_id: {self.extra_id} yielded: {refs}"
         )
@@ -1356,7 +1364,6 @@ class Model:
                 butler.get(
                     self.zernike_table_name,
                     dataId=ref.dataId,
-                    collections=[run_name],
                 ),
             )
             for ref in refs
@@ -1472,6 +1479,33 @@ class Model:
 
         return offset
 
+    def get_radius(self, ds: DonutStamps, label: str, data_id: dict) -> float:
+        """Get the donut radius from the DonutStamps dataset.
+
+        Parameters
+        ----------
+        ds : `DonutStamps`
+            DonutStamps dataset.
+        label : `str`
+            Label for logging purposes.
+        data_id : `dict`
+            Data id for logging purposes.
+
+        Returns
+        -------
+        radius : `float`
+            The radius of the donut in pixels. If not found or invalid,
+            returns `np.nan`.
+        """
+        if "RADIUS" in ds.metadata:
+            r = ds.metadata.get("RADIUS")
+            if r is None or r <= 0:
+                self.log.warning(f"Invalid RADIUS in {label} for {data_id}.")
+                return np.nan
+            return r
+        self.log.warning(f"Missing RADIUS in {label} for {data_id}.")
+        return np.nan
+
     def get_corner_offsets(
         self,
         refs: list,
@@ -1498,44 +1532,64 @@ class Model:
         """
         corner_offsets = []
         for ref in refs:
-            donuts_intra = butler.get(
+            has_intra = butler.exists(
                 "donutStampsIntra",
-                dataId=ref.dataId,
-                collections=[run_name],
+                data_id=ref.dataId,
             )
-            if "RADIUS" in donuts_intra.metadata:
-                intra_radius = donuts_intra.metadata.get("RADIUS")
-                if intra_radius <= 0:
-                    self.log.warning("No valid RADIUS values found in donuts_intra.")
-                    intra_radius = np.nan
-            else:
-                self.log.warning(f"Missing RADIUS in donuts_intra for {ref.dataId}.")
-                intra_radius = np.nan
-
-            donuts_extra = butler.get(
+            has_extra = butler.exists(
                 "donutStampsExtra",
-                dataId=ref.dataId,
-                collections=[run_name],
+                data_id=ref.dataId,
             )
-            if "RADIUS" in donuts_extra.metadata:
-                extra_radius = donuts_extra.metadata.get("RADIUS")
-                if extra_radius <= 0:
-                    self.log.warning("No valid RADIUS values found in donuts_extra.")
-                    extra_radius = np.nan
-            else:
-                self.log.warning(f"Missing RADIUS in donuts_extra for {ref.dataId}.")
-                extra_radius = np.nan
 
-            self.log.info(
-                f"Donut median radii for {ref.dataId['detector']}: "
-                f"intra={intra_radius:.2f} px, "
-                f"extra={extra_radius:.2f} px. "
-            )
+            if has_intra and has_extra:
+                donuts_intra = butler.get(
+                    "donutStampsIntra",
+                    dataId=ref.dataId,
+                )
+                donuts_extra = butler.get(
+                    "donutStampsExtra",
+                    dataId=ref.dataId,
+                )
+
+                intra_radius = self.get_radius(donuts_intra, "donuts_intra", ref.dataId)
+                extra_radius = self.get_radius(donuts_extra, "donuts_extra", ref.dataId)
+
+                self.log.info(
+                    f"[Paired] Detector {ref.dataId['detector']}: "
+                    f"intra={intra_radius:.2f} px, extra={extra_radius:.2f} px"
+                )
+            else:
+                if butler.exists(
+                    "donutStampsNeural",
+                    data_id=ref.dataId,
+                ):
+                    self.log.info(
+                        f"Using neural network donuts for {ref.dataId} "
+                        "no radius is reported for this pipeline yet."
+                    )
+                    return np.array([np.nan])
+                self.log.warning(
+                    f"Missing intra/extra donuts for {ref.dataId}; using donutStampsCwfs fallback."
+                )
+
+                donuts_cwfs = butler.get(
+                    "donutStampsCwfs",
+                    dataId=ref.dataId,
+                )
+                cwfs_radius = self.get_radius(donuts_cwfs, "donutStampsCwfs", ref.dataId)
+
+                # Use same radius in place of both intra/extra
+                intra_radius = cwfs_radius
+                extra_radius = cwfs_radius
+
+                self.log.info(f"[Cwfs] Detector {ref.dataId['detector']}: radius={cwfs_radius:.2f} px")
 
             max_radius = np.nanmax([intra_radius, extra_radius])
             detector_offset = self.get_offset_from_radius(max_radius)
             self.log.info(f"Computed out-of-focus offsets from donuts: {detector_offset:.2f} um.")
-            if max_radius == extra_radius:
+            if intra_radius == extra_radius and ref.dataId["detector"] in self.EXTRA_DETECTORS:
+                detector_offset *= -1
+            elif max_radius == extra_radius:
                 detector_offset *= -1
 
             camera = LsstCam().getCamera()

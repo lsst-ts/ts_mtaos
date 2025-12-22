@@ -11,6 +11,8 @@ pipeline_instrument:
   lsstFamCam: "lsst.obs.lsst.LsstCamTest"
 pipeline_n_processes: 123
 zernike_table_name: zernikeEstimateRawTest
+num_expected_tables: 8
+num_expected_tables_min: 3
 reference_detector: 2
 visit_id_offset: 4000000000000
 m1m3_stress_limit: 137900.0 # Pascals (approx. 20 psi)

@@ -28,6 +28,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 import yaml
+
 from lsst.ts import mtaos, salobj
 from lsst.ts.xml import type_hints
 
