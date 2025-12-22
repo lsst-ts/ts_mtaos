@@ -1581,8 +1581,8 @@ class MTAOS(salobj.ConfigurableCsc):
             ) from e
         if actual_state != salobj.State.ENABLED:
             raise RuntimeError(f"MTPtg is not ENABLED. Expected: ENABLED. Actual: {actual_state.name}.")
-        # Get lv_dof vector
-        dof_visit = self.model.get_dof_lv()
+        # Get lv_dof vector expanded to the 50-element basis
+        dof_visit = self.model.get_dof_lv_full()
         if not np.any(dof_visit):
             self.log.info("Skipping pointing correction: per-visit DOF change is zero.")
             return
