@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.26.2
+--------
+
+* Ensure `configure` re-adds missing remotes (e.g., `mtptg`) when pointing correction is enabled on a reconfigure/state cycle.
+
 v0.26.1
 --------
 
