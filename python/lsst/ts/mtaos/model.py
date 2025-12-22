@@ -1567,7 +1567,7 @@ class Model:
                         f"Using neural network donuts for {ref.dataId} "
                         "no radius is reported for this pipeline yet."
                     )
-                    return np.array([np.nan])
+                    return np.array([])
                 self.log.warning(
                     f"Missing intra/extra donuts for {ref.dataId}; using donutStampsCwfs fallback."
                 )
