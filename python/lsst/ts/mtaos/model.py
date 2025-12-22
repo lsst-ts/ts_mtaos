@@ -1407,6 +1407,7 @@ class Model:
         """
         try:
             sensor_ids, zk_indices, wfe = self.get_wavefront_errors()
+            self.log.debug(f"Retrieved sensor_ids: {sensor_ids}")
             corner_offsets = self.wavefront_errors.getListOfRadiiInTakenData()
 
             dz = np.nan
@@ -1560,14 +1561,14 @@ class Model:
                 )
             else:
                 if butler.exists(
-                    "donutStampsNeural",
+                    "donutStamps",
                     data_id=ref.dataId,
                 ):
                     self.log.info(
                         f"Using neural network donuts for {ref.dataId} "
                         "no radius is reported for this pipeline yet."
                     )
-                    return np.array([np.nan])
+                    return np.array([])
                 self.log.warning(
                     f"Missing intra/extra donuts for {ref.dataId}; using donutStampsCwfs fallback."
                 )
