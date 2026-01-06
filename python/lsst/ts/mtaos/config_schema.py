@@ -37,7 +37,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v11
+title: MTAOS v12
 description: Schema for MTAOS configuration files
 type: object
 
@@ -178,6 +178,31 @@ properties:
       closed loop will not apply the computed corrections.
     type: number
     default: 9.0
+
+  closed_loop_filter_change_gain:
+    description: >-
+      Optional parameters to temporarily override the OFC controller gains
+      (kp, ki, kd) for a number of closed-loop iterations after a filter
+      change is detected.
+    type: object
+    additionalProperties: false
+    properties:
+      n_iter:
+        description: Number of successful OFC iterations to apply the override.
+        type: integer
+        minimum: 0
+      gain:
+        description: Controller gains to use as [kp, ki, kd].
+        anyOf:
+          - type: array
+            items:
+              anyOf:
+                - type: number
+                  minimum: 0
+                - type: "null"
+            minItems: 3
+            maxItems: 3
+          - type: "null"
 
   tilt_offset_threshold:
     description: >-
