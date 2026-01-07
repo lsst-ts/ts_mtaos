@@ -258,6 +258,8 @@ class MTAOS(salobj.ConfigurableCsc):
         self.filter_change_gain_n_iter: int = 0
         self.filter_change_gains: tuple[float | None, float | None, float | None] | None = None
 
+        self.closed_loop_timeout_wep_results: float = 75.0
+
         self.log.info("MTAOS CSC is ready.")
 
     @property
@@ -437,6 +439,7 @@ class MTAOS(salobj.ConfigurableCsc):
         self.max_ofc_consecutive_failures = config.max_ofc_consecutive_failures
         self.raise_on_large_defocus = config.raise_on_large_defocus
         self.closed_loop_timeout_without_images = config.closed_loop_timeout_without_images
+        self.closed_loop_timeout_wep_results = config.closed_loop_timeout_wep_results
 
         # Pointing correction: store flag and load matrix
         self.enable_pointing_correction = enable_pointing_correction
@@ -840,7 +843,10 @@ class MTAOS(salobj.ConfigurableCsc):
                     self.execution_times["RUN_WEP"] = []
                 self.execution_times["RUN_WEP"].append(time.time() - start_time)
 
-                await self.model.query_ocps_results(self.model.instrument)
+                await self.model.query_ocps_results(
+                    self.model.instrument,
+                    timeout=self.closed_loop_timeout_wep_results,
+                )
         else:
             if timestamp is None or identity is None:
                 raise ValueError("Timestamp and identity must be provided when not using OCPS.")

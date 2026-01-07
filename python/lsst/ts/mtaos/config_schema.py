@@ -284,6 +284,12 @@ properties:
       - type: "null"
     default: 900.0
 
+  closed_loop_timeout_wep_results:
+    description: >-
+      Timeout to wait for wep results in the closed loop (seconds).
+    type: number
+    default: 75.0
+
   enable_pointing_correction:
     description: >-
       Enable applying pointing correction (MTPtg poriginOffset) alongside AOS corrections.
