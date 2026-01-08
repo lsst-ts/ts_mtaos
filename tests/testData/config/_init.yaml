@@ -26,6 +26,10 @@ use_ocps: False
 used_dofs: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 raise_on_large_defocus: True
 closed_loop_timeout_without_images: 900.0 # seconds (15 minutes)
+closed_loop_timeout_wep_results: 75.0 # seconds
+closed_loop_filter_change_gain:
+  n_iter: 2
+  gain: [0.75, 0.0, 0.0]
 enable_pointing_correction: true
 pointing_correction_matrix:
   - [0.1, 0.0]

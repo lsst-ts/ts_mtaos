@@ -1,0 +1,3 @@
+closed_loop_filter_change_gain:
+  n_iter: 3
+  gain: [1.0, 0.5, null]

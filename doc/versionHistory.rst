@@ -2,6 +2,12 @@
 Version History
 ===============
 
+v0.27.0
+--------
+
+* Add a mechanism to temporarily override OFC controller gains (kp, ki, kd) for a configurable number of closed-loop iterations after filter changes.
+* Add configurable timeout parameter ``closed_loop_timeout_wep_results`` for waiting on WEP results from OCPS when using ``query_ocps_results()``.
+
 v0.26.1
 --------
 
