@@ -26,6 +26,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import numpy as np
 import pytest
@@ -729,6 +730,109 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         configurationOverride=tmp_cfg_name,
                         timeout=STD_TIMEOUT,
                     )
+
+    async def test_configure_filter_change_override_gains(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            # Start with default config to test _init.yaml defaults.
+            await self.remote.cmd_start.set_start(timeout=STD_TIMEOUT)
+
+            # Default values from _init.yaml
+            self.assertEqual(self.csc.filter_change_gain_n_iter, 2)
+            self.assertEqual(self.csc.filter_change_gains, (0.75, 0.0, 0.0))
+
+            # A config override can change the defaults.
+            await salobj.set_summary_state(self.remote, salobj.State.STANDBY)
+            await self.remote.cmd_start.set_start(
+                configurationOverride="closed_loop_filter_change_gain.yaml",
+                timeout=STD_TIMEOUT,
+            )
+            self.assertEqual(self.csc.filter_change_gain_n_iter, 3)
+            # Mixed behavior in one config: 0.5 is a valid override value and
+            # null means "do not override".
+            self.assertEqual(self.csc.filter_change_gains, (1.0, 0.5, None))
+
+    async def test_execute_ofc_filter_change_gains_override_and_restore(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await self.remote.cmd_start.set_start(
+                configurationOverride="valid_comcam.yaml", timeout=STD_TIMEOUT
+            )
+
+            csc = self.csc
+            controller = csc.model.ofc.controller
+            controller.kp, controller.ki, controller.kd = 1.0, 2.0, 3.0
+
+            # Stub out event publishers and OFC-data mutation to keep this unit
+            # test focused on gain override/restore behavior.
+            csc.pubEvent_degreeOfFreedom = AsyncMock()
+            csc.pubEvent_mirrorStresses = AsyncMock()
+            csc.pubEvent_m2HexapodCorrection = AsyncMock()
+            csc.pubEvent_cameraHexapodCorrection = AsyncMock()
+            csc.pubEvent_m1m3Correction = AsyncMock()
+            csc.pubEvent_m2Correction = AsyncMock()
+            csc.pubEvent_ofcDuration = AsyncMock()
+            csc.model.set_ofc_data_values = AsyncMock(return_value={})
+
+            csc.execution_times.setdefault("CALCULATE_CORRECTIONS", [])
+
+            seen_gains: list[tuple[float, float, float]] = []
+
+            def calculate_corrections_stub(*args: object, **kwargs: object) -> None:
+                seen_gains.append((controller.kp, controller.ki, controller.kd))
+
+            csc.model.calculate_corrections = calculate_corrections_stub
+
+            csc.filter_change_gains = (0.9, 0.1, 0.1)
+            await csc._execute_ofc(
+                userGain=0.0,
+                config="",
+                timeout=STD_TIMEOUT,
+                apply_filter_change_override=True,
+                raise_on_large_defocus=False,
+            )
+
+            self.assertEqual(seen_gains[-1], (0.9, 0.1, 0.1))
+            self.assertEqual((controller.kp, controller.ki, controller.kd), (1.0, 2.0, 3.0))
+
+            def calculate_corrections_raises(*args: object, **kwargs: object) -> None:
+                seen_gains.append((controller.kp, controller.ki, controller.kd))
+                raise RuntimeError("boom")
+
+            csc.model.calculate_corrections = calculate_corrections_raises
+
+            csc.filter_change_gains = (0.5, 0.1, 0.0)
+            with self.assertRaises(RuntimeError):
+                await csc._execute_ofc(
+                    userGain=0.0,
+                    config="",
+                    timeout=STD_TIMEOUT,
+                    apply_filter_change_override=True,
+                    raise_on_large_defocus=False,
+                )
+
+            self.assertEqual(seen_gains[-1], (0.5, 0.1, 0.0))
+            self.assertEqual((controller.kp, controller.ki, controller.kd), (1.0, 2.0, 3.0))
+
+            # Partial override: override kp and explicitly set ki=0.0;
+            # keep kd unchanged.
+            csc.model.calculate_corrections = calculate_corrections_stub
+            csc.filter_change_gains = (1.0, 0.0, None)
+            await csc._execute_ofc(
+                userGain=0.2,
+                config="",
+                timeout=STD_TIMEOUT,
+                apply_filter_change_override=True,
+                raise_on_large_defocus=False,
+            )
+            self.assertEqual(seen_gains[-1], (1.0, 0.0, 3.0))
+            self.assertEqual((controller.kp, controller.ki, controller.kd), (1.0, 2.0, 3.0))
 
 
 if __name__ == "__main__":

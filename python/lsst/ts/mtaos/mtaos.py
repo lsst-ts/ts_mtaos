@@ -254,6 +254,12 @@ class MTAOS(salobj.ConfigurableCsc):
         # Pointing correction flag
         self.enable_pointing_correction: bool = False
 
+        # Closed-loop gain override after filter changes.
+        self.filter_change_gain_n_iter: int = 0
+        self.filter_change_gains: tuple[float | None, float | None, float | None] | None = None
+
+        self.closed_loop_timeout_wep_results: float = 75.0
+
         self.log.info("MTAOS CSC is ready.")
 
     @property
@@ -283,6 +289,15 @@ class MTAOS(salobj.ConfigurableCsc):
         """
         self._logExecFunc()
         self.log.debug("MTAOS configuration started.")
+
+        cfg_fc_gain = getattr(config, "closed_loop_filter_change_gain", None)
+        if cfg_fc_gain is not None:
+            n_iter = cfg_fc_gain.get("n_iter", 0)
+            gains = cfg_fc_gain.get("gain", None)
+
+            self.filter_change_gain_n_iter = int(n_iter)
+            if gains is not None:
+                self.filter_change_gains = tuple(gains)
 
         # Read feature flag early to decide if we start MTPtg remote
         enable_pointing_correction = bool(getattr(config, "enable_pointing_correction", True))
@@ -424,6 +439,7 @@ class MTAOS(salobj.ConfigurableCsc):
         self.max_ofc_consecutive_failures = config.max_ofc_consecutive_failures
         self.raise_on_large_defocus = config.raise_on_large_defocus
         self.closed_loop_timeout_without_images = config.closed_loop_timeout_without_images
+        self.closed_loop_timeout_wep_results = config.closed_loop_timeout_wep_results
 
         # Pointing correction: store flag and load matrix
         self.enable_pointing_correction = enable_pointing_correction
@@ -827,7 +843,10 @@ class MTAOS(salobj.ConfigurableCsc):
                     self.execution_times["RUN_WEP"] = []
                 self.execution_times["RUN_WEP"].append(time.time() - start_time)
 
-                await self.model.query_ocps_results(self.model.instrument)
+                await self.model.query_ocps_results(
+                    self.model.instrument,
+                    timeout=self.closed_loop_timeout_wep_results,
+                )
         else:
             if timestamp is None or identity is None:
                 raise ValueError("Timestamp and identity must be provided when not using OCPS.")
@@ -893,24 +912,50 @@ class MTAOS(salobj.ConfigurableCsc):
         userGain: float,
         config: str,
         timeout: float,
+        apply_filter_change_override: bool = False,
         raise_on_large_defocus: bool = False,
     ) -> None:
         """Handles the core logic of running the OFC,
         sending calls to the model to compute corrections.
 
+        Notes
+        -----
+        If `apply_filter_change_override` is True, the controller gains from
+        `self.filter_change_gains` temporarily override the corresponding
+        controller gains for the duration of this call. Any `None` entries
+        mean "do not override" that gain. Original gains are restored to
+        their pre-call values before returning.
+
         Parameters
         ----------
         userGain : float
             User gain to be used for the OFC controller.
+        apply_filter_change_override : bool
+            Whether to apply filter-change gain overrides from
+            self.filter_change_gains.
         config : str
             Configuration for the OFC process.
         timeout : float
             Timeout for the OFC process.
         """
         async with self.issue_correction_lock:
-            kp = self.model.ofc.controller.kp
+            kp, ki, kd = (
+                self.model.ofc.controller.kp,
+                self.model.ofc.controller.ki,
+                self.model.ofc.controller.kd,
+            )
+
             if userGain != 0.0:
                 self.model.ofc.controller.kp = userGain
+
+            if apply_filter_change_override and self.filter_change_gains is not None:
+                kp_override, ki_override, kd_override = self.filter_change_gains
+                if kp_override is not None:
+                    self.model.ofc.controller.kp = kp_override
+                if ki_override is not None:
+                    self.model.ofc.controller.ki = ki_override
+                if kd_override is not None:
+                    self.model.ofc.controller.kd = kd_override
 
             loaded_config = yaml.safe_load(config) if len(config) > 0 else dict()
 
@@ -953,7 +998,10 @@ class MTAOS(salobj.ConfigurableCsc):
 
                 self.log.info("Restore ofc data values.")
                 await self.model.set_ofc_data_values(**original_ofc_data_values)
+
                 self.model.ofc.controller.kp = kp
+                self.model.ofc.controller.ki = ki
+                self.model.ofc.controller.kd = kd
 
             while len(self.execution_times["CALCULATE_CORRECTIONS"]) > self.MAX_TIME_SAMPLE:
                 self.execution_times["CALCULATE_CORRECTIONS"].pop(0)
@@ -1130,6 +1178,8 @@ class MTAOS(salobj.ConfigurableCsc):
         self._logExecFunc()
 
         prev_elevation = None
+        prev_filter: str | None = None
+        filter_gain_override_iters_left = 0
         oods_name = "MTOODS" if self.camera_name == "LSSTCam" else "CCOODS"
         camera_name = "MTCamera"
         self.log.info(f"Starting closed loop for {oods_name}.")
@@ -1235,6 +1285,18 @@ class MTAOS(salobj.ConfigurableCsc):
                         self.camera_name,
                     )
 
+                    filter_changed = prev_filter is not None and filter_label != prev_filter
+
+                    # Start a gain override window after a filter change.
+                    if self.filter_change_gain_n_iter > 0 and filter_changed:
+                        filter_gain_override_iters_left = self.filter_change_gain_n_iter
+                        self.log.info(
+                            f"Filter change detected in closed loop: {prev_filter} -> {filter_label}. "
+                            f"Applying gain override for {filter_gain_override_iters_left} successful "
+                            f"OFC iterations. Using gains (kp, ki, kd): {self.filter_change_gains}."
+                        )
+                    prev_filter = filter_label
+
                     if image_in_oods.obsid in self.image_rotator:
                         rotation_angle = float(np.mean(np.array(self.image_rotator[image_in_oods.obsid])))
                     else:
@@ -1319,13 +1381,37 @@ class MTAOS(salobj.ConfigurableCsc):
                         config_yaml = yaml.safe_dump(config)
 
                         try:
+                            use_filter_gain_override = filter_gain_override_iters_left > 0
+
+                            if use_filter_gain_override:
+                                self.log.info(
+                                    "Applying filter change gain override iteration "
+                                    f"{self.filter_change_gain_n_iter - filter_gain_override_iters_left + 1}/"
+                                    f"{self.filter_change_gain_n_iter} with gains {self.filter_change_gains}."
+                                )
+
                             await self._execute_ofc(
                                 userGain=gain,
                                 config=config_yaml,
                                 timeout=self.CMD_TIMEOUT,
+                                apply_filter_change_override=use_filter_gain_override,
                                 raise_on_large_defocus=self.raise_on_large_defocus,
                             )
                             ofc_failure_count = 0
+
+                            if use_filter_gain_override:
+                                filter_gain_override_iters_left -= 1
+                                if filter_gain_override_iters_left == 0:
+                                    self.log.info(
+                                        "Filter change gain override complete. "
+                                        f"Completed all {self.filter_change_gain_n_iter} iterations. "
+                                        "Reverting to normal gains."
+                                    )
+                                else:
+                                    self.log.info(
+                                        "Filter change gain override iteration complete. "
+                                        f"{filter_gain_override_iters_left} iterations remaining."
+                                    )
                         except Exception as e:
                             ofc_failure_count += 1
                             if ofc_failure_count >= self.max_ofc_consecutive_failures:

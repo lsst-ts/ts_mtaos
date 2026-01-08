@@ -804,7 +804,7 @@ class Model:
     async def query_ocps_results(
         self,
         instrument: str,
-        timeout: int = 300,
+        timeout: float = 300,
     ) -> None:
         """Query the OCPS results.
 
@@ -812,7 +812,7 @@ class Model:
         ----------
         instrument : `str`
             Name of the instrument to query results for.
-        timeout : `int`, optional
+        timeout : `float`, optional
             Timeout in seconds for the query. Default is 300 seconds.
         """
         wavefront_results, radii_results = await self._poll_butler_outputs(
@@ -1228,8 +1228,8 @@ class Model:
     async def _poll_butler_outputs(
         self,
         instrument: str,
-        timeout: int,
-        poll_interval: int = 5,
+        timeout: float,
+        poll_interval: float = 5,
     ) -> tuple[list, list]:
         """
         Poll the Butler for the outputs of a given run
@@ -1239,9 +1239,9 @@ class Model:
         ----------
         instrument : `str`
             Camera used to take the data.
-        timeout : `int`, optional
+        timeout : `float`, optional
             Maximum time to wait for the outputs (in seconds).
-        poll_interval : `int`, optional
+        poll_interval : `float`, optional
             How often to poll for the data (in seconds).
 
         Returns
