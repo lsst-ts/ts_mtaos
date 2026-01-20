@@ -389,6 +389,7 @@ class MTAOS(salobj.ConfigurableCsc):
             zernike_table_name=config.zernike_table_name,
             zernike_column_pattern=self.zernike_column_pattern,
             subtract_intrinsics=config.subtract_intrinsics,
+            control_vmodes=config.control_vmodes,
             elevation_delta_limit_max=config.elevation_delta_limit_max,
             elevation_delta_limit_min=config.elevation_delta_limit_min,
             tilt_offset_threshold=config.tilt_offset_threshold,

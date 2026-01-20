@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.27.1
+--------
+
+* Add control_vmodes as a configuration to MTAOS to set whether to ask OFC to control in vmode basis or dof basis.
+
 v0.27.0
 --------
 
