@@ -516,15 +516,15 @@ class Model:
         self.intra_id = intra_id
         self.extra_id = extra_id
 
-    def get_gains(self) -> tuple[float, float, float]:
+    def get_gains(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get the gains used when deriving ofc corrections
         Returns
         -------
-        kp_gain : `float`
+        kp_gain : `np.ndarray`
             Proportional gain
-        ki_gain : `float`
+        ki_gain : `np.ndarray`
             Integral gain
-        kd_gain : `float`
+        kd_gain : `np.ndarray`
             Derivative gain
         """
         return self.ofc.controller.kp, self.ofc.controller.ki, self.ofc.controller.kd

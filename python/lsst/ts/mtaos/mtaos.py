@@ -31,6 +31,7 @@ import logging
 import time
 import traceback
 import typing
+from collections.abc import Iterable
 from typing import Any
 
 import eups
@@ -1886,7 +1887,7 @@ class MTAOS(salobj.ConfigurableCsc):
                 sensorId=sensor_id,
                 nollZernikeIndices=zernike_indices_extended,
                 nollZernikeValues=zernike_values_extended,
-                visitId=visit_id % 100000,
+                visitId=visit_id,
                 extraId=extra_id,
                 force_output=True,
             )
@@ -1912,7 +1913,7 @@ class MTAOS(salobj.ConfigurableCsc):
                 sensorId=sensor_id,
                 nollZernikeIndices=zernike_indices_extended,
                 nollZernikeValues=zernike_values_extended,
-                visitId=visit_id % 100000,
+                visitId=visit_id,
                 extraId=extra_id,
                 force_output=True,
             )
@@ -1930,14 +1931,21 @@ class MTAOS(salobj.ConfigurableCsc):
         dof_visit = model.get_dof_lv()
         visit_id, extra_id = model.get_visit_ids()
         kp_gain, ki_gain, kd_gain = model.get_gains()
+        focus_index = 0
         await self.evt_degreeOfFreedom.set_write(
             aggregatedDoF=dof_aggr,
             visitDoF=dof_visit,
-            visitId=visit_id % 100000,
+            visitId=visit_id,
             extraId=extra_id,
-            kpGain=kp_gain,
-            kiGain=ki_gain,
-            kdGain=kd_gain,
+            kpGain=kp_gain
+            if isinstance(self.evt_degreeOfFreedom.DataType().kpGain, Iterable)
+            else kp_gain[focus_index],
+            kiGain=ki_gain
+            if isinstance(self.evt_degreeOfFreedom.DataType().kiGain, Iterable)
+            else ki_gain[focus_index],
+            kdGain=kd_gain
+            if isinstance(self.evt_degreeOfFreedom.DataType().kdGain, Iterable)
+            else kd_gain[focus_index],
             force_output=True,
         )
 
@@ -1975,14 +1983,21 @@ class MTAOS(salobj.ConfigurableCsc):
         dof_visit = model.get_dof_lv()
         visit_id, extra_id = model.get_visit_ids()
         kp_gain, ki_gain, kd_gain = model.get_gains()
+        focus_index = 0
         await self.evt_rejectedDegreeOfFreedom.set_write(
             aggregatedDoF=dof_aggr,
             visitDoF=dof_visit,
-            visitId=visit_id % 100000,
+            visitId=visit_id,
             extraId=extra_id,
-            kpGain=kp_gain,
-            kiGain=ki_gain,
-            kdGain=kd_gain,
+            kpGain=kp_gain
+            if isinstance(self.evt_degreeOfFreedom.DataType().kpGain, Iterable)
+            else kp_gain[focus_index],
+            kiGain=ki_gain
+            if isinstance(self.evt_degreeOfFreedom.DataType().kiGain, Iterable)
+            else ki_gain[focus_index],
+            kdGain=kd_gain
+            if isinstance(self.evt_degreeOfFreedom.DataType().kdGain, Iterable)
+            else kd_gain[focus_index],
             force_output=True,
         )
 
@@ -2002,7 +2017,7 @@ class MTAOS(salobj.ConfigurableCsc):
             u=u,
             v=v,
             w=w,
-            visitId=visit_id % 100000,
+            visitId=visit_id,
             extraId=extra_id,
             force_output=True,
         )
@@ -2023,7 +2038,7 @@ class MTAOS(salobj.ConfigurableCsc):
             u=u,
             v=v,
             w=w,
-            visitId=visit_id % 100000,
+            visitId=visit_id,
             extraId=extra_id,
             force_output=True,
         )
@@ -2044,7 +2059,7 @@ class MTAOS(salobj.ConfigurableCsc):
             u=u,
             v=v,
             w=w,
-            visitId=visit_id % 100000,
+            visitId=visit_id,
             extraId=extra_id,
             force_output=True,
         )
@@ -2065,7 +2080,7 @@ class MTAOS(salobj.ConfigurableCsc):
             u=u,
             v=v,
             w=w,
-            visitId=visit_id % 100000,
+            visitId=visit_id,
             extraId=extra_id,
             force_output=True,
         )
@@ -2081,7 +2096,7 @@ class MTAOS(salobj.ConfigurableCsc):
         visit_id, extra_id = model.get_visit_ids()
         await self.evt_m1m3Correction.set_write(
             zForces=z_forces,
-            visitId=visit_id % 100000,
+            visitId=visit_id,
             extraId=extra_id,
             force_output=True,
         )
@@ -2097,7 +2112,7 @@ class MTAOS(salobj.ConfigurableCsc):
         visit_id, extra_id = model.get_visit_ids()
         await self.evt_rejectedM1M3Correction.set_write(
             zForces=z_forces,
-            visitId=visit_id % 100000,
+            visitId=visit_id,
             extraId=extra_id,
             force_output=True,
         )
@@ -2113,7 +2128,7 @@ class MTAOS(salobj.ConfigurableCsc):
         visit_id, extra_id = model.get_visit_ids()
         await self.evt_m2Correction.set_write(
             zForces=z_forces,
-            visitId=visit_id % 100000,
+            visitId=visit_id,
             extraId=extra_id,
             force_output=True,
         )
@@ -2129,7 +2144,7 @@ class MTAOS(salobj.ConfigurableCsc):
         visit_id, extra_id = model.get_visit_ids()
         await self.evt_rejectedM2Correction.set_write(
             zForces=z_forces,
-            visitId=visit_id % 100000,
+            visitId=visit_id,
             extraId=extra_id,
             force_output=True,
         )
