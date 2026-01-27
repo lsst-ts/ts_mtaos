@@ -1366,7 +1366,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
                     prev_elevation = elevation
 
-                    if gain > 0.0:
+                    if np.any(gain > 0.0):
                         config = (
                             yaml.safe_load(self.last_run_ofc_configuration)
                             if self.last_run_ofc_configuration
