@@ -911,7 +911,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
     async def _execute_ofc(
         self,
-        userGain: float,
+        userGain: float | np.ndarray,
         config: str,
         timeout: float,
         apply_filter_change_override: bool = False,
@@ -930,7 +930,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        userGain : float
+        userGain : float | np.ndarray
             User gain to be used for the OFC controller.
         apply_filter_change_override : bool
             Whether to apply filter-change gain overrides from
@@ -947,7 +947,7 @@ class MTAOS(salobj.ConfigurableCsc):
                 self.model.ofc.controller.kd,
             )
 
-            if userGain != 0.0:
+            if np.any(userGain != 0.0):
                 self.model.ofc.controller.kp = userGain
 
             if apply_filter_change_override and self.filter_change_gains is not None:

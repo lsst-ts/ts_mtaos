@@ -1189,7 +1189,7 @@ class Model:
         self,
         previous_elevation: float | None,
         camera_name: str,
-    ) -> float:
+    ) -> float | np.ndarray:
         """Check if corrections are supposed to be applied.
 
         Parameters
@@ -1199,7 +1199,7 @@ class Model:
 
         Returns
         -------
-        gain : `float`
+        gain : `float` or `np.ndarray`
             Gain to apply to the corrections.
         """
         _, elevation = await self.get_image_info(
@@ -1212,7 +1212,7 @@ class Model:
                 f"Large elevation change detected: {elevation} - {previous_elevation} = {elevation_diff}. "
                 "Rejecting corrections."
             )
-            return 0.0  # No corrections applied
+            return np.zeros(self.ofc.ofc_data.ndofs)  # No corrections applied
 
         if elevation_diff <= self.elevation_delta_limit_min:
             return self.ofc.controller.kp
