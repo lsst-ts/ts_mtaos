@@ -1425,7 +1425,8 @@ class MTAOS(salobj.ConfigurableCsc):
                             else:
                                 self.log.warning(
                                     "OFC execution failed. Failures: "
-                                    f"{ofc_failure_count}/{self.max_ofc_consecutive_failures}."
+                                    f"{ofc_failure_count}/{self.max_ofc_consecutive_failures}.",
+                                    exc_info=True,
                                 )
                                 continue
 
