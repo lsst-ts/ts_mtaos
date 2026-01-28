@@ -9,6 +9,7 @@ pipeline_n_processes: 9
 zernike_table_name: zernikeEstimateRaw
 zernike_column_pattern: opd_columns
 subtract_intrinsics: True
+control_vmodes: False
 reference_detector: 0
 visit_id_offset: 0
 m1m3_stress_limit: 137900.0 # Pascals (approx. 20 psi)

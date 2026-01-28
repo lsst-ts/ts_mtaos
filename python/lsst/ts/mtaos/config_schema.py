@@ -37,7 +37,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v12
+title: MTAOS v13
 description: Schema for MTAOS configuration files
 type: object
 
@@ -119,6 +119,12 @@ properties:
     description: >-
       Whether to subtract intrinsic Zernike coefficients from the
       wavefront error measurements in OFC.
+    type: boolean
+
+  control_vmodes:
+    description: >-
+      Whether to control in v-modes space. If False, control is done in DOF
+      space.
     type: boolean
 
   reference_detector:

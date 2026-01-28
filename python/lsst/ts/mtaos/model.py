@@ -85,6 +85,7 @@ class Model:
         zernike_table_name: str = "zernikes",
         zernike_column_pattern: str | None = None,
         subtract_intrinsics: bool = True,
+        control_vmodes: bool = False,
         elevation_delta_limit_max: float = 9.0,
         elevation_delta_limit_min: float = 4.0,
         tilt_offset_threshold: float = 0.1,
@@ -185,6 +186,9 @@ class Model:
         subtract_intrinsics : `bool`
             Whether to subtract intrinsic Zernike coefficients from the
             wavefront error measurements in OFC.
+        control_vmodes : `bool`
+            Whether to control in v-modes space. If False, control is done
+            in dof space.
         elevation_delta_limit_max : `float`
             Maximum elevation change allowed before rejecting corrections.
         elevation_delta_limit_min : `float`
@@ -253,6 +257,7 @@ class Model:
             zernike_column_pattern if zernike_column_pattern is not None else "opd_columns"
         )
         self.subtract_intrinsics = subtract_intrinsics
+        self.control_vmodes = control_vmodes
         self.reference_detector = reference_detector
         self.elevation_delta_limit_max = elevation_delta_limit_max
         self.elevation_delta_limit_min = elevation_delta_limit_min
@@ -511,15 +516,15 @@ class Model:
         self.intra_id = intra_id
         self.extra_id = extra_id
 
-    def get_gains(self) -> tuple[float, float, float]:
+    def get_gains(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get the gains used when deriving ofc corrections
         Returns
         -------
-        kp_gain : `float`
+        kp_gain : `np.ndarray`
             Proportional gain
-        ki_gain : `float`
+        ki_gain : `np.ndarray`
             Integral gain
-        kd_gain : `float`
+        kd_gain : `np.ndarray`
             Derivative gain
         """
         return self.ofc.controller.kp, self.ofc.controller.ki, self.ofc.controller.kd
@@ -1184,7 +1189,7 @@ class Model:
         self,
         previous_elevation: float | None,
         camera_name: str,
-    ) -> float:
+    ) -> float | np.ndarray:
         """Check if corrections are supposed to be applied.
 
         Parameters
@@ -1194,7 +1199,7 @@ class Model:
 
         Returns
         -------
-        gain : `float`
+        gain : `float` or `np.ndarray`
             Gain to apply to the corrections.
         """
         _, elevation = await self.get_image_info(
@@ -1207,7 +1212,7 @@ class Model:
                 f"Large elevation change detected: {elevation} - {previous_elevation} = {elevation_diff}. "
                 "Rejecting corrections."
             )
-            return 0.0  # No corrections applied
+            return np.zeros(self.ofc.ofc_data.ndofs)  # No corrections applied
 
         if elevation_diff <= self.elevation_delta_limit_min:
             return self.ofc.controller.kp
@@ -1694,6 +1699,7 @@ class Model:
             filter_name=filter_name,
             rotation_angle=rotation_angle,
             subtract_intrinsics=self.subtract_intrinsics,
+            control_vmodes=self.control_vmodes,
         )
 
         self.log.debug(
