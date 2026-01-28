@@ -659,6 +659,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # These are accessed unconditionally in configure().
             cfg.setdefault("zernike_column_pattern", "opd_columns")
             cfg.setdefault("subtract_intrinsics", True)
+            cfg.setdefault("control_vmodes", False)
 
             tmp_cfg_name = "pointing_correction_disabled.yaml"
             tmp_cfg_path = Path(tmpdir) / tmp_cfg_name
@@ -798,8 +799,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 raise_on_large_defocus=False,
             )
 
-            self.assertEqual(seen_gains[-1], (0.9, 0.1, 0.1))
-            self.assertEqual((controller.kp, controller.ki, controller.kd), (1.0, 2.0, 3.0))
+            kp, ki, kd = seen_gains[-1]
+            self.assertTrue(np.allclose(kp, 0.9))
+            self.assertTrue(np.allclose(ki, 0.1))
+            self.assertTrue(np.allclose(kd, 0.1))
+            self.assertTrue(np.allclose(controller.kp, 1.0))
+            self.assertTrue(np.allclose(controller.ki, 2.0))
+            self.assertTrue(np.allclose(controller.kd, 3.0))
 
             def calculate_corrections_raises(*args: object, **kwargs: object) -> None:
                 seen_gains.append((controller.kp, controller.ki, controller.kd))
@@ -817,8 +823,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     raise_on_large_defocus=False,
                 )
 
-            self.assertEqual(seen_gains[-1], (0.5, 0.1, 0.0))
-            self.assertEqual((controller.kp, controller.ki, controller.kd), (1.0, 2.0, 3.0))
+            kp, ki, kd = seen_gains[-1]
+            self.assertTrue(np.allclose(kp, 0.5))
+            self.assertTrue(np.allclose(ki, 0.1))
+            self.assertTrue(np.allclose(kd, 0.0))
+            self.assertTrue(np.allclose(controller.kp, 1.0))
+            self.assertTrue(np.allclose(controller.ki, 2.0))
+            self.assertTrue(np.allclose(controller.kd, 3.0))
 
             # Partial override: override kp and explicitly set ki=0.0;
             # keep kd unchanged.
@@ -831,8 +842,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 apply_filter_change_override=True,
                 raise_on_large_defocus=False,
             )
-            self.assertEqual(seen_gains[-1], (1.0, 0.0, 3.0))
-            self.assertEqual((controller.kp, controller.ki, controller.kd), (1.0, 2.0, 3.0))
+            kp, ki, kd = seen_gains[-1]
+            self.assertTrue(np.allclose(kp, 1.0))
+            self.assertTrue(np.allclose(ki, 0.0))
+            self.assertTrue(np.allclose(kd, 3.0))
+            self.assertTrue(np.allclose(controller.kp, 1.0))
+            self.assertTrue(np.allclose(controller.ki, 2.0))
+            self.assertTrue(np.allclose(controller.kd, 3.0))
 
 
 if __name__ == "__main__":
