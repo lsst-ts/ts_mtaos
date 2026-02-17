@@ -1224,8 +1224,9 @@ class Model:
             / (self.elevation_delta_limit_max - self.elevation_delta_limit_min)
         )
 
+        formatted_gain = [f"{g:.2f}" for g in gain]
         self.log.info(
-            f"Applying partial corrections with gain {gain:.2f} "
+            f"Applying partial corrections with gain {', '.join(formatted_gain)} "
             f"for elevation difference {elevation_diff:.2f}."
         )
         return gain
