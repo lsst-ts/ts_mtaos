@@ -1302,31 +1302,38 @@ class Model:
                 await asyncio.sleep(poll_interval)
                 elapsed_time = time.time() - start_time
         else:
-            self.log.error(f"Polling loop timed out {timeout=}s, {elapsed_time=}s.")
+            self.log.error(f"Finished polling the butler in {elapsed_time:.2f}s.")
             if len(refs) < n_tables_min:
                 raise TimeoutError(
                     f"Timeout: Could not find outputs for run '{self.run_name}' "
                     f"and visit id {pair_id} within {timeout} seconds."
-                )
-            else:
-                self.log.warning(
-                    f"Only {len(refs)} outputs found, but timeout reached."
-                    "Probably, not enough donut cutouts found."
+                    f"Rapid Analysis didn't produce the expected number of tables."
                 )
 
-        self.log.debug(f"run_name: {self.run_name}, visit_id: {pair_id} yielded: {refs}")
-
-        wavefront_errors = [
-            (
-                ref.dataId["detector"],
-                butler.get(
+            wavefront_errors = []
+            for ref in refs:
+                table = butler.get(
                     self.zernike_table_name,
                     dataId=ref.dataId,
                     collections=[self.run_name],
-                ),
-            )
-            for ref in refs
-        ]
+                )
+
+                n_rows = len(table)
+                if n_rows > 0:
+                    wavefront_errors.append((ref.dataId["detector"], table))
+
+            if len(wavefront_errors) < n_tables_min:
+                raise TimeoutError(
+                    f"Timeout: Only {len(wavefront_errors)} non-empty tables found "
+                    f"(expected at least {n_tables_min})."
+                )
+            else:
+                self.log.info(
+                    f"Found {len(wavefront_errors)} non-empty tables "
+                    f"out of {len(refs)} total tables after polling."
+                )
+
+        self.log.debug(f"run_name: {self.run_name}, visit_id: {pair_id} yielded: {refs}")
 
         corner_offsets = self.get_corner_offsets(refs, butler, self.run_name)
         return wavefront_errors, corner_offsets

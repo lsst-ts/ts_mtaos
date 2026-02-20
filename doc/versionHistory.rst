@@ -2,6 +2,12 @@
 Version History
 ===============
 
+v0.29.0
+--------
+
+* Fix a bug in how MTAOS checks for enough zernikes outputs from the butler, so now it checks their length not only if they exist. 
+  Since when they are empty they exist but have length 0.
+
 v0.28.0
 --------
 
