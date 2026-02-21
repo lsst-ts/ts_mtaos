@@ -2,6 +2,18 @@
 Version History
 ===============
 
+v0.29.1
+--------
+
+* Fix type error when logging correction gain for large elevation changes.
+* Fix closed loop discarding an extra exposure after a large slew or filter change.
+
+v0.29.0
+--------
+
+* Fix a bug in how MTAOS checks for enough zernikes outputs from the butler, so now it checks their length not only if they exist. 
+  Since when they are empty they exist but have length 0.
+
 v0.28.0
 --------
 
