@@ -1224,8 +1224,9 @@ class Model:
             / (self.elevation_delta_limit_max - self.elevation_delta_limit_min)
         )
 
+        formatted_gain = [f"{g:.2f}" for g in gain]
         self.log.info(
-            f"Applying partial corrections with gain {gain:.2f} "
+            f"Applying partial corrections with gain {', '.join(formatted_gain)} "
             f"for elevation difference {elevation_diff:.2f}."
         )
         return gain
@@ -1303,35 +1304,36 @@ class Model:
                 elapsed_time = time.time() - start_time
         else:
             self.log.error(f"Finished polling the butler in {elapsed_time:.2f}s.")
-            if len(refs) < n_tables_min:
-                raise TimeoutError(
-                    f"Timeout: Could not find outputs for run '{self.run_name}' "
-                    f"and visit id {pair_id} within {timeout} seconds."
-                    f"Rapid Analysis didn't produce the expected number of tables."
-                )
 
-            wavefront_errors = []
-            for ref in refs:
-                table = butler.get(
-                    self.zernike_table_name,
-                    dataId=ref.dataId,
-                    collections=[self.run_name],
-                )
+        if len(refs) < n_tables_min:
+            raise TimeoutError(
+                f"Timeout: Could not find outputs for run '{self.run_name}' "
+                f"and visit id {pair_id} within {timeout} seconds."
+                f"Rapid Analysis didn't produce the expected number of tables."
+            )
 
-                n_rows = len(table)
-                if n_rows > 0:
-                    wavefront_errors.append((ref.dataId["detector"], table))
+        wavefront_errors = []
+        for ref in refs:
+            table = butler.get(
+                self.zernike_table_name,
+                dataId=ref.dataId,
+                collections=[self.run_name],
+            )
 
-            if len(wavefront_errors) < n_tables_min:
-                raise TimeoutError(
-                    f"Timeout: Only {len(wavefront_errors)} non-empty tables found "
-                    f"(expected at least {n_tables_min})."
-                )
-            else:
-                self.log.info(
-                    f"Found {len(wavefront_errors)} non-empty tables "
-                    f"out of {len(refs)} total tables after polling."
-                )
+            n_rows = len(table)
+            if n_rows > 0:
+                wavefront_errors.append((ref.dataId["detector"], table))
+
+        if len(wavefront_errors) < n_tables_min:
+            raise TimeoutError(
+                f"Timeout: Only {len(wavefront_errors)} non-empty tables found "
+                f"(expected at least {n_tables_min})."
+            )
+        else:
+            self.log.info(
+                f"Found {len(wavefront_errors)} non-empty tables "
+                f"out of {len(refs)} total tables after polling."
+            )
 
         self.log.debug(f"run_name: {self.run_name}, visit_id: {pair_id} yielded: {refs}")
 

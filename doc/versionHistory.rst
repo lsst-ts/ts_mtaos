@@ -2,6 +2,12 @@
 Version History
 ===============
 
+v0.29.1
+--------
+
+* Fix type error when logging correction gain for large elevation changes.
+* Fix closed loop discarding an extra exposure after a large slew or filter change.
+
 v0.29.0
 --------
 

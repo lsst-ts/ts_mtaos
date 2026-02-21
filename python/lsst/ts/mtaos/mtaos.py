@@ -1340,6 +1340,8 @@ class MTAOS(salobj.ConfigurableCsc):
                             "Skipping."
                         )
                         skipped_images.append(visit_id)
+                        prev_elevation = elevation
+                        prev_filter = filter_label
                         await asyncio.sleep(self.heartbeat_interval)
                         continue
 
