@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 __all__ = [
+    "NotEnoughWaveFrontDataError",
     "WEPWarning",
     "OFCWarning",
     "MTHexapodIndex",
@@ -49,6 +50,14 @@ from lsst.daf.butler import Butler
 from lsst.obs.base import DefineVisitsConfig, DefineVisitsTask, Instrument
 from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
 from lsst.utils import getPackageDir
+
+
+class NotEnoughWaveFrontDataError(Exception):
+    """Raised when the number of wavefront error results is less than
+    the minimum expected.
+    """
+
+    pass
 
 
 class WEPWarning(Enum):
