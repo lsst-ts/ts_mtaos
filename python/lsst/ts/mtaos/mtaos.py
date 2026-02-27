@@ -1229,6 +1229,7 @@ class MTAOS(salobj.ConfigurableCsc):
 
             oods.evt_imageInOODS.flush()
             ofc_failure_count = 0
+            not_enough_wavefront_failure_count = 0
             consecutive_missed_exposures = 0
             while self.summary_state == salobj.State.ENABLED:
                 try:
@@ -1354,12 +1355,27 @@ class MTAOS(salobj.ConfigurableCsc):
 
                     await self.evt_closedLoopState.set_write(state=ClosedLoopState.PROCESSING)
 
-                    await self._execute_wavefront_estimation(
-                        visit_id=visit_id,
-                        extra_id=None,
-                        use_ocps=self.use_ocps,
-                        config=self.wep_config,
-                    )
+                    try:
+                        await self._execute_wavefront_estimation(
+                            visit_id=visit_id,
+                            extra_id=None,
+                            use_ocps=self.use_ocps,
+                            config=self.wep_config,
+                        )
+                        not_enough_wavefront_failure_count = 0
+                    except utility.NotEnoughWaveFrontDataError as e:
+                        not_enough_wavefront_failure_count += 1
+                        if not_enough_wavefront_failure_count >= self.max_ofc_consecutive_failures:
+                            raise e
+                        else:
+                            self.log.warning(
+                                f"Not enough wavefront data for {visit_id=}. "
+                                "Skipping this image and continuing closed loop. "
+                                f"Failures: {not_enough_wavefront_failure_count}/"
+                                f"{self.max_ofc_consecutive_failures}.",
+                                exc_info=True,
+                            )
+                            continue
 
                     gain = await self.model.get_correction_gain(
                         prev_elevation,

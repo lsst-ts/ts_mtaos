@@ -2,6 +2,15 @@
 Version History
 ===============
 
+v0.28.2
+--------
+
+* Fix closed loop faulting when WEP returns fewer corner wavefront sensor results than expected.
+  Introduce a ``NotEnoughWaveFrontDataError`` exception and catch it gracefully, skipping the image
+  instead of faulting the CSC. Allow up to ``max_ofc_consecutive_failures`` consecutive
+  not-enough-wavefront-data events before faulting, matching the existing OFC failure tolerance
+  pattern.
+
 v0.28.1
 --------
 
