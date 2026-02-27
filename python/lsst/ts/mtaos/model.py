@@ -55,7 +55,12 @@ from .config_schema import (
     SCIENCE_SENSOR_PIPELINE_CONFIG,
     WEP_HEADER_CONFIG,
 )
-from .utility import define_visit, get_formatted_corner_wavefront_sensors_ids, timeit
+from .utility import (
+    NotEnoughWaveFrontDataError,
+    define_visit,
+    get_formatted_corner_wavefront_sensors_ids,
+    timeit,
+)
 from .wavefront_collection import WavefrontCollection
 
 
@@ -1325,9 +1330,8 @@ class Model:
                 wavefront_errors.append((ref.dataId["detector"], table))
 
         if len(wavefront_errors) < n_tables_min:
-            raise TimeoutError(
-                f"Timeout: Only {len(wavefront_errors)} non-empty tables found "
-                f"(expected at least {n_tables_min})."
+            raise NotEnoughWaveFrontDataError(
+                f"Only {len(wavefront_errors)} non-empty tables found (expected at least {n_tables_min})."
             )
         else:
             self.log.info(
