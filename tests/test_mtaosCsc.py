@@ -22,8 +22,6 @@
 import asyncio
 import glob
 import os
-import shutil
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -643,52 +641,27 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         assert "lsst_distrib" in sofware_versions.subsystemVersions
 
     async def test_pointing_config_disabled_no_remote(self) -> None:
-        # Use an ephemeral config dir to avoid writing to the repo
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Seed temp dir with an LSSTCam config that already enables
-            # pointing correction
-            base_cfg_path = TEST_CONFIG_DIR / "valid_lsstcam_enable_pointing.yaml"
-            shutil.copy(base_cfg_path, Path(tmpdir) / "_init.yaml")
-            with open(base_cfg_path) as fp:
-                cfg = yaml.safe_load(fp)
-            # Disable the feature and omit the matrix
-            cfg["enable_pointing_correction"] = False
-            cfg.pop("pointing_correction_matrix", None)
-
-            # Ensure required core keys exists
-            # These are accessed unconditionally in configure().
-            cfg.setdefault("zernike_column_pattern", "opd_columns")
-            cfg.setdefault("subtract_intrinsics", True)
-            cfg.setdefault("control_vmodes", False)
-
-            tmp_cfg_name = "pointing_correction_disabled.yaml"
-            tmp_cfg_path = Path(tmpdir) / tmp_cfg_name
-            with open(tmp_cfg_path, "w") as f:
-                yaml.safe_dump(cfg, f)
-
-            async with self.make_csc(
-                initial_state=salobj.State.STANDBY,
-                config_dir=tmpdir,
-                simulation_mode=0,
-            ):
-                await self.remote.cmd_start.set_start(configurationOverride=tmp_cfg_name, timeout=STD_TIMEOUT)
-
-                # Verify CSC did not initialize mtptg remote and flag is False
-                self.assertFalse(self.csc.enable_pointing_correction)
-                self.assertNotIn("mtptg", self.csc.remotes)
-
-    async def test_pointing_config_enabled_with_matrix(self) -> None:
-        # Use the existing valid config (already includes a 50x2 matrix)
-        # and verify the CSC enables the feature and wires the MTPtg remote.
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=0,
         ):
             await self.remote.cmd_start.set_start(
-                configurationOverride="valid_lsstcam_enable_pointing.yaml",
+                configurationOverride="disable_pointing_correction.yaml",
                 timeout=STD_TIMEOUT,
             )
+
+            # Verify CSC did not initialize mtptg remote and flag is False
+            self.assertFalse(self.csc.enable_pointing_correction)
+            self.assertNotIn("mtptg", self.csc.remotes)
+
+    async def test_pointing_config_enabled_with_matrix(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await self.remote.cmd_start.set_start(timeout=STD_TIMEOUT)
 
             # Verify CSC flag and remote presence
             self.assertTrue(self.csc.enable_pointing_correction)
@@ -702,35 +675,40 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(dx, float)
             self.assertIsInstance(dy, float)
 
-    async def test_pointing_config_enabled_missing_matrix_rejected(self) -> None:
-        # Use an ephemeral config dir with enable=True but missing matrix;
-        # start should be rejected.
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Seed temp dir with an LSSTCam config that already enables
-            # pointing correction
-            base_cfg_path = TEST_CONFIG_DIR / "valid_lsstcam_enable_pointing.yaml"
-            shutil.copy(base_cfg_path, Path(tmpdir) / "_init.yaml")
-            with open(base_cfg_path) as fp:
-                cfg = yaml.safe_load(fp)
-            cfg["enable_pointing_correction"] = True
-            # Explicitly set an invalid matrix to avoid inheriting from
-            # _init.yaml
-            cfg["pointing_correction_matrix"] = []
-            tmp_cfg_name = "pointing_correction_missing_matrix.yaml"
-            tmp_cfg_path = Path(tmpdir) / tmp_cfg_name
-            with open(tmp_cfg_path, "w") as f:
-                yaml.safe_dump(cfg, f)
+    async def test_pointing_config_enabled_empty_matrix_rejected(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            with salobj.assertRaisesAckError():
+                await self.remote.cmd_start.set_start(
+                    configurationOverride="empty_pointing_correction_matrix.yaml",
+                    timeout=STD_TIMEOUT,
+                )
 
-            async with self.make_csc(
-                initial_state=salobj.State.STANDBY,
-                config_dir=tmpdir,
-                simulation_mode=0,
-            ):
-                with salobj.assertRaisesAckError():
-                    await self.remote.cmd_start.set_start(
-                        configurationOverride=tmp_cfg_name,
-                        timeout=STD_TIMEOUT,
-                    )
+    async def test_pointing_correction_reconfig_adds_mtptg(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await self.remote.cmd_start.set_start(
+                configurationOverride="disable_pointing_correction.yaml",
+                timeout=STD_TIMEOUT,
+            )
+            self.assertFalse(self.csc.enable_pointing_correction)
+            self.assertNotIn("mtptg", self.csc.remotes)
+
+            await salobj.set_summary_state(self.remote, salobj.State.STANDBY)
+
+            # Valid reconfiguration to enable pointing correction
+            await self.remote.cmd_start.set_start(
+                configurationOverride="enable_pointing_correction.yaml",
+                timeout=STD_TIMEOUT,
+            )
+            self.assertTrue(self.csc.enable_pointing_correction)
+            self.assertIn("mtptg", self.csc.remotes)
 
     async def test_configure_filter_change_override_gains(self) -> None:
         async with self.make_csc(
