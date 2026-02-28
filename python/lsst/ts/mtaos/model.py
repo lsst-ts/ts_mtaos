@@ -495,6 +495,18 @@ class Model:
         """
         return self.ofc.lv_dof
 
+    def get_dof_lv_full(self) -> np.ndarray:
+        """Get the last-visit DOF expanded to the full 50-element vector."""
+
+        compact = np.asarray(self.ofc.lv_dof, dtype=float).reshape(-1)
+        dof_idx = np.asarray(self.ofc.ofc_data.dof_idx, dtype=int).reshape(-1)
+        if compact.size != dof_idx.size:
+            raise ValueError(f"Size mismatch between lv_dof and dof_idx: {compact.size} vs {dof_idx.size}.")
+
+        full = np.zeros_like(self.ofc.controller.aggregated_state, dtype=float)
+        full[dof_idx] = compact
+        return full
+
     def get_visit_ids(self) -> tuple[int, int]:
         """Get the visit ids of the processed exposure
 
