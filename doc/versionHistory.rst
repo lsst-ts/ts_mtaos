@@ -2,6 +2,11 @@
 Version History
 ===============
 
+v0.28.3
+--------
+
+* In ``mtaos.py``, ensure ``configure`` method  re-adds missing remotes (e.g., ``mtptg``) when pointing correction is enabled on a reconfigure/state cycle.
+
 v0.28.2
 --------
 
