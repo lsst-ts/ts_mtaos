@@ -56,6 +56,7 @@ from .config_schema import (
     WEP_HEADER_CONFIG,
 )
 from .utility import (
+    NotEnoughRAOutputsError,
     NotEnoughWaveFrontDataError,
     define_visit,
     get_formatted_corner_wavefront_sensors_ids,
@@ -1311,7 +1312,7 @@ class Model:
             self.log.error(f"Finished polling the butler in {elapsed_time:.2f}s.")
 
         if len(refs) < n_tables_min:
-            raise TimeoutError(
+            raise NotEnoughRAOutputsError(
                 f"Timeout: Could not find outputs for run '{self.run_name}' "
                 f"and visit id {pair_id} within {timeout} seconds."
                 f"Rapid Analysis didn't produce the expected number of tables."
