@@ -417,6 +417,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(remote.evt_m1m3Correction, flush=False, timeout=SHORT_TIMEOUT)
             await self.assert_next_sample(remote.evt_m2Correction, flush=False, timeout=SHORT_TIMEOUT)
 
+    @pytest.mark.xfail(
+        reason="This test fails if there is an issue with git lfs (OSW-2007).",
+        raises=salobj.AckError,
+    )
     @pytest.mark.csc_integtest
     async def test_run_wep_comcam(self) -> None:
         async with self.make_csc(
@@ -503,6 +507,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             await salobj.set_summary_state(self.remote, salobj.State.STANDBY)
 
+    @pytest.mark.xfail(
+        reason="This test fails if there is an issue with git lfs (OSW-2007).",
+        raises=salobj.AckError,
+    )
     @pytest.mark.csc_integtest
     async def test_run_wep_lsst_cwfs(self) -> None:
         async with self.make_csc(

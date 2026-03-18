@@ -21,6 +21,7 @@
 
 __all__ = [
     "NotEnoughWaveFrontDataError",
+    "NotEnoughRAOutputsError",
     "WEPWarning",
     "OFCWarning",
     "MTHexapodIndex",
@@ -55,6 +56,14 @@ from lsst.utils import getPackageDir
 class NotEnoughWaveFrontDataError(Exception):
     """Raised when the number of wavefront error results is less than
     the minimum expected.
+    """
+
+    pass
+
+
+class NotEnoughRAOutputsError(Exception):
+    """Raised when Rapid Analysis did not produce enough output
+    datasets in the butler within the polling timeout.
     """
 
     pass

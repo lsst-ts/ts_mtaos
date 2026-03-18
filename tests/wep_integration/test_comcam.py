@@ -102,6 +102,10 @@ class TestComCam(unittest.IsolatedAsyncioTestCase):
         if cls.model.run_name in list(butler.registry.queryCollections()):
             runProgram(writeCleanUpRepoCmd(cls.model.data_path, cls.model.run_name))
 
+    @pytest.mark.xfail(
+        reason="This test fails if there is an issue with git lfs (OSW-2007).",
+        raises=RuntimeError,
+    )
     async def test_process_comcam(self) -> None:
         await self.model.process_comcam(
             dict(),
