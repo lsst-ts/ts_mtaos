@@ -825,7 +825,7 @@ class MTAOS(salobj.ConfigurableCsc):
                     self.model.instrument,
                     timeout=1,
                 )
-            except asyncio.TimeoutError:
+            except (asyncio.TimeoutError, utility.NotEnoughRAOutputsError):
                 self.log.debug("Image not processed yet.")
 
                 if extra_visit_id is None:
@@ -1230,6 +1230,7 @@ class MTAOS(salobj.ConfigurableCsc):
             oods.evt_imageInOODS.flush()
             ofc_failure_count = 0
             not_enough_wavefront_failure_count = 0
+            ra_output_failure_count = 0
             consecutive_missed_exposures = 0
             while self.summary_state == salobj.State.ENABLED:
                 try:
@@ -1363,6 +1364,7 @@ class MTAOS(salobj.ConfigurableCsc):
                             config=self.wep_config,
                         )
                         not_enough_wavefront_failure_count = 0
+                        ra_output_failure_count = 0
                     except utility.NotEnoughWaveFrontDataError as e:
                         not_enough_wavefront_failure_count += 1
                         if not_enough_wavefront_failure_count >= self.max_ofc_consecutive_failures:
@@ -1372,6 +1374,19 @@ class MTAOS(salobj.ConfigurableCsc):
                                 f"Not enough wavefront data for {visit_id=}. "
                                 "Skipping this image and continuing closed loop. "
                                 f"Failures: {not_enough_wavefront_failure_count}/"
+                                f"{self.max_ofc_consecutive_failures}.",
+                                exc_info=True,
+                            )
+                            continue
+                    except utility.NotEnoughRAOutputsError as e:
+                        ra_output_failure_count += 1
+                        if ra_output_failure_count >= self.max_ofc_consecutive_failures:
+                            raise e
+                        else:
+                            self.log.warning(
+                                f"Rapid Analysis did not produce enough outputs for {visit_id=}. "
+                                "Skipping this image and continuing closed loop. "
+                                f"Failures: {ra_output_failure_count}/"
                                 f"{self.max_ofc_consecutive_failures}.",
                                 exc_info=True,
                             )

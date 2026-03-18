@@ -2,6 +2,14 @@
 Version History
 ===============
 
+v0.28.3
+--------
+
+* Add ``NotEnoughRAOutputsError`` exception for when Rapid Analysis does not produce enough
+  output datasets in the butler. Handle it gracefully in the closed loop with the same tolerance
+  mechanism used for ``NotEnoughWaveFrontDataError``, allowing up to ``max_ofc_consecutive_failures``
+  consecutive RA output failures before faulting the CSC.
+
 v0.28.2
 --------
 
