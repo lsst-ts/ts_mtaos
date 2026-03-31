@@ -41,7 +41,7 @@ from astropy import units as u
 
 from lsst.ts import salobj
 from lsst.ts.ofc import OFCData
-from lsst.ts.utils import astropy_time_from_tai_unix, make_done_future
+from lsst.ts.utils import astropy_time_from_tai_unix, current_tai, make_done_future
 from lsst.ts.xml import type_hints
 from lsst.ts.xml.enums.MTAOS import ClosedLoopState, FilterType
 from lsst.ts.xml.sal_enums import SalRetCode
@@ -245,6 +245,8 @@ class MTAOS(salobj.ConfigurableCsc):
         self.last_run_ofc_configuration = ""
         # Store rotator position for images during closed loop.
         self.image_rotator: collections.OrderedDict = collections.OrderedDict()
+        self.image_started_time: collections.OrderedDict = collections.OrderedDict()
+
         # Keep track of the images that are followed in closed loop.
         self.following_images_max_len = 100
         self.following_images: collections.deque = collections.deque(maxlen=self.following_images_max_len)
@@ -261,6 +263,8 @@ class MTAOS(salobj.ConfigurableCsc):
         self.filter_change_gains: tuple[float | None, float | None, float | None] | None = None
 
         self.closed_loop_timeout_wep_results: float = 75.0
+        self.timestamp_diff_tol: float = 1.0
+        self.discard_intermediate_corrections: bool = True
 
         self.log.info("MTAOS CSC is ready.")
 
@@ -1169,7 +1173,13 @@ class MTAOS(salobj.ConfigurableCsc):
 
         # Set ofc configuration to be used in closed loop.
         if data.config:
-            self.last_run_ofc_configuration = data.config
+            config = yaml.safe_load(data.config)
+            self.discard_intermediate_corrections = config.pop("discard_intermediate_corrections", True)
+            self.last_run_ofc_configuration = yaml.safe_dump(config)
+            self.log.debug(
+                f"Input configuration: {data.config}. "
+                f"Closed loop ofc configuration: {self.last_run_ofc_configuration}."
+            )
 
         if self.closed_loop_task.done():
             self.closed_loop_task = asyncio.create_task(self.run_closed_loop())
@@ -1191,6 +1201,7 @@ class MTAOS(salobj.ConfigurableCsc):
         skipped_images: collections.deque = collections.deque(maxlen=self.following_images_max_len)
         self.current_rotator_position = None
         self.current_elevation_position = None
+        time_last_correction_applied = current_tai()
 
         async with (
             salobj.Remote(
@@ -1274,7 +1285,7 @@ class MTAOS(salobj.ConfigurableCsc):
                                 f"Images in the following list: {following_images}."
                             )
                         elif visit_id in skipped_images:
-                            self.log.debug(f"Visit {visit_id} skipped because it was not being followed.")
+                            self.log.debug(f"Visit {visit_id} in the list of skipped visits. Skipping...")
                             continue
                         consecutive_missed_exposures = 0
                     except ValueError:
@@ -1283,6 +1294,25 @@ class MTAOS(salobj.ConfigurableCsc):
                     if visit_id in processed_images or visit_id in skipped_images:
                         self.log.info(f"Visit {visit_id} already processed or skipped, continuing.")
                         continue
+                    elif (
+                        delta_time := self.image_started_time[image_in_oods.obsid]
+                        - time_last_correction_applied
+                    ) < 0:
+                        if self.discard_intermediate_corrections:
+                            self.log.info(
+                                f"Exposure {image_in_oods.obsid} started {abs(delta_time):.2f}s "
+                                "before the last applied "
+                                f"correction ({time_last_correction_applied} TAI). Skipping..."
+                            )
+                            skipped_images.append(visit_id)
+                            continue
+                        else:
+                            self.log.info(
+                                f"Exposure {image_in_oods.obsid} started {abs(delta_time):.2f}s "
+                                "before the last applied "
+                                f"correction ({time_last_correction_applied} TAI). "
+                                "Closed loop configured to apply all correction, continuing..."
+                            )
 
                     self.model.set_visit_ids(intra_id=visit_id, extra_id=None)
 
@@ -1484,6 +1514,7 @@ class MTAOS(salobj.ConfigurableCsc):
                         )
 
                         await self._execute_issue_correction()
+                        time_last_correction_applied = current_tai()
                     else:
                         self.log.info("Skipping correction but proceeding with closed-loop execution.")
 
@@ -2213,6 +2244,16 @@ class MTAOS(salobj.ConfigurableCsc):
         if data.imageName not in self.following_images:
             self.following_images.append(data.imageName)
         self.image_rotator[data.imageName] = []
+        timestamp_diff = abs(data.private_sndStamp - data.timestampAcquisitionStart)
+        if timestamp_diff > self.timestamp_diff_tol:
+            self.log.warning(
+                f"Difference between acquisition start and data sent timestamps ({timestamp_diff:.2f}s) "
+                f"larger than tolerance ({self.timestamp_diff_tol}s). "
+                "Using send timestamp."
+            )
+            self.image_started_time[data.imageName] = data.private_sndStamp
+        else:
+            self.image_started_time[data.imageName] = data.timestampAcquisitionStart
 
     async def follow_end_integration(self, data: type_hints.BaseMsgType) -> None:
         if self.current_image == data.imageName:
@@ -2223,8 +2264,23 @@ class MTAOS(salobj.ConfigurableCsc):
             f"Current image rotator size: {len(self.image_rotator)}."
         )
 
-        while len(self.image_rotator) > self.following_images_max_len:
+        rotator_keys = set(self.image_rotator.keys())
+        started_keys = set(self.image_started_time.keys())
+
+        inconsistent_keys = rotator_keys ^ started_keys
+        if inconsistent_keys:
+            self.log.warning(
+                f"Removing inconsistent values from rotator and start time dictionaries: {inconsistent_keys}."
+            )
+            for key in inconsistent_keys:
+                self.image_rotator.pop(key, None)
+                self.image_started_time.pop(key, None)
+
+        max_len = self.following_images_max_len
+        num_to_remove = max(0, len(self.image_rotator) - max_len)
+        for _ in range(num_to_remove):
             self.image_rotator.popitem(last=False)
+            self.image_started_time.popitem(last=False)
 
     async def follow_rotator_position(self, data: type_hints.BaseMsgType) -> None:
         self.current_rotator_position = data.actualPosition
