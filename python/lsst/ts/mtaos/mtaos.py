@@ -1187,8 +1187,8 @@ class MTAOS(salobj.ConfigurableCsc):
         camera_name = "MTCamera"
         self.log.info(f"Starting closed loop for {oods_name}.")
 
-        processed_images: collections.deque = collections.deque(maxlen=100)
-        skipped_images: collections.deque = collections.deque(maxlen=100)
+        processed_images: collections.deque = collections.deque(maxlen=self.following_images_max_len)
+        skipped_images: collections.deque = collections.deque(maxlen=self.following_images_max_len)
         self.current_rotator_position = None
         self.current_elevation_position = None
 
