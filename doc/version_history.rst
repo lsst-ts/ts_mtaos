@@ -2,8 +2,19 @@
 Version History
 ===============
 
+.. WARNING: DO NOT MANUALLY EDIT THIS FILE.
+
+   Release notes are now managed using towncrier.
+   The following comment marks the start of the automatically managed content.
+   For help in how to create the "news fragments" see the README page in the
+   doc directory.
+
+   Do not remove the following comment line.
+
+.. towncrier release notes start
+
 v0.28.3
---------
+=======
 
 * Add ``NotEnoughRAOutputsError`` exception for when Rapid Analysis does not produce enough
   output datasets in the butler. Handle it gracefully in the closed loop with the same tolerance
@@ -11,7 +22,7 @@ v0.28.3
   consecutive RA output failures before faulting the CSC.
 
 v0.28.2
---------
+=======
 
 * Fix closed loop faulting when WEP returns fewer corner wavefront sensor results than expected.
   Introduce a ``NotEnoughWaveFrontDataError`` exception and catch it gracefully, skipping the image
@@ -20,7 +31,7 @@ v0.28.2
   pattern.
 
 v0.28.1
---------
+=======
 
 * Fix type error when logging correction gain for large elevation changes.
 * Fix closed loop discarding an extra exposure after a large slew or filter change.
@@ -28,38 +39,38 @@ v0.28.1
   Since when they are empty they exist but have length 0.
 
 v0.28.0
---------
+=======
 
 * Add control_vmodes as a configuration to MTAOS to set whether to ask OFC to control in vmode basis or dof basis.
 
 v0.27.0
---------
+=======
 
 * Add a mechanism to temporarily override OFC controller gains (kp, ki, kd) for a configurable number of closed-loop iterations after filter changes.
 * Add configurable timeout parameter ``closed_loop_timeout_wep_results`` for waiting on WEP results from OCPS when using ``query_ocps_results()``.
 
 v0.26.1
---------
+=======
 
 * Fix donutStamps dataset name in model.py to work with TARTS.
 
 v0.26.0
---------
+=======
 
 * Make MTAOS expect 8 sensors to allow the unpaired calcZernikeTask to run online.
 
 v0.25.0
---------
+=======
 
 * Introduce optional pointing correction functionality to refine telescope pointing after applying AOS corrections.
 
 v0.24.0
---------
+=======
 
 * In `model.py`, update `WavefrontCollection` initialization to use `zernike_column_pattern` from configuration for flexiblity in using wavefront deviation or total wavefront.
 
 v0.23.4
---------
+=======
 
 * In `mtaos.py`, update the `model.calculate_corrections` call to use keyword arguments for compatibility with the `timeit` decorator.
 * In ``mtaos.py``, keep track of the images that are being followed (when received start integration from the camera) and update the close loop to skip images if they are not in the following list, up to a maximum number of consecutive misses.
@@ -69,24 +80,24 @@ v0.23.4
   We add a tolerance to the number of consecutive misses in case there is some metadata mismatch or communication issue preventing the CSC for receiving the events.
 
 v0.23.3
---------
+=======
 
 * Use ``Hexapod.moveInSteps`` with the ``overwriteStepSizeFromConfig=True``.
 
 v0.23.2
---------
+=======
 
 * In `_execute_ofc.py` publish degree of freedom event before restoring ofc data values.
 * In `model.py` remove the plane fitting for the corner offsets and use median for the defocus instead.
 
 v0.23.1
---------
+=======
 
 * In `tests/test_mtaosCscWithSimulators.py` add base `asyncTearDown` function to bring back topic cleanup process.
 * In `mtaos.py`, replace direct `model.calculate_corrections` call with `loop.run_in_executor` to avoid blocking the event loop.
 
 v0.23.0
---------
+=======
 
 * Add intra_id and extra_id topics in wavefront, corrections and degree of freedom events.
 
@@ -95,24 +106,24 @@ v0.23.0
 * Add gains topics in degree of freedom events.
   
 v0.22.2
---------
+=======
 
 * Use donutCorrelator for RADIUS measurement, remove RADIUS_FAIL_FLAG and simplify model logic.
 
 v0.22.1
---------
+=======
 
 * Fix `test_mtaosCscWithSimulators` `test test_addAberration_issueCorrection_xref_x0` to work with a configuration that has integral gain different from zero.
 
 v0.22.0
---------
+=======
 
 * Add `raise_on_large_defocus` configuration option to `mtaos.py` to raise an exception when the defocus exceeds the threshold when running closed loop task.
 
 * Add `closed_loop_timeout_without_images` configuration option to `mtaos.py` to set a timeout for the closed loop task when no images are received.
 
 v0.21.0
---------
+=======
 
 * Add retrials to `_execute_ofc` in `mtaos.py` to handle OFC failures from missing wavefront errors without faulting the system.
 
@@ -124,24 +135,24 @@ v0.21.0
 
 
 v0.20.1
---------
+=======
 
 * Add mypy for type checking in the entire package.
 
 v0.20.0
---------
+=======
 
 * Add automatic refocus functionality in calculate_corrections. If not enough wavefront errors are estimated, it will attempt to use donut radii to focus the telescope.
 
 * Fix log message in `run_closed_loop` when rotator or elevation jump exceed the thresholds.
 
 v0.19.1
--------
+=======
 
 * Add heartbeat and summaryState to remotes in `mtaos.py` and fix typo.
 
 v0.19.0
--------
+=======
 
 * Add configuration option for `do_startClosedLoop` in mtaos.py.
 
@@ -154,7 +165,7 @@ v0.19.0
 * Fix typos in mtaos.py and model.py
 
 v0.18.0
--------
+=======
 
 * Fixed unit tests to work with new ts_wep test data.
 
@@ -175,7 +186,7 @@ v0.18.0
 * Avoid empty zernikes daatasets to be stored in wavefrontError
 
 v0.17.0
--------
+=======
 
 * Added new closed loop task commands `do_startClosedLoop` and `do_stopClosedLoop` in `mtaos.py``.
 
@@ -188,12 +199,12 @@ v0.17.0
 * Add `truncation_index` as a configurable field in `set_ofc_data_values`
 
 v0.16.1
--------
+=======
 
 * Deprecate `annularZernikeCoeff` topic from WavefrontError events.
 
 v0.16.0
--------
+=======
 
 * Introduced a minimum threshold for applying active optics corrections.
   Forces are now only applied if they exceed a defined threshold in both `issue_m2_correction` and `issue_m1m3_correction` methods.
@@ -255,12 +266,12 @@ v0.16.0
 * Add `pubEvent_mirrorStresses` method to publish mirror stresses.
 
 v0.15.0
--------
+=======
 
 * Update to use version 3.2.0 of ts_ofc
 
 v0.14.0
--------
+=======
 
 * In ``mtaos.py``, implement the ``resetOffsetOFC`` command.
 
@@ -279,7 +290,7 @@ v0.14.0
   This allows us to add offsets to M1M3 and M2 bending modes as well as rigid body motions of the hexapods.
 
 v0.13.3
--------
+=======
 
 * Update Jenkinsfile to checkout the work branches for ts_wep.
 
@@ -300,30 +311,30 @@ v0.13.3
 * In config_schema, add option to override the data instrument name.
 
 v0.13.2
--------
+=======
 
 * Add SConstruct file to allow building package with scons.
 
 v0.13.1
--------
+=======
 
 * Update ``tests/test_mtaosCsc.py`` to work with the kafka version of salobj.
 * Update to work with ``ts_wep>=7``.
 
 v0.13.0
--------
+=======
 
 * Remove compatibility with xml<19.
 * Update to ts-pre-commit-config 0.6.
 
 v0.12.2
--------
+=======
 
 * Add stubs for the new commands introduced in the CSC in xml 19.
   For now only add backward compatibility.
 
 v0.12.1
--------
+=======
 
 * Add support for ts-pre-commit-config.
 * Update package setup files.
@@ -331,19 +342,19 @@ v0.12.1
 * Run isort.
 
 v0.12.0
--------
+=======
 
 * Updates to work with ts_wep 6.
 * Update Jenkinsfile to remove root workaround.
 
 v0.11.3
--------
+=======
 
 * In ``Model._generate_pipetask_command`` stop adding refcats to the collections.
 * Update unit tests to work with latest version of ``ts_wep``.
 
 v0.11.2
--------
+=======
 
 * In `Model` class:
 
@@ -362,18 +373,18 @@ v0.11.2
 * In CI Jenkinsfile, enable abort previous build.
 
 v0.11.1
--------
+=======
 
 * Replace reference to MTHexapodID -> salIndex, for compatibility with salobj >7.1.
 * Update Jenkinsfile to replace HOME -> WHOME.
 
 v0.11.0
--------
+=======
 
 * Upgrade CSC to work with salobj 7/xml 11.
 
 v0.10.2
--------
+=======
 
 * Fix bug in `begin_disable` that would prevent CSC from going out of ENABLED if last time`runWEP` execution failed.
 * Update `Model.process_lsstcam_corner_wfs` to restrict processing to corner wavefront sensor detectors.
@@ -381,12 +392,12 @@ v0.10.2
 * Add `get_formatted_corner_wavefront_sensors_ids` utility method to generate a comma-separated string with the ids of the corner wavefront sensors for LSSTCam.
 
 v0.10.1
--------
+=======
 
 * Fill `softwareVersions.subsystemVersions` event attribute with information about ts_ofc, ts_wep and lsst_distrib packages.
 
 v0.10.0
--------
+=======
 
 * In Jenkinsfile, separate running tests marked as integtest and csc_integtest from the other unit tests. 
   Run non-marked tests first and, if successful, run integtest and csc_integtest respectively.
@@ -404,7 +415,7 @@ v0.10.0
 * In test_utility, reduce sleep time to speed up `timeit` test.
 
 v0.9.0
-------
+======
 
 * Add unit tests for `interruptWEP` command.
 * Add xml 10/11 backward compatible command `interruptWEP`.
@@ -417,7 +428,7 @@ v0.9.0
 * Update MTAOS to work with latest version of wep.
 
 v0.8.0
-------
+======
 
 * Add new (backward compatible) CSC configuration parameter `wep_config`, which allows users to specify a default configuration override for the CSC to use in the `runWep` command.
 * Reorganize import statements in test_model.py unit test.
@@ -429,7 +440,7 @@ v0.8.0
   * Reformat docstrings to fit pep8 standards.
 
 v0.7.8
-------
+======
 
 * In `Model`, asynchronously log output of pipeline task.
 * In `MTAOS.do_runWEP`, implement mechanism to differentiate wep runs using private identity (who sent the command?) and the send timestamp.
@@ -439,27 +450,27 @@ v0.7.8
   This causes the command to be rejected as failed, which is the behavior we want.
 
 v0.7.7
-------
+======
 
 * Update phosim_utils branch to main instead of master in CI job.
 
 v0.7.6
-------
+======
 * Update name of `ts_wep` task in `config_schema.py` from `EstimateZernikesFamTask` to `EstimateZernikesScienceSensorTask`.
 
 v0.7.5
-------
+======
 
 * Fix publishing Degrees of Freedom event when `issueCorrection` fails.
 
 v0.7.4
-------
+======
 
 * Update Jenkinsfile to notify gate keeper (tribeiro) on slack when build suffers a regression and when it is fixed.
 * In `test_model`, update `test_process_comcam` to check the shape of the return arrays and the index of the maximum zernike coefficient instead of the values themselves.
 
 v0.7.3
-------
+======
 
 * Add visit_id_offset to configuration schema.
 * Add visit_id_offset CSC configuration parameter to work around type of visitId being a long in runWEP and preProcess commands.
@@ -474,18 +485,18 @@ v0.7.3
 * Publish wepDuration at the end of runWEP.
 
 v0.7.2
-------
+======
 
 * Support the setting of **xref**.
 * Add LSSTCam/calib to collections path in test Gen3 pipelines and fix the syntax of butler ``get()``.
 
 v0.7.1
-------
+======
 
 * Fix unit tests for reversed intra/extra image selection.
 
 v0.7.0
-------
+======
 
 * Implement ``runWEP`` command.
   The current implementation is designed to work for ComCam intra/extra data.
@@ -497,7 +508,7 @@ v0.7.0
 * Update model unit tests for fixed intra/extra definition.
 
 v0.6.0
-------
+======
 
 * In Jenkinsfile, run pytest in the entire package instead of only the `tests/` folder, to capture pep8 and black violations in the entire repo.
 * Refactor module names to the current telescope and site standards (lower_camel_case).
@@ -512,22 +523,22 @@ v0.6.0
 * Update tests/Sconscript to allow running scons with licensed version of OpenSplice.
 
 v0.5.6
-------
+======
 
 * Fixed a trailing space.
 
 v0.5.5
-------
+======
 
 * Fixed a too long comment line.
 
 v0.5.4
-------
+======
 
 * Reformat code using black 20.
 
 v0.5.3
-------
+======
 
 * Implement addAberration command.
 * Remove `asynctest` and use `unittest.IsolatedAsyncioTestCase` instead.
@@ -535,7 +546,7 @@ v0.5.3
 * Minor documentation updates.
 
 v0.5.2
-------
+======
 
 * Refactor of the Model class to prepare it for integration with wep pipeline task.
 * Modernize naming conventions in Model class and remove unused methods.
@@ -546,29 +557,29 @@ v0.5.2
 * Update docs configuration.
 
 v0.5.1
-------
+======
 
 * Fix reference to undefined name `issue_corrections_tasks` -> `issued_corrections`.
 
 v0.5.0
-------
+======
 
 * Update MTAOS CSC to reflect new xml interface discussed in tstn-026.
 
 v0.4.5
--------------
+=======
 * Use the latest **ts_wep** that removes the dependency of ``sims`` package.
 * Update the M2 interface based on the **ts_xml** v7.0.0.
 
 v0.4.4
--------------
+=======
 * Use the ``sims_w_2020_42``.
 * Use the **ts_salobj** v6.0.3.
 * Remove the deprecated functions for the new version of **ts_salobj**.
 * Update the **user-guide.rst** for the use of CSC.
 
 v0.4.3
--------------
+=======
 * Update the M2 interface based on the **ts_xml** v6.1.0.
 * Do some minor fixes.
 * Update the test cases of CSC.
@@ -576,29 +587,29 @@ v0.4.3
 * Use the ``sims_w_2020_29``.
 
 v0.4.2
--------------
+=======
 * Reformat the **rst** documents to follow the standard.
 * Add the user manual.
 * Publish the document to `MTAOS document <https://ts-mtaos.lsst.io>`_.
 
 v0.4.1
--------------
+=======
 * Reformat the code by ``black``.
 * Add the ``black`` check to ``.githooks``.
 * Ignore ``flake8`` check of E203 ans W503 for the ``black``.
 
 v0.4.0
--------------
+=======
 * Configure the ``state0`` in degree of freedom (DOF) from MTAOS files.
 * Use the scientific pipeline ``w_2020_20``.
 
 v0.3.9
--------------
+=======
 * Add the **CollOfListOfWfErr** class to support the multiple exposures in a single visit.
 * Use the scientific pipeline ``w_2020_15``.
 
 v0.3.8
--------------
+=======
 * Adapt to **ts_xml** v5.0.0.
 * Add the logs directory.
 * Support the change of debug level of log files.
@@ -607,43 +618,43 @@ v0.3.8
 * Remove the dependency of **version.py**.
 
 v0.3.7
--------------
+=======
 * Adapt to **ts_xml** v4.7.0.
 
 v0.3.6
--------------
+=======
 * Use ``calcTime`` instead of ``duration`` and ``simulation_mode`` instead of ``initial_simulation_mode``.
 
 v0.3.5
--------------
+=======
 * Restrict some commands can only be executed in the **Enabled** state.
 
 v0.3.4
--------------
+=======
 * Support the log file for debug.
 
 v0.3.3
--------------
+=======
 * Support the configurable CSC and simulation mode.
 
 v0.3.2
--------------
+=======
 * Add the **Model** class and related test cases.
 
 v0.3.1
--------------
+=======
 * Workaround the Jenkins permission in **Jenkinsfile**.
 
 v0.3.0
--------------
+=======
 * Integrate with the PhoSim with the scientific pipeline tag: ``sims_w_2019_20``.
 * Add the **Jenkinsfile**.
 * Update the documentation.
 
 v0.2.0
--------------
+=======
 * Integrate with **ts_wep** and **ts_ofc**.
 
 v0.1.0
--------------
+=======
 * Initial version of **ts_MTAOS**.

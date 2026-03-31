@@ -74,7 +74,7 @@ Version History
 The version history is at the following link.
 
 .. toctree::
-    versionHistory
+    version_history
     :maxdepth: 1
 
 The released version is `here <https://github.com/lsst-ts/ts_MTAOS/releases>`_.
