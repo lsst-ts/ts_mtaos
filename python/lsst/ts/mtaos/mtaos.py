@@ -244,9 +244,10 @@ class MTAOS(salobj.ConfigurableCsc):
         # loop.
         self.last_run_ofc_configuration = ""
         # Store rotator position for images during closed loop.
-        self.image_rotator: dict = dict()
+        self.image_rotator: collections.OrderedDict = collections.OrderedDict()
         # Keep track of the images that are followed in closed loop.
-        self.following_images: collections.deque = collections.deque(maxlen=100)
+        self.following_images_max_len = 100
+        self.following_images: collections.deque = collections.deque(maxlen=self.following_images_max_len)
         self.current_elevation_position = None
         self.current_rotator_position = None
 
@@ -2218,14 +2219,12 @@ class MTAOS(salobj.ConfigurableCsc):
             self.current_image = None
 
         self.log.info(
-            f"{data.imageName} completed with {len(self.image_rotator[data.imageName])} rotator positions."
+            f"{data.imageName} completed with {len(self.image_rotator[data.imageName])} rotator positions. "
+            f"Current image rotator size: {len(self.image_rotator)}."
         )
 
-        if len(self.image_rotator) > 100:
-            self.log.debug("Cleaning up image rotator values.")
-            items_to_pop = list(self.image_rotator.keys())[0:10]
-            for item in items_to_pop:
-                self.image_rotator.pop(item)
+        while len(self.image_rotator) > self.following_images_max_len:
+            self.image_rotator.popitem(last=False)
 
     async def follow_rotator_position(self, data: type_hints.BaseMsgType) -> None:
         self.current_rotator_position = data.actualPosition
