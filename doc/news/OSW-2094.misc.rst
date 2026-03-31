@@ -1,0 +1,1 @@
+Updated the documentation structure and pre-commit configuration to officially support Towncrier and the Ruff linter.
