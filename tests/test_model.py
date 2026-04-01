@@ -54,7 +54,8 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         # Let the mtaos to set WEP based on this path variable
         os.environ["ISRDIRPATH"] = cls.isrDir.as_posix()
 
-        ofc_data = OFCData("comcam")
+        ofc_config_dir = mtaos.getModulePath().joinpath("tests", "testData", "ofc")
+        ofc_data = OFCData("comcam", config_dir=ofc_config_dir)
 
         dof_state0 = yaml.safe_load(
             mtaos.getModulePath().joinpath("tests", "testData", "state0inDof.yaml").open().read()
@@ -264,7 +265,7 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(w, 0, 3)
 
         # Expected total hexapod offset
-        self.assertAlmostEqual(z_m2hex + z_camhex, 6.3002, 3)
+        self.assertAlmostEqual(z_m2hex + z_camhex, 6.2795, 3)
 
         actCorr = self.model.m1m3_correction()
         self.assertTrue(
