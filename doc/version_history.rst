@@ -13,6 +13,23 @@ Version History
 
 .. towncrier release notes start
 
+v0.29.0 (2026-04-01)
+====================
+
+New Features
+------------
+
+- Implemented a deque-based tracking system using 'following_images_max_len' to manage processed and skipped images in the closed loop. (`OSW-2094 <https://rubinobs.atlassian.net//browse/OSW-2094>`_)
+- Improved rotator position handling by using an ordered dictionary to manage image-specific data and ensure manageable memory usage. (`OSW-2094 <https://rubinobs.atlassian.net//browse/OSW-2094>`_)
+- Refactored the closed-loop logic in 'mtaos.py' to skip corrections for exposures taken prior to the most recently applied correction. (`OSW-2094 <https://rubinobs.atlassian.net//browse/OSW-2094>`_)
+
+
+Other Changes and Additions
+---------------------------
+
+- Updated the documentation structure and pre-commit configuration to officially support Towncrier and the Ruff linter. (`OSW-2094 <https://rubinobs.atlassian.net//browse/OSW-2094>`_)
+
+
 v0.28.3
 =======
 
