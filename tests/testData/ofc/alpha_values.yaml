@@ -1,0 +1,36 @@
+---
+
+# Default alpha coefficient for the normalized point-source sensitivity
+# There are 25 terms of alpha value here for z4-z28 to use.
+# Alpha values are shown in um^{-2} and they come from fitting
+# PSSN ~ 1 - alpha * delta^2
+# Eq (7.1) in Normalized Point Source Sensitivity for LSST
+# The procedure to obtain them is detailed in scripts/generate_alpha_values.py
+# For more details, please check the page 19-21 in:
+# https://docushare.lsst.org/docushare/dsweb/Get/Document-18041/150513.pptx.pdf
+
+- 8.119788703876399
+- 3.803903860099262
+- 3.7075643426817457
+- 7.910778451717063
+- 7.9130665825261435
+- 4.517331586817598
+- 4.512051621073744
+- 12.68880233184141
+- 7.715997813829591
+- 7.908990901486927
+- 5.19792373386893
+- 5.3505904402906825
+- 12.319457295074399
+- 12.315411708893777
+- 7.918695509378762
+- 7.916315866335741
+- 6.148076662094036
+- 6.1462988120611985
+- 16.6572064679918
+- 12.280711288351212
+- 11.968099475926916
+- 8.19567104622164
+- 7.959842096007853
+- 7.027391849189098
+- 6.850699369023726

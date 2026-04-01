@@ -1,0 +1,14 @@
+---
+
+# Weighting ratio of image quality used in the Q matrix in cost function
+# Sensor name: weight
+
+R22_S00: 1
+R22_S01: 1
+R22_S02: 1
+R22_S10: 1
+R22_S11: 1
+R22_S12: 1
+R22_S20: 1
+R22_S21: 1
+R22_S22: 1

@@ -1,0 +1,29 @@
+# Description: Bending mode stresses for M2 mirror
+#
+# bending_mode_stress is the stress in Pa/um (of surface deviation) per bending mode (array of 20 elements)
+# A summary of how they were derived can be found in the report 
+# https://docushare.lsst.org/docushare/dsweb/Get/Document-59542/M2_AOS_Corrected_Forces_Stress_Verification.pptx
+#
+# The stress values we are concerned with regarding glass safety are those describing tensile stress, which 
+# are indicated by positive values, whereas compressive stress is indicated by negative values. This is an 
+# adopted convention in material mechanics. Tensile stress refers to forces that attempt to pull the material 
+# apart, while compressive stress refers to forces that push the material together.
+#
+# In the case of the M2 mirror, the maximum tensile stress for a particular positive bending mode is not 
+# necessarily the same as for the negative of that bending mode. For most modes, the maximum tensile stress 
+# is almost identical, but for a few, there is a significant difference. 
+
+
+bending_mode_stress_positive: [
+  6917, 6900, 39589, 42482, 64895,
+  159149, 157371, 144003, 144566, 287154,
+  282166, 351118, 346213, 575162, 680888,
+  601952, 712855, 1959056, 2847102, 2905338,
+]
+
+bending_mode_stress_negative: [
+  6917, 6900, 39589, 42482, 64895,
+  159149, 157371, 144003, 144566, 287154,
+  282167, 351119, 346213, 575163, 680888,
+  601953, 712856, 1959056, 2847108, 2905340,
+]

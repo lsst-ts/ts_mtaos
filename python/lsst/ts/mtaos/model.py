@@ -1868,6 +1868,7 @@ class Model:
 
                     elif key == "zn_selected" and len(kwargs[key]) > 0:
                         self.ofc.ofc_data.zn_selected = np.array(kwargs[key])
+                    self.ofc.state_estimator.refresh_from_ofc_data()
 
         except Exception:
             self.log.error("Error setting value in ofc_data. Restoring original values.")

@@ -1,0 +1,11 @@
+---
+
+# Rotation matrix between ZEMAX coordinate and Mirrior's coordinate.
+# ZEMAX is used to generate/ evaluate the bending mode.
+# Mirror's coordinate is used in the mirror's control system.
+
+# For the Harris's MATLAB and LabVIEW tools:
+# The (x, y, z)-axis in MATLAB is (-y, -x, -z) in LabVIEW
+
+# +z in Bo's FEA (ZEMAX) is +z in M2 hardware (LabVIEW).
+act: 1.0

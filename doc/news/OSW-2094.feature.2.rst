@@ -1,0 +1,1 @@
+Improved rotator position handling by using an ordered dictionary to manage image-specific data and ensure manageable memory usage.
