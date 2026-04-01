@@ -1,0 +1,23 @@
+description: LSST LSSTCam Parameters
+instrument: lsst.obs.lsst.LsstCam
+
+# Field inner and outer radius
+field:
+  radius_inner: 0.0 # degree
+  radius_outer: 1.75 # degree
+
+# Pupil inner and outer radius
+pupil:
+  radius_inner: 2.558 # meter
+  radius_outer: 4.18 # meter
+
+# Wavelenghts for different filters
+wavelengths:
+  u: 0.365 # micron
+  g: 0.480 # micron
+  r: 0.622 # micron
+  i: 0.754 # micron
+  z: 0.869 # micron
+  y: 0.971 # micron
+  ref: 0.5 # micron
+  

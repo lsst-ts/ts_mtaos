@@ -1,0 +1,61 @@
+# Description: Normalization weights for the sensitivity matrix
+#
+# The normalization weights are used to normalize the sensitivity matrix and 
+# be able to operate in a different basis. The normalization weights are effectively a rescaling
+# diagonal matix that is applied to the sensitivity to equalize the relevance of the different 
+# degrees of freedom (namelly, the different units and ranges of the degrees of freedom).
+# The default is simply an identity (weights = 1)), which means that the sensitivity matrix is not
+# normalized in any way.
+# Units can be dimensionless. The reduced basis weights units are um of range * arcsec of FWHM.
+# But the matrix is denormalized before retrieving the optical state, so it should not be relevant. 
+
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1

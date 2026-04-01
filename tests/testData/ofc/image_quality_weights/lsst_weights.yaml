@@ -1,0 +1,13 @@
+---
+
+# Weighting ratio of image quality used in the Q matrix in cost function
+# Sensor name: weight
+
+R00_SW0: 1
+R00_SW1: 1
+R40_SW0: 1
+R40_SW1: 1
+R04_SW0: 1
+R04_SW1: 1
+R44_SW0: 1
+R44_SW1: 1
