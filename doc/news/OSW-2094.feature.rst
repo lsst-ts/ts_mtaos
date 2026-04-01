@@ -1,0 +1,1 @@
+Refactored the closed-loop logic in 'mtaos.py' to skip corrections for exposures taken prior to the most recently applied correction.

@@ -1,0 +1,1 @@
+Implemented a deque-based tracking system using 'following_images_max_len' to manage processed and skipped images in the closed loop.

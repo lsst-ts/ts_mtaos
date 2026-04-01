@@ -1,0 +1,11 @@
+---
+
+# Rotation matrix between ZEMAX coordinate and Mirrior's coordinate.
+# ZEMAX is used to generate/ evaluate the bending mode.
+# Mirror's coordinate is used in the mirror's control system.
+
+# The FEA coordinate is the optical coordinate system defined in LTS-136.
+# +z is defined from M1M3 to M2.
+
+# +z in Bo's FEA (ZEMAX) is +z in M1M3 hardware.
+act: 1.0

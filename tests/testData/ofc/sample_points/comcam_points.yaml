@@ -1,0 +1,16 @@
+---
+
+# This file stores the sensor field points for the ComCam field
+# The points are stored in the following format:
+# - [field_x, field_y]
+# field_x and field_y are in degrees, and they correspond to the field angles
+
+R22_S00: [-0.23472222222222225, -0.23472222222222225]
+R22_S01: [-0.23472222222222222, 0.0]
+R22_S02: [-0.23472222222222225, 0.23472222222222225]
+R22_S10: [0.0, -0.23472222222222222]
+R22_S11: [0.0, 0.0]
+R22_S12: [0.0, 0.23472222222222222]
+R22_S20: [0.23472222222222225, -0.23472222222222225]
+R22_S21: [0.23472222222222222, 0.0]
+R22_S22: [0.23472222222222225, 0.23472222222222225]
