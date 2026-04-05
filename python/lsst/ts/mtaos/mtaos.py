@@ -81,6 +81,7 @@ class MTAOS(salobj.ConfigurableCsc):
     MAX_TIME_SAMPLE = 100
     CMD_TIMEOUT = 60.0
     CLOSED_LOOP_FAILED = 1
+    TIMEOUT_WAIT_INITIAL_DETAILED_STATE = 2
 
     def __init__(
         self,
@@ -1495,17 +1496,24 @@ class MTAOS(salobj.ConfigurableCsc):
                                 continue
 
                         await self.evt_closedLoopState.set_write(state=ClosedLoopState.WAITING_APPLY)
-                        camera.evt_shutterDetailedState.flush()
-                        camera_shutter_detailed_state = await camera.evt_shutterDetailedState.aget(
-                            timeout=self.CMD_TIMEOUT
-                        )
+                        try:
+                            camera_shutter_detailed_state = await camera.evt_shutterDetailedState.next(
+                                flush=True,
+                                timeout=self.TIMEOUT_WAIT_INITIAL_DETAILED_STATE,
+                            )
+                        except asyncio.TimeoutError:
+                            camera_shutter_detailed_state = await camera.evt_shutterDetailedState.aget(
+                                timeout=self.CMD_TIMEOUT
+                            )
+
                         while camera_shutter_detailed_state.substate != 1:
                             self.log.info(
                                 "Camera shutter detailed state: "
                                 f"{camera_shutter_detailed_state.substate}, waiting until it is 1."
                             )
                             camera_shutter_detailed_state = await camera.evt_shutterDetailedState.next(
-                                flush=False
+                                flush=False,
+                                timeout=self.closed_loop_timeout_without_images,
                             )
 
                         self.log.info(
