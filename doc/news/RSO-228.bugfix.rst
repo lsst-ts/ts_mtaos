@@ -1,0 +1,1 @@
+Improved the retrieval logic for the camera shutter detailed state in 'mtaos.py' to ensure robustness against event lag caused by closed-loop processing loads.
