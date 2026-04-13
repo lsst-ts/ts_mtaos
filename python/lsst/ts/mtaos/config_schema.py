@@ -127,6 +127,17 @@ properties:
       space.
     type: boolean
 
+  vmodes_selected:
+    description: >-
+      Explicit list of v-mode indices (1-based) to use in the state estimator.
+      When set, overrides the automatic truncation_index-based selection.
+      If empty, automatic truncation is used.
+    type: array
+    items:
+      type: integer
+      minimum: 1
+    default: []
+
   reference_detector:
     description: Which detector to use as a reference for determining the boresight information.
     type: integer

@@ -433,6 +433,12 @@ class MTAOS(salobj.ConfigurableCsc):
         self.used_dofs = np.zeros(50)
         self.used_dofs[selected_dofs] = 1
 
+        # Apply explicit v-mode selection if configured
+        vmodes_selected = getattr(config, "vmodes_selected", [])
+        if len(vmodes_selected) > 0:
+            self.model.ofc.set_vmodes_selected(vmodes_selected)
+            self.log.info(f"Configured explicit v-mode selection: {vmodes_selected}")
+
         # Set the stress scale approach, factor, and limits
         self.stress_scale_approach = config.stress_scale_approach
         self.stress_scale_factor = config.stress_scale_factor
