@@ -1,0 +1,1 @@
+Add ``vmodes_selected`` to the CSC configuration schema to allow explicit v-mode selection in the state estimator, overriding the automatic truncation-based selection.

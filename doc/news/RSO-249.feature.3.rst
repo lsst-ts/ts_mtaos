@@ -1,0 +1,1 @@
+Add ``vmodes_selected`` handler in ``Model.set_ofc_data_values()`` to support runtime override of the v-mode selection via the ``startClosedLoop`` command config.
