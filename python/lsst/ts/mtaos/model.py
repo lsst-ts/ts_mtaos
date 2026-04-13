@@ -1869,7 +1869,7 @@ class Model:
                     elif key == "zn_selected" and len(kwargs[key]) > 0:
                         self.ofc.ofc_data.zn_selected = np.array(kwargs[key])
 
-                    elif key == "vmodes_selected" and len(kwargs[key]) > 0:
+                    elif key == "vmodes_selected" and (kwargs[key] is None or len(kwargs[key]) > 0):
                         original_ofc_data_values[key] = (
                             self.ofc.ofc_data.vmodes_selected.copy()
                             if self.ofc.ofc_data.vmodes_selected is not None
