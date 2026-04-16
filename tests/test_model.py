@@ -643,8 +643,8 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
     async def test_set_ofc_data_values_vmodes_selected(self) -> None:
         """Test that vmodes_selected can be set and restored via
         set_ofc_data_values."""
-        # Confirm default is None (automatic truncation)
-        self.assertIsNone(self.model.ofc.ofc_data.vmodes_selected)
+        # Save the default selection
+        default_vmodes = self.model.ofc.ofc_data.vmodes_selected.copy()
 
         # Set vmodes_selected
         new_vmodes = [1, 2, 3, 4, 5]
@@ -652,11 +652,11 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
 
         np.testing.assert_array_equal(self.model.ofc.ofc_data.vmodes_selected, np.array(new_vmodes))
         self.assertIn("vmodes_selected", original)
-        self.assertIsNone(original["vmodes_selected"])
+        np.testing.assert_array_equal(original["vmodes_selected"], default_vmodes)
 
         # Restore original
         await self.model.set_ofc_data_values(**original)
-        self.assertIsNone(self.model.ofc.ofc_data.vmodes_selected)
+        np.testing.assert_array_equal(self.model.ofc.ofc_data.vmodes_selected, default_vmodes)
 
     async def test_set_ofc_data_values_vmodes_selected_refreshes_estimator(self) -> None:
         """Test that setting vmodes_selected triggers a state estimator

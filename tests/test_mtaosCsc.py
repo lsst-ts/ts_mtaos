@@ -770,9 +770,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=0,
         ):
-            # Start with default config — vmodes_selected should be None
+            # Start with default config — vmodes_selected from _init.yaml
             await self.remote.cmd_start.set_start(timeout=STD_TIMEOUT)
-            self.assertIsNone(self.csc.model.ofc.ofc_data.vmodes_selected)
+            np.testing.assert_array_equal(
+                self.csc.model.ofc.ofc_data.vmodes_selected,
+                np.array([1, 2, 3, 4, 5, 6, 7, 8]),
+            )
 
             # A config override can set vmodes_selected
             await salobj.set_summary_state(self.remote, salobj.State.STANDBY)
