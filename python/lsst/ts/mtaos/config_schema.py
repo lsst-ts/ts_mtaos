@@ -37,7 +37,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v13
+title: MTAOS v14
 description: Schema for MTAOS configuration files
 type: object
 
@@ -131,12 +131,10 @@ properties:
     description: >-
       Explicit list of v-mode indices (1-based) to use in the state estimator.
       When set, overrides the automatic truncation_index-based selection.
-      If empty, automatic truncation is used.
     type: array
     items:
       type: integer
       minimum: 1
-    default: []
 
   reference_detector:
     description: Which detector to use as a reference for determining the boresight information.
