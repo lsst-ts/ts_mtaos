@@ -1735,12 +1735,12 @@ class MTAOS(salobj.ConfigurableCsc):
             ) from e
         if actual_state != salobj.State.ENABLED:
             raise RuntimeError(f"MTPtg is not ENABLED. Expected: ENABLED. Actual: {actual_state.name}.")
-        # Get lv_dof vector
-        dof_visit = self.model.get_dof_lv()
-        if not np.any(dof_visit):
-            self.log.info("Skipping pointing correction: per-visit DOF change is zero.")
+        # Get aggregated DOF vector
+        dof_aggr = self.model.get_dof_aggr()
+        if not np.any(dof_aggr):
+            self.log.info("Skipping pointing correction: aggregated DOF is zero.")
             return
-        x_mm, y_mm = self.model.compute_pointing_correction_offset(dof_visit)
+        x_mm, y_mm = self.model.compute_pointing_correction_offset(dof_aggr)
         try:
             await self.remotes["mtptg"].cmd_poriginOffset.set_start(
                 dx=float(x_mm),
