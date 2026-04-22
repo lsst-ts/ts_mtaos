@@ -22,11 +22,9 @@
 import asyncio
 import glob
 import os
-import shutil
-import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, PropertyMock, patch
 
 import numpy as np
 import pytest
@@ -109,6 +107,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def _getRemote(self) -> salobj.Remote:
         # This is instantiated after calling self.make_csc().
         return self.remote
+
+    def _make_local_model_for_dof_tests(self) -> mtaos.Model:
+        ofc_data = OFCData("lsstfam")
+        with mtaos.getModulePath().joinpath("tests", "testData", "state0inDof.yaml").open() as fp:
+            ofc_data.dof_state0 = yaml.safe_load(fp)
+
+        return mtaos.Model(instrument=ofc_data.name, data_path=None, ofc_data=ofc_data)
 
     async def testBinScript(self) -> None:
         cmdline_args = ["--log-to-file", "--log-level", "20"]
@@ -299,6 +304,99 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 flush=False,
                 timeout=SHORT_TIMEOUT,
             )
+
+    async def test_handle_summary_state_fault_stores_previous_dofs_copy(self) -> None:
+        """Test that handling transition to FAULT stores a copy of the current
+        DOFs in previous_dofs."""
+        async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
+            csc = self.csc
+            csc._model = self._make_local_model_for_dof_tests()
+            aggregated_state = csc.model.get_dof_aggr().copy()
+            aggregated_state += 0.5
+            csc.model.set_dof_aggr(aggregated_state)
+
+            with patch.object(type(csc), "summary_state", new_callable=PropertyMock) as summary_state:
+                summary_state.return_value = salobj.State.FAULT
+                await csc.handle_summary_state()
+
+            np.testing.assert_array_equal(csc.previous_dofs, aggregated_state)
+            self.assertIsNot(csc.previous_dofs, csc.model.get_dof_aggr())
+
+            updated_dofs = aggregated_state + 10.0
+            csc.model.set_dof_aggr(updated_dofs)
+            np.testing.assert_array_equal(csc.previous_dofs, aggregated_state)
+
+    async def test_handle_summary_state_disabled_preserves_previous_dofs(self) -> None:
+        """Test that handling transition to DISABLED does not modify
+        previous_dofs."""
+        async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
+            csc = self.csc
+            csc._model = self._make_local_model_for_dof_tests()
+            previous_dofs = csc.model.get_dof_aggr().copy()
+            previous_dofs += 0.5
+            csc.previous_dofs = previous_dofs.copy()
+            current_dofs = csc.model.get_dof_aggr().copy()
+            current_dofs += 1.5
+            csc.model.set_dof_aggr(current_dofs)
+
+            with patch.object(type(csc), "summary_state", new_callable=PropertyMock) as summary_state:
+                summary_state.return_value = salobj.State.DISABLED
+                await csc.handle_summary_state()
+
+            np.testing.assert_array_equal(csc.previous_dofs, previous_dofs)
+
+    async def test_execute_issue_correction_stores_previous_dofs(self) -> None:
+        """Test that executing issueCorrection stores a copy of the current
+        DOFs in previous_dofs."""
+        async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
+            csc = self.csc
+            csc._model = self._make_local_model_for_dof_tests()
+            updated_dofs = csc.model.get_dof_aggr().copy()
+            updated_dofs += 0.5
+
+            async def handle_corrections() -> None:
+                csc.model.set_dof_aggr(updated_dofs)
+                csc._store_previous_dofs()
+
+            csc.handle_corrections = AsyncMock(side_effect=handle_corrections)
+            csc.pubEvent_mirrorStresses = AsyncMock()
+
+            await csc._execute_issue_correction()
+
+            np.testing.assert_array_equal(csc.previous_dofs, updated_dofs)
+            self.assertIsNot(csc.previous_dofs, csc.model.get_dof_aggr())
+
+    async def test_dof_restored_after_fault_recovery(self) -> None:
+        """Test DOFs are restored after FAULT → STANDBY → ENABLED cycle.
+
+        This test verifies behavior (B): DOFs stored at the moment of FAULT
+        are restored when returning to ENABLED.
+        """
+        async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
+            # Go to ENABLED state
+            await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
+
+            csc = self.csc
+
+            # Set known DOFs representing state at moment of FAULT
+            original_dofs = csc.model.get_dof_aggr().copy()
+            original_dofs += 0.5
+            csc.model.set_dof_aggr(original_dofs)
+
+            # Simulate FAULT (stores DOFs at moment of fault)
+            with patch.object(type(csc), "summary_state", new_callable=PropertyMock) as summary_state:
+                summary_state.return_value = salobj.State.FAULT
+                await csc.handle_summary_state()
+
+            # Verify DOFs were stored
+            np.testing.assert_array_equal(csc.previous_dofs, original_dofs)
+
+            # Recover: STANDBY → ENABLED (configure() restores DOFs)
+            await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
+
+            # Verify DOFs were restored
+            restored_dofs = csc.model.get_dof_aggr()
+            np.testing.assert_array_equal(restored_dofs, original_dofs)
 
     async def test_addAberration(self) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
@@ -651,52 +749,27 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         assert "lsst_distrib" in sofware_versions.subsystemVersions
 
     async def test_pointing_config_disabled_no_remote(self) -> None:
-        # Use an ephemeral config dir to avoid writing to the repo
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Seed temp dir with an LSSTCam config that already enables
-            # pointing correction
-            base_cfg_path = TEST_CONFIG_DIR / "valid_lsstcam_enable_pointing.yaml"
-            shutil.copy(base_cfg_path, Path(tmpdir) / "_init.yaml")
-            with open(base_cfg_path) as fp:
-                cfg = yaml.safe_load(fp)
-            # Disable the feature and omit the matrix
-            cfg["enable_pointing_correction"] = False
-            cfg.pop("pointing_correction_matrix", None)
-
-            # Ensure required core keys exists
-            # These are accessed unconditionally in configure().
-            cfg.setdefault("zernike_column_pattern", "opd_columns")
-            cfg.setdefault("subtract_intrinsics", True)
-            cfg.setdefault("control_vmodes", False)
-
-            tmp_cfg_name = "pointing_correction_disabled.yaml"
-            tmp_cfg_path = Path(tmpdir) / tmp_cfg_name
-            with open(tmp_cfg_path, "w") as f:
-                yaml.safe_dump(cfg, f)
-
-            async with self.make_csc(
-                initial_state=salobj.State.STANDBY,
-                config_dir=tmpdir,
-                simulation_mode=0,
-            ):
-                await self.remote.cmd_start.set_start(configurationOverride=tmp_cfg_name, timeout=STD_TIMEOUT)
-
-                # Verify CSC did not initialize mtptg remote and flag is False
-                self.assertFalse(self.csc.enable_pointing_correction)
-                self.assertNotIn("mtptg", self.csc.remotes)
-
-    async def test_pointing_config_enabled_with_matrix(self) -> None:
-        # Use the existing valid config (already includes a 50x2 matrix)
-        # and verify the CSC enables the feature and wires the MTPtg remote.
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=0,
         ):
             await self.remote.cmd_start.set_start(
-                configurationOverride="valid_lsstcam_enable_pointing.yaml",
+                configurationOverride="disable_pointing_correction.yaml",
                 timeout=STD_TIMEOUT,
             )
+
+            # Verify CSC did not initialize mtptg remote and flag is False
+            self.assertFalse(self.csc.enable_pointing_correction)
+            self.assertNotIn("mtptg", self.csc.remotes)
+
+    async def test_pointing_config_enabled_with_matrix(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await self.remote.cmd_start.set_start(timeout=STD_TIMEOUT)
 
             # Verify CSC flag and remote presence
             self.assertTrue(self.csc.enable_pointing_correction)
@@ -710,35 +783,40 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(dx, float)
             self.assertIsInstance(dy, float)
 
-    async def test_pointing_config_enabled_missing_matrix_rejected(self) -> None:
-        # Use an ephemeral config dir with enable=True but missing matrix;
-        # start should be rejected.
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Seed temp dir with an LSSTCam config that already enables
-            # pointing correction
-            base_cfg_path = TEST_CONFIG_DIR / "valid_lsstcam_enable_pointing.yaml"
-            shutil.copy(base_cfg_path, Path(tmpdir) / "_init.yaml")
-            with open(base_cfg_path) as fp:
-                cfg = yaml.safe_load(fp)
-            cfg["enable_pointing_correction"] = True
-            # Explicitly set an invalid matrix to avoid inheriting from
-            # _init.yaml
-            cfg["pointing_correction_matrix"] = []
-            tmp_cfg_name = "pointing_correction_missing_matrix.yaml"
-            tmp_cfg_path = Path(tmpdir) / tmp_cfg_name
-            with open(tmp_cfg_path, "w") as f:
-                yaml.safe_dump(cfg, f)
+    async def test_pointing_config_enabled_empty_matrix_rejected(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            with salobj.assertRaisesAckError():
+                await self.remote.cmd_start.set_start(
+                    configurationOverride="empty_pointing_correction_matrix.yaml",
+                    timeout=STD_TIMEOUT,
+                )
 
-            async with self.make_csc(
-                initial_state=salobj.State.STANDBY,
-                config_dir=tmpdir,
-                simulation_mode=0,
-            ):
-                with salobj.assertRaisesAckError():
-                    await self.remote.cmd_start.set_start(
-                        configurationOverride=tmp_cfg_name,
-                        timeout=STD_TIMEOUT,
-                    )
+    async def test_pointing_correction_reconfig_adds_mtptg(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await self.remote.cmd_start.set_start(
+                configurationOverride="disable_pointing_correction.yaml",
+                timeout=STD_TIMEOUT,
+            )
+            self.assertFalse(self.csc.enable_pointing_correction)
+            self.assertNotIn("mtptg", self.csc.remotes)
+
+            await salobj.set_summary_state(self.remote, salobj.State.STANDBY)
+
+            # Valid reconfiguration to enable pointing correction
+            await self.remote.cmd_start.set_start(
+                configurationOverride="enable_pointing_correction.yaml",
+                timeout=STD_TIMEOUT,
+            )
+            self.assertTrue(self.csc.enable_pointing_correction)
+            self.assertIn("mtptg", self.csc.remotes)
 
     async def test_configure_filter_change_override_gains(self) -> None:
         async with self.make_csc(
