@@ -308,47 +308,47 @@ class MTAOS(salobj.ConfigurableCsc):
         # Read feature flag early to decide if we start MTPtg remote
         enable_pointing_correction = bool(getattr(config, "enable_pointing_correction", True))
 
-        if not self.remotes:
-            remotes_parameters = {
-                "m2hex": (
-                    "MTHexapod",
-                    utility.MTHexapodIndex.M2.value,
-                    ["summaryState", "heartbeat"],
-                ),
-                "camhex": (
-                    "MTHexapod",
-                    utility.MTHexapodIndex.Camera.value,
-                    ["summaryState", "heartbeat"],
-                ),
-                "m1m3": (
-                    "MTM1M3",
-                    None,
-                    ["summaryState", "heartbeat", "appliedActiveOpticForces"],
-                ),
-                "m2": ("MTM2", None, ["summaryState", "heartbeat", "axialForce"]),
-            }
+        remotes_parameters = {
+            "m2hex": (
+                "MTHexapod",
+                utility.MTHexapodIndex.M2.value,
+                ["summaryState", "heartbeat"],
+            ),
+            "camhex": (
+                "MTHexapod",
+                utility.MTHexapodIndex.Camera.value,
+                ["summaryState", "heartbeat"],
+            ),
+            "m1m3": (
+                "MTM1M3",
+                None,
+                ["summaryState", "heartbeat", "appliedActiveOpticForces"],
+            ),
+            "m2": ("MTM2", None, ["summaryState", "heartbeat", "axialForce"]),
+        }
 
-            if enable_pointing_correction:
-                remotes_parameters["mtptg"] = (
-                    "MTPtg",
-                    None,
-                    ["summaryState", "heartbeat"],
-                )
+        if enable_pointing_correction:
+            remotes_parameters["mtptg"] = (
+                "MTPtg",
+                None,
+                ["summaryState", "heartbeat"],
+            )
 
-            for remote_name in remotes_parameters:
-                component, index, include = remotes_parameters[remote_name]
-                self.log.info(f"Starting remote for {component=}:{index=}")
-                self.remotes[remote_name] = salobj.Remote(
-                    self.domain, component, index=index, include=include
-                )
-                try:
-                    async with asyncio.timeout(self.DEFAULT_TIMEOUT):
-                        await self.remotes[remote_name].start_task
-                except asyncio.TimeoutError:
-                    self.log.warning("Timeout while waiting for remote to start. Continuing.")
-                finally:
-                    await asyncio.sleep(self.heartbeat_interval)
-            self.log.info("All remotes ready.")
+        for remote_name in remotes_parameters:
+            if remote_name in self.remotes:
+                continue
+
+            component, index, include = remotes_parameters[remote_name]
+            self.log.info(f"Starting remote for {component=}:{index=}")
+            self.remotes[remote_name] = salobj.Remote(self.domain, component, index=index, include=include)
+            try:
+                async with asyncio.timeout(self.DEFAULT_TIMEOUT):
+                    await self.remotes[remote_name].start_task
+            except asyncio.TimeoutError:
+                self.log.warning("Timeout while waiting for remote to start. Continuing.")
+            finally:
+                await asyncio.sleep(self.heartbeat_interval)
+        self.log.info("All remotes ready.")
 
         # TODO (DM-31365): Remove workaround to visitId being of type long in
         # MTAOS runWEP command.
@@ -1735,12 +1735,12 @@ class MTAOS(salobj.ConfigurableCsc):
             ) from e
         if actual_state != salobj.State.ENABLED:
             raise RuntimeError(f"MTPtg is not ENABLED. Expected: ENABLED. Actual: {actual_state.name}.")
-        # Get lv_dof vector
-        dof_visit = self.model.get_dof_lv()
-        if not np.any(dof_visit):
-            self.log.info("Skipping pointing correction: per-visit DOF change is zero.")
+        # Get aggregated DOF vector
+        dof_aggr = self.model.get_dof_aggr()
+        if not np.any(dof_aggr):
+            self.log.info("Skipping pointing correction: aggregated DOF is zero.")
             return
-        x_mm, y_mm = self.model.compute_pointing_correction_offset(dof_visit)
+        x_mm, y_mm = self.model.compute_pointing_correction_offset(dof_aggr)
         try:
             await self.remotes["mtptg"].cmd_poriginOffset.set_start(
                 dx=float(x_mm),
@@ -1751,9 +1751,8 @@ class MTAOS(salobj.ConfigurableCsc):
                 f"Successfully issued pointing correction to MTPtg (poriginOffset): "
                 f"dx={x_mm} mm, dy={y_mm} mm."
             )
-        except Exception:
-            self.log.exception("MTPtg poriginOffset command failed.")
-            raise
+        except Exception as e:
+            raise RuntimeError("Failed to issue pointing correction to MTPtg.") from e
 
     async def issue_m2hex_correction(self, undo: bool = False) -> None:
         """Issue the correction of M2 hexapod.
