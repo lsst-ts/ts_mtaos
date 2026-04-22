@@ -1,1 +1,0 @@
-- Fixed MTAOS recovery of the previously applied aggregated degrees of freedom when returning from FAULT or DISABLED to ENABLED.
