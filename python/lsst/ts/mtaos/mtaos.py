@@ -407,7 +407,7 @@ class MTAOS(salobj.ConfigurableCsc):
         )
 
         if self.previous_dofs is not None:
-            self.model.ofc.aggregated_state = self.previous_dofs
+            self.model.set_dof_aggr(self.previous_dofs)
         elif dof_state0 is not None:
             self.model.ofc_data.dof_state0 = dof_state0
 
@@ -490,6 +490,14 @@ class MTAOS(salobj.ConfigurableCsc):
         funcName = inspect.stack()[1].function
         self.log.info(f"Execute {funcName}().")
 
+    def _store_previous_dofs(self) -> None:
+        """Store a copy of the current aggregated DOFs for later recovery."""
+
+        current_dof_aggr = np.array(self.model.get_dof_aggr(), copy=True)
+        self.log.debug(f"Storing previous dofs: {current_dof_aggr} Previous dofs: {self.previous_dofs}")
+
+        self.previous_dofs = current_dof_aggr
+
     @staticmethod
     def get_config_pkg() -> str:
         return "ts_config_mttcs"
@@ -545,12 +553,16 @@ class MTAOS(salobj.ConfigurableCsc):
 
     async def handle_summary_state(self) -> None:
         """Handle summary state changes.
-        Here we store the previous state of the DOFs when
-        going to fault or disabled.
+        Save recoverable DOFs on FAULT or first DISABLED transition,
+        and re-apply the stored state when returning to ENABLED.
         """
-        if self.summary_state in {salobj.State.FAULT, salobj.State.DISABLED}:
+        if self.summary_state == salobj.State.FAULT:
             self.log.info("Storing previous state.")
-            self.previous_dofs = self.model.ofc.controller.aggregated_state
+            self._store_previous_dofs()
+
+        elif self.summary_state == salobj.State.DISABLED and self.previous_dofs is None:
+            self.log.info("Storing previous state.")
+            self._store_previous_dofs()
 
         elif self.summary_state == salobj.State.ENABLED:
             await self.evt_closedLoopState.set_write(state=ClosedLoopState.IDLE)
@@ -1675,6 +1687,8 @@ class MTAOS(salobj.ConfigurableCsc):
         # All AOS corrections succeeded
         if self.enable_pointing_correction:
             await self.issue_pointing_correction()
+
+        self._store_previous_dofs()
 
     async def handle_undo_corrections(self, issued_corrections: dict[str, asyncio.Task]) -> str:
         """Handle undoing corrections.
