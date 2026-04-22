@@ -13,6 +13,17 @@ Version History
 
 .. towncrier release notes start
 
+v0.29.1 (2026-04-22)
+====================
+
+Bug Fixes
+---------
+
+- In ``mtaos.py``, ensure ``configure`` method re-adds missing remotes (e.g., ``mtptg``) when pointing correction is enabled on a reconfigure/state cycle. (`RSO-50 <https://rubinobs.atlassian.net//browse/RSO-50>`_)
+- In ``mtaos.py``, use aggregated DOF (``get_dof_aggr``) instead of per-visit DOF for pointing correction, as ``poriginOffset`` expects absolute offset values. (`RSO-50 <https://rubinobs.atlassian.net//browse/RSO-50>`_)
+- Fixed MTAOS recovery of the previously applied aggregated degrees of freedom when returning from FAULT or DISABLED to ENABLED. (`RSO-214 <https://rubinobs.atlassian.net//browse/RSO-214>`_)
+
+
 v0.29.0 (2026-04-01)
 ====================
 
