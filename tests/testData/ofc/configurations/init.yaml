@@ -9,6 +9,7 @@
 # please refer to the report https://www.betzler.physik.uni-osnabrueck.de/Manuskripte/Elektronik-Praktikum/p3/doc2558.pdf
 # derivative_filter_coeff is the coefficient of the derivative filter
 # zn_selected is the zernike coefficients selected to be used by the controller in Noll index
+# vmodes_selected optionally overrides automatic truncation and selects explicit v-modes in the estimator basis
 # setpoint is the setpoint for each degree of freedom (array of 50 elements)
 
 description: Default controller.

@@ -842,6 +842,30 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # null means "do not override".
             self.assertEqual(self.csc.filter_change_gains, (1.0, 0.5, None))
 
+    async def test_configure_vmodes_selected(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            # Start with default config — vmodes_selected from _init.yaml
+            await self.remote.cmd_start.set_start(timeout=STD_TIMEOUT)
+            np.testing.assert_array_equal(
+                self.csc.model.ofc.ofc_data.vmodes_selected,
+                np.array([1, 2, 3, 4, 5, 6, 7, 8]),
+            )
+
+            # A config override can set vmodes_selected
+            await salobj.set_summary_state(self.remote, salobj.State.STANDBY)
+            await self.remote.cmd_start.set_start(
+                configurationOverride="vmodes_selected.yaml",
+                timeout=STD_TIMEOUT,
+            )
+            np.testing.assert_array_equal(
+                self.csc.model.ofc.ofc_data.vmodes_selected, np.array([1, 2, 3, 4, 5])
+            )
+            self.assertEqual(self.csc.model.ofc.state_estimator.effective_vh.shape[0], 5)
+
     async def test_execute_ofc_filter_change_gains_override_and_restore(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,

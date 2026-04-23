@@ -640,6 +640,40 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
                 ],
             )
 
+    async def test_set_ofc_data_values_vmodes_selected(self) -> None:
+        """Test that vmodes_selected can be set and restored via
+        set_ofc_data_values."""
+        # Save the default selection
+        default_vmodes = self.model.ofc.ofc_data.vmodes_selected.copy()
+
+        # Set vmodes_selected
+        new_vmodes = [1, 2, 3, 4, 5]
+        original = await self.model.set_ofc_data_values(vmodes_selected=new_vmodes)
+
+        np.testing.assert_array_equal(self.model.ofc.ofc_data.vmodes_selected, np.array(new_vmodes))
+        self.assertIn("vmodes_selected", original)
+        np.testing.assert_array_equal(original["vmodes_selected"], default_vmodes)
+
+        # Restore original
+        await self.model.set_ofc_data_values(**original)
+        np.testing.assert_array_equal(self.model.ofc.ofc_data.vmodes_selected, default_vmodes)
+
+    async def test_set_ofc_data_values_vmodes_selected_refreshes_estimator(self) -> None:
+        """Test that setting vmodes_selected triggers a state estimator
+        refresh so the cached v-mode basis is updated."""
+        original_vh = self.model.ofc.state_estimator.effective_vh.copy()
+
+        new_vmodes = [1, 3, 5]
+        original = await self.model.set_ofc_data_values(vmodes_selected=new_vmodes)
+
+        # The effective_vh should now have only 3 rows (3 selected modes)
+        self.assertEqual(self.model.ofc.state_estimator.effective_vh.shape[0], 3)
+        self.assertFalse(np.array_equal(self.model.ofc.state_estimator.effective_vh, original_vh))
+
+        # Restore
+        await self.model.set_ofc_data_values(**original)
+        np.testing.assert_array_equal(self.model.ofc.state_estimator.effective_vh, original_vh)
+
 
 if __name__ == "__main__":
     # Do the unit test

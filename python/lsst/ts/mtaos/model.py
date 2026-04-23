@@ -1868,6 +1868,11 @@ class Model:
 
                     elif key == "zn_selected" and len(kwargs[key]) > 0:
                         self.ofc.ofc_data.zn_selected = np.array(kwargs[key])
+
+                    elif key == "vmodes_selected":
+                        original_ofc_data_values[key] = self.ofc.ofc_data.vmodes_selected.copy()
+                        self.ofc.set_vmodes_selected(kwargs[key])
+
                     self.ofc.state_estimator.refresh_from_ofc_data()
 
         except Exception:

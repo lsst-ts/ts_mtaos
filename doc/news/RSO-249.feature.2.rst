@@ -1,0 +1,1 @@
+Apply ``vmodes_selected`` from CSC configuration during ``configure()`` via ``OFC.set_vmodes_selected()`` to support explicit v-mode selection at startup.
