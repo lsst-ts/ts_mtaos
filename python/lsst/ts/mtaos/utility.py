@@ -304,8 +304,7 @@ def get_formatted_corner_wavefront_sensors_ids() -> str:
 
 
 def define_visit(
-    data_path: str,
-    collections: typing.List[str],
+    butler: Butler,
     instrument_name: str,
     exposures_str: str,
 ) -> None:
@@ -327,7 +326,11 @@ def define_visit(
         to be processed.
     """
 
-    butler = Butler(data_path, collections=collections, writeable=True)  # type: ignore
+    if not butler.isWriteable():
+        logging.getLogger(__name__).warning(
+            "Input butler is not writeable, copying into a writeable butler to define visit."
+        )
+        butler = butler.from_config(butler._config, writeable=True)  # type: ignore[attr-defined]
 
     exposure_data_ids = set(butler.registry.queryDataIds(["exposure"], where=exposures_str))
 
