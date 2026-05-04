@@ -329,7 +329,6 @@ class Model:
 
         self.butler = Butler.from_config(
             self.data_path,
-            instrument="LSSTCam",
             collections=[self.run_name, "LSSTCam/raw/all"],
             writeable=True,
         )
@@ -960,10 +959,12 @@ class Model:
 
             self.log.debug(f"Running: {run_pipetask_cmd}")
 
-            # Run pipeline task in a process asynchronously
+            # Run pipeline task in a process asynchronously. stdout is sent to
+            # DEVNULL so the OS pipe buffer cannot fill and block the
+            # subprocess; stderr is piped and drained by `log_stream`.
             self.wep_process = await asyncio.create_subprocess_shell(
                 run_pipetask_cmd,
-                stdout=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE,
             )
 
@@ -1051,10 +1052,7 @@ class Model:
         elif self.wep_process.returncode != 0:
             self.log.debug(f"Process returned: {self.wep_process.returncode}")
 
-            stdout, stderr = await self.wep_process.communicate()
-
-            if len(stdout) > 0:
-                self.log.debug(stdout.decode())
+            _, stderr = await self.wep_process.communicate()
 
             if len(stderr) > 0:
                 self.log.error(stderr.decode())
