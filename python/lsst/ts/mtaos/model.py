@@ -327,6 +327,13 @@ class Model:
         self.intra_id = 0
         self.extra_id: int | None = None
 
+        self.butler = Butler.from_config(
+            self.data_path,
+            instrument="LSSTCam",
+            collections=[self.run_name, "LSSTCam/raw/all"],
+            writeable=True,
+        )
+
         # This asyncio.Lock is used to synchronize the initialization of a new
         # wep pipeline task process. The idea is that we want to limit the
         # number of executing processes to 1. If more than one call to
@@ -994,8 +1001,7 @@ class Model:
                 pool,
                 functools.partial(
                     define_visit,
-                    data_path=self.data_path,
-                    collections=self.collections.split(","),
+                    butler=self.butler,
                     instrument_name=self.data_instrument_name[instrument],
                     exposures_str=exposures_str,
                 ),
@@ -1177,15 +1183,10 @@ class Model:
         ValueError
             If the visit id is not found in the butler.
         """
-        butler = Butler(
-            self.data_path,
-            instrument="LSSTCam",
-            collections=[self.run_name, "LSSTCam/raw/all"],
-        )  # type: ignore
         pair_id = self.extra_id if self.extra_id is not None else self.intra_id
-        refs = butler.query_datasets("raw", where=f"visit={pair_id}")
+        refs = self.butler.query_datasets("raw", where=f"visit={pair_id}")
 
-        image = butler.get(refs[0])
+        image = self.butler.get(refs[0])
         filter_label = image.getFilter().bandLabel
         elevation = (image.getMetadata().get("ELSTART") + image.getMetadata().get("ELEND")) / 2
 
@@ -1270,7 +1271,6 @@ class Model:
         """
         self.log.debug("Polling butler for WEP outputs.")
 
-        butler = Butler(self.data_path, collections=[self.run_name], instrument="LSSTCam")  # type: ignore
         start_time = time.time()
         elapsed_time = 0.0
 
@@ -1292,7 +1292,7 @@ class Model:
                     f"zernike column: {self.zernike_column_pattern}, "
                     f"{self.run_name=} {pair_id=}."
                 )
-                refs = butler.query_datasets(
+                refs = self.butler.query_datasets(
                     self.zernike_table_name,
                     collections=[self.run_name],
                     where=f"visit in ({pair_id})",
@@ -1320,7 +1320,7 @@ class Model:
 
         wavefront_errors = []
         for ref in refs:
-            table = butler.get(
+            table = self.butler.get(
                 self.zernike_table_name,
                 dataId=ref.dataId,
                 collections=[self.run_name],
@@ -1342,7 +1342,7 @@ class Model:
 
         self.log.debug(f"run_name: {self.run_name}, visit_id: {pair_id} yielded: {refs}")
 
-        corner_offsets = self.get_corner_offsets(refs, butler, self.run_name)
+        corner_offsets = self.get_corner_offsets(refs, self.butler, self.run_name)
         return wavefront_errors, corner_offsets
 
     def _gather_outputs(
@@ -1368,11 +1368,9 @@ class Model:
         """
         self.log.debug("Data processing completed successfully. Gathering output.")
 
-        butler = Butler(self.data_path, collections=[run_name])  # type: ignore
-
         # We may need to run the following in an executor so we won't block the
         # event loop.
-        refs = butler.query_datasets(self.zernike_table_name)
+        refs = self.butler.query_datasets(self.zernike_table_name)
         self.log.debug(
             f"run_name: {run_name}, intra_id: {self.intra_id}, extra_id: {self.extra_id} yielded: {refs}"
         )
@@ -1380,14 +1378,14 @@ class Model:
         wavefront_errors = [
             (
                 ref.dataId["detector"],
-                butler.get(
+                self.butler.get(
                     self.zernike_table_name,
                     dataId=ref.dataId,
                 ),
             )
             for ref in refs
         ]
-        radii_results = self.get_corner_offsets(refs, butler, run_name)
+        radii_results = self.get_corner_offsets(refs, self.butler, run_name)
         return (wavefront_errors, radii_results)
 
     def reject_unreasonable_wfe(self, listOfWfErr: list) -> list:
