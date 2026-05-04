@@ -334,6 +334,8 @@ class Model:
             writeable=True,
         )
 
+        self.camera = LsstCam().getCamera()
+
         # This asyncio.Lock is used to synchronize the initialization of a new
         # wep pipeline task process. The idea is that we want to limit the
         # number of executing processes to 1. If more than one call to
@@ -1610,8 +1612,7 @@ class Model:
             elif max_radius == extra_radius:
                 detector_offset *= -1
 
-            camera = LsstCam().getCamera()
-            detector = camera.get(ref.dataId["detector"])
+            detector = self.camera.get(ref.dataId["detector"])
             x_pos, y_pos = detector.getCenter(FIELD_ANGLE)
             x_pos_um = np.degrees(x_pos) * self.PIXEL_SIZE * 3600 / self.PIXEL_SCALE
             y_pos_um = np.degrees(y_pos) * self.PIXEL_SIZE * 3600 / self.PIXEL_SCALE
