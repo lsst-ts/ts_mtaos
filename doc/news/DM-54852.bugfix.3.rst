@@ -1,0 +1,1 @@
+- Pass the cached ``Butler`` into ``define_visit`` instead of letting it construct its own from ``data_path`` and ``collections``, removing another per-WEP-call butler instantiation.
