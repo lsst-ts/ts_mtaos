@@ -41,7 +41,6 @@ import logging
 import os
 import re
 import time
-import typing
 from enum import Enum, auto
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
