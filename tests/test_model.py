@@ -24,7 +24,7 @@ import os
 import shutil
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import numpy as np
 import yaml
@@ -47,7 +47,8 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
     model: mtaos.Model
 
     @classmethod
-    def setUpClass(cls) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    def setUpClass(cls, MockButler: Mock) -> None:
         cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
         cls.isrDir = cls.dataDir.joinpath("input")
 
@@ -190,23 +191,20 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result), 20)
 
     def test_compute_pointing_correction_offset(self) -> None:
-        # Fresh model
-        local_model = mtaos.Model(instrument="comcam", data_path=None, ofc_data=OFCData("comcam"))
-
         # If matrix not set -> (0, 0)
-        dx, dy = local_model.compute_pointing_correction_offset(np.zeros(50))
+        dx, dy = self.model.compute_pointing_correction_offset(np.zeros(50))
         self.assertEqual((dx, dy), (0.0, 0.0))
 
         # Set a simple matrix: x = d[0]; y = 2*d[1]
         mat = np.zeros((50, 2))
         mat[0, 0] = 1.0
         mat[1, 1] = 2.0
-        local_model.set_pointing_correction_matrix(mat)
+        self.model.set_pointing_correction_matrix(mat)
 
         d = np.zeros(50)
         d[0] = 3.0
         d[1] = 5.0
-        dx, dy = local_model.compute_pointing_correction_offset(d)
+        dx, dy = self.model.compute_pointing_correction_offset(d)
         self.assertAlmostEqual(dx, 3.0, places=3)
         self.assertAlmostEqual(dy, 10.0, places=3)
 
