@@ -22,6 +22,7 @@
 import asyncio
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
@@ -68,7 +69,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         if logFile.exists():
             logFile.unlink()
 
-    async def test_addAberration_issueCorrection(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_addAberration_issueCorrection(self, MockButler: Mock) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
             await self._simulateCSCs()
 
@@ -239,7 +241,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 )
             )
 
-    async def test_addAberration_issueCorrection_xref_x0(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_addAberration_issueCorrection_xref_x0(self, MockButler: Mock) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
             await self._simulateCSCs()
 
@@ -285,7 +288,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # The two times calculation of visit DOF should be eqaul under "x0"
             np.testing.assert_array_equal(dof_first.visitDoF, dof_second.visitDoF)
 
-    async def test_offsetDOF(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_offsetDOF(self, MockButler: Mock) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
             await self._simulateCSCs()
 
@@ -327,7 +331,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             assert len(self.m2_corrections) == 1
             assert len(self.m1m3_corrections) == 1
 
-    async def test_stress_below_limit(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_stress_below_limit(self, MockButler: Mock) -> None:
         # Scenario where stress is below the limit,
         # so no scaling or truncation should happen
         async with self.make_csc(
@@ -355,7 +360,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             final_total_stress = await self.assert_next_sample(remote.evt_mirrorStresses)
             self.assertLessEqual(final_total_stress.stressM1M3, self.csc.m1m3_stress_limit)
 
-    async def test_stress_above_limit_scale(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_stress_above_limit_scale(self, MockButler: Mock) -> None:
         # Scenario where stress is above the
         # limit and sclaing approach is used
         async with self.make_csc(
@@ -395,7 +401,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             final_total_stress = await self.assert_next_sample(remote.evt_mirrorStresses)
             self.assertLessEqual(final_total_stress.stressM1M3, self.csc.m1m3_stress_limit)
 
-    async def test_stress_above_limit_truncate(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_stress_above_limit_truncate(self, MockButler: Mock) -> None:
         # Scenario where stress is above the
         # limit and truncation approach is used
         async with self.make_csc(
@@ -510,7 +517,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.cscMtptg.close(),
         )
 
-    async def test_pointing_correction(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_pointing_correction(self, MockButler: Mock) -> None:
         # Validate that MTPtg poriginOffset is issued once after successful
         # AOS corrections when pointing correction is enabled.
         async with self.make_csc(
