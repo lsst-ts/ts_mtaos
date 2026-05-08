@@ -1754,11 +1754,32 @@ class MTAOS(salobj.ConfigurableCsc):
         if not np.any(dof_aggr):
             self.log.info("Skipping pointing correction: aggregated DOF is zero.")
             return
+
+        visit_id, _ = self.model.get_visit_ids()
         x_mm, y_mm = self.model.compute_pointing_correction_offset(dof_aggr)
+
+        # De-rotating the offsets:
+        #
+        # This need to be the current rotator position. The x and y positions
+        # retrieved are bore-sight, but the offset applied to the pointing
+        # are camera-coordinates. So depending on the orientation of the
+        # camera when we apply the correction we need to make sure we use
+        # current coordinates. The negative sign shows up when I analyise
+        # on sky data and I believe is has to do with de-rotating the offsets,
+        # e.g. undoing the camera rotation.
+        rotator_angle_rad = -np.deg2rad(self.current_rotator_position)
+        rot_mat = np.array(
+            [
+                [np.cos(rotator_angle_rad), -np.sin(rotator_angle_rad)],
+                [np.sin(rotator_angle_rad), np.cos(rotator_angle_rad)],
+            ]
+        )
+        x_mm_rot, y_mm_rot = rot_mat @ np.array([x_mm, y_mm])
+
         try:
             await self.remotes["mtptg"].cmd_poriginOffset.set_start(
-                dx=float(x_mm),
-                dy=float(y_mm),
+                dx=float(x_mm_rot),
+                dy=float(y_mm_rot),
                 timeout=self.DEFAULT_TIMEOUT,
             )
             self.log.info(
