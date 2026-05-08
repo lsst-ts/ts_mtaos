@@ -1666,11 +1666,21 @@ class MTAOS(salobj.ConfigurableCsc):
             ]
         )
 
+        pointing_correction = (
+            asyncio.create_task(self.issue_pointing_correction())
+            if self.enable_pointing_correction
+            else make_done_future()
+        )
+
         # Wait for all corrections to complete
         await asyncio.gather(
             *[task for task in issue_corrections_tasks.values()],
             return_exceptions=True,
         )
+        try:
+            await pointing_correction
+        except Exception:
+            self.log.exception("Failed to apply pointing correction. Ignoring...")
 
         # Check if there was any exception. If so, undo all successfull
         # corrections and reject command.
@@ -1683,10 +1693,6 @@ class MTAOS(salobj.ConfigurableCsc):
             error_repor = await self.handle_undo_corrections(issue_corrections_tasks)
 
             raise RuntimeError(error_repor)
-
-        # All AOS corrections succeeded
-        if self.enable_pointing_correction:
-            await self.issue_pointing_correction()
 
         self._store_previous_dofs()
 
