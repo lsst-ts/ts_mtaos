@@ -232,6 +232,8 @@ class MTAOS(salobj.ConfigurableCsc):
         # Lock to prevent multiple issueCorrection commands to execute at the
         # same time.
         self.issue_correction_lock = asyncio.Lock()
+        self._issue_correction = asyncio.Event()
+        self._completed_correction = asyncio.Event()
 
         self.wep_config: dict = dict()
 
@@ -265,6 +267,7 @@ class MTAOS(salobj.ConfigurableCsc):
         self.closed_loop_timeout_wep_results: float = 75.0
         self.timestamp_diff_tol: float = 1.0
         self.discard_intermediate_corrections: bool = True
+        self.synchronous_closed_loop: bool = True
 
         self.log.info("MTAOS CSC is ready.")
 
@@ -682,7 +685,33 @@ class MTAOS(salobj.ConfigurableCsc):
             result="issueCorrection started.",
         )
 
-        await self._execute_issue_correction()
+        if self.evt_closedLoopState.data.state == ClosedLoopState.IDLE:
+            await self._execute_issue_correction()
+        elif self.evt_closedLoopState.data.state == ClosedLoopState.WAITING_APPLY:
+            self._completed_correction.clear()
+            self._issue_correction.set()
+            if not self.synchronous_closed_loop:
+                self.log.info(
+                    "Received issue correction command while in closed loop "
+                    "but running in asynchronous mode. "
+                    "This command has no effect in this condition."
+                )
+            else:
+                self.log.debug(
+                    "Closed loop running and waiting to apply corrections. "
+                    "Triggered correction and waiting for correction to complete."
+                )
+            await self._completed_correction.wait()
+            self.log.debug("Correction completed.")
+            if self.evt_closedLoopState.data.state == ClosedLoopState.ERROR:
+                raise RuntimeError("Close loop failed.")
+        else:
+            raise RuntimeError(
+                "Cannot issue correction when closed loop state is "
+                f"{ClosedLoopState(self.evt_closedLoopState.data.state)!r}. "
+                "Must be either IDLE (for open loop correction) "
+                "or WAITING_APPLY (for close loop correction)."
+            )
 
     async def _execute_issue_correction(self) -> None:
         """Handles the core logic of issuing corrections to the components."""
@@ -1187,6 +1216,7 @@ class MTAOS(salobj.ConfigurableCsc):
         if data.config:
             config = yaml.safe_load(data.config)
             self.discard_intermediate_corrections = config.pop("discard_intermediate_corrections", True)
+            self.synchronous_closed_loop = config.pop("synchronous_closed_loop", True)
             self.last_run_ofc_configuration = yaml.safe_dump(config)
             self.log.debug(
                 f"Input configuration: {data.config}. "
@@ -1506,7 +1536,19 @@ class MTAOS(salobj.ConfigurableCsc):
                                 )
                                 continue
 
+                        self._issue_correction.clear()
+                        self._completed_correction.clear()
                         await self.evt_closedLoopState.set_write(state=ClosedLoopState.WAITING_APPLY)
+                        if self.synchronous_closed_loop:
+                            self.log.debug(
+                                "Running in synchronous closed loop mode. "
+                                "Waiting for issue correction command."
+                            )
+                            async with asyncio.timeout(delay=self.closed_loop_timeout_without_images):
+                                await self._issue_correction.wait()
+                        else:
+                            self.log.debug("Running in fully asynchronous mode. Applying correction.")
+
                         camera.evt_shutterDetailedState.flush()
                         camera_shutter_detailed_state = await camera.evt_shutterDetailedState.aget(
                             timeout=self.CMD_TIMEOUT
@@ -1543,6 +1585,8 @@ class MTAOS(salobj.ConfigurableCsc):
                     self.log.exception("Closed loop failed; turning off closed loop mode")
                     await self.evt_closedLoopState.set_write(state=ClosedLoopState.ERROR)
                     raise
+                finally:
+                    self._completed_correction.set()
 
     def apply_stress_correction(
         self,
