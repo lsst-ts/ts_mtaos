@@ -1734,6 +1734,15 @@ class MTAOS(salobj.ConfigurableCsc):
             else:
                 # Correction failed, store it as failed and continue.
                 failed_to_do.append(comp)
+
+        if self.enable_pointing_correction:
+            self.log.warning("Undoing pointing correction.")
+            try:
+                await self.issue_pointing_correction()
+            except Exception:
+                self.log.exception("Failed to undo pointing correction.")
+                failed_to_undo.append("pointing")
+
         # Generate a report about the issue.
         error_report = f"Failed to apply correction to: {failed_to_do}. "
         if len(failed_to_undo) > 0:
