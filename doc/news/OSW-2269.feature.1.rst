@@ -1,0 +1,1 @@
+Optimized correction timing by applying pointing corrections in parallel with AOS corrections, reducing total overhead.
