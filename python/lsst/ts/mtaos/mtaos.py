@@ -882,10 +882,17 @@ class MTAOS(salobj.ConfigurableCsc):
                     }
 
                 start_time = time.time()
-                await self.ocps.cmd_execute.set_start(
-                    config=json.dumps(ocps_config),
-                    timeout=self.DEFAULT_TIMEOUT,
-                )
+                try:
+                    await self.ocps.cmd_execute.set_start(
+                        config=json.dumps(ocps_config),
+                        timeout=self.DEFAULT_TIMEOUT,
+                    )
+                except salobj.AckError as e:
+                    raise RuntimeError(
+                        f"Failed to send execute command to {self.ocps.salinfo.name_index}. "
+                        "This CSC is needed to send a trigger for RA to process the data. "
+                        "Ensure CSC is alive and ENABLED."
+                    ) from e
 
                 if "RUN_WEP" not in self.execution_times:
                     self.execution_times["RUN_WEP"] = []
