@@ -1,0 +1,1 @@
+Enhanced 'handle_undo_corrections' to automatically undo pointing corrections when they are enabled.

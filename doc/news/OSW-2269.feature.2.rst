@@ -1,0 +1,1 @@
+Implemented rotation-aware pointing corrections by de-rotating offsets using the current rotator position.

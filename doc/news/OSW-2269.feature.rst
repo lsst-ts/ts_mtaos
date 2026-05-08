@@ -1,0 +1,1 @@
+Introduced a synchronous mode to the closed-loop logic in 'mtaos.py', allowing corrections to be triggered explicitly via command while maintaining support for the standard asynchronous behavior.
