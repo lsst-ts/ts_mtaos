@@ -24,14 +24,14 @@ import glob
 import os
 import unittest
 from pathlib import Path
-from unittest.mock import AsyncMock, PropertyMock, patch
+from unittest.mock import AsyncMock, Mock, PropertyMock, patch
 
 import numpy as np
 import pytest
 import yaml
 
 from lsst.daf import butler as dafButler
-from lsst.ts import mtaos, salobj
+from lsst.ts import mtaos, salobj  # type: ignore[attr-defined]
 from lsst.ts.ofc import OFCData
 from lsst.ts.wep.utils import getModulePath as getModulePathWep
 from lsst.ts.wep.utils import runProgram, writeCleanUpRepoCmd
@@ -119,7 +119,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         cmdline_args = ["--log-to-file", "--log-level", "20"]
         await self.check_bin_script("MTAOS", 0, "run_mtaos", cmdline_args=cmdline_args)
 
-    async def testStandardStateTransitions(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def testStandardStateTransitions(self, MockButler: Mock) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
             enabled_commands = {
                 "resetCorrection",
@@ -142,7 +143,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 timeout=STD_TIMEOUT,
             )
 
-    async def test_configuration(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_configuration(self, MockButler: Mock) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -200,7 +202,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertEqual(self.csc.model.zernike_table_name, config_data["zernike_table_name"])
 
-    async def testResetCorrection(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def testResetCorrection(self, MockButler: Mock) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
@@ -281,7 +284,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(actForcesM2), 72)
         self.assertEqual(np.sum(np.abs(actForcesM2)), 0)
 
-    async def testIssueCorrectionError(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def testIssueCorrectionError(self, MockButler: Mock) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
@@ -305,7 +309,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 timeout=SHORT_TIMEOUT,
             )
 
-    async def test_handle_summary_state_fault_stores_previous_dofs_copy(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_handle_summary_state_fault_stores_previous_dofs_copy(self, MockButler: Mock) -> None:
         """Test that handling transition to FAULT stores a copy of the current
         DOFs in previous_dofs."""
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
@@ -326,7 +331,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             csc.model.set_dof_aggr(updated_dofs)
             np.testing.assert_array_equal(csc.previous_dofs, aggregated_state)
 
-    async def test_handle_summary_state_disabled_preserves_previous_dofs(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_handle_summary_state_disabled_preserves_previous_dofs(self, MockButler: Mock) -> None:
         """Test that handling transition to DISABLED does not modify
         previous_dofs."""
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
@@ -345,7 +351,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             np.testing.assert_array_equal(csc.previous_dofs, previous_dofs)
 
-    async def test_execute_issue_correction_stores_previous_dofs(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_execute_issue_correction_stores_previous_dofs(self, MockButler: Mock) -> None:
         """Test that executing issueCorrection stores a copy of the current
         DOFs in previous_dofs."""
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
@@ -366,7 +373,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             np.testing.assert_array_equal(csc.previous_dofs, updated_dofs)
             self.assertIsNot(csc.previous_dofs, csc.model.get_dof_aggr())
 
-    async def test_dof_restored_after_fault_recovery(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_dof_restored_after_fault_recovery(self, MockButler: Mock) -> None:
         """Test DOFs are restored after FAULT → STANDBY → ENABLED cycle.
 
         This test verifies behavior (B): DOFs stored at the moment of FAULT
@@ -398,7 +406,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             restored_dofs = csc.model.get_dof_aggr()
             np.testing.assert_array_equal(restored_dofs, original_dofs)
 
-    async def test_addAberration(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_addAberration(self, MockButler: Mock) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
@@ -431,7 +440,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(remote.evt_m1m3Correction, flush=False, timeout=SHORT_TIMEOUT)
             await self.assert_next_sample(remote.evt_m2Correction, flush=False, timeout=SHORT_TIMEOUT)
 
-    async def test_addAberration_with_config(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_addAberration_with_config(self, MockButler: Mock) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
@@ -515,12 +525,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(remote.evt_m1m3Correction, flush=False, timeout=SHORT_TIMEOUT)
             await self.assert_next_sample(remote.evt_m2Correction, flush=False, timeout=SHORT_TIMEOUT)
 
+    @patch("lsst.ts.mtaos.model.Butler")
     @pytest.mark.xfail(
         reason="This test fails if there is an issue with git lfs (OSW-2007).",
         raises=salobj.AckError,
     )
     @pytest.mark.csc_integtest
-    async def test_run_wep_comcam(self) -> None:
+    async def test_run_wep_comcam(self, MockButler: Mock) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -566,8 +577,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 timeout=STD_TIMEOUT,
             )
 
+    @patch("lsst.ts.mtaos.model.Butler")
     @pytest.mark.csc_integtest
-    async def test_run_wep_comcam_disable_after_execution_error(self) -> None:
+    async def test_run_wep_comcam_disable_after_execution_error(self, MockButler: Mock) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -605,12 +617,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             await salobj.set_summary_state(self.remote, salobj.State.STANDBY)
 
+    @patch("lsst.ts.mtaos.model.Butler")
     @pytest.mark.xfail(
         reason="This test fails if there is an issue with git lfs (OSW-2007).",
         raises=salobj.AckError,
     )
     @pytest.mark.csc_integtest
-    async def test_run_wep_lsst_cwfs(self) -> None:
+    async def test_run_wep_lsst_cwfs(self, MockButler: Mock) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -653,8 +666,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 timeout=STD_TIMEOUT,
             )
 
+    @patch("lsst.ts.mtaos.model.Butler")
     @pytest.mark.csc_integtest
-    async def test_run_wep_lsst_cwfs_ocps(self) -> None:
+    async def test_run_wep_lsst_cwfs_ocps(self, MockButler: Mock) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -689,8 +703,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     useOCPS=True,
                 )
 
+    @patch("lsst.ts.mtaos.model.Butler")
     @pytest.mark.csc_integtest
-    async def test_interruptWEP(self) -> None:
+    async def test_interruptWEP(self, MockButler: Mock) -> None:
         async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=0):
             await salobj.set_summary_state(self.remote, salobj.State.ENABLED)
 
@@ -748,7 +763,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         assert "ts_wep" in sofware_versions.subsystemVersions
         assert "lsst_distrib" in sofware_versions.subsystemVersions
 
-    async def test_pointing_config_disabled_no_remote(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_pointing_config_disabled_no_remote(self, MockButler: Mock) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -763,7 +779,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.assertFalse(self.csc.enable_pointing_correction)
             self.assertNotIn("mtptg", self.csc.remotes)
 
-    async def test_pointing_config_enabled_with_matrix(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_pointing_config_enabled_with_matrix(self, MockButler: Mock) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -795,7 +812,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     timeout=STD_TIMEOUT,
                 )
 
-    async def test_pointing_correction_reconfig_adds_mtptg(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_pointing_correction_reconfig_adds_mtptg(self, MockButler: Mock) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -818,7 +836,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.assertTrue(self.csc.enable_pointing_correction)
             self.assertIn("mtptg", self.csc.remotes)
 
-    async def test_configure_filter_change_override_gains(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_configure_filter_change_override_gains(self, MockButler: Mock) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,
@@ -842,7 +861,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # null means "do not override".
             self.assertEqual(self.csc.filter_change_gains, (1.0, 0.5, None))
 
-    async def test_execute_ofc_filter_change_gains_override_and_restore(self) -> None:
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_execute_ofc_filter_change_gains_override_and_restore(self, MockButler: Mock) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=TEST_CONFIG_DIR,

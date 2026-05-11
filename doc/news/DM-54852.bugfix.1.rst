@@ -1,0 +1,1 @@
+- Send WEP subprocess stdout to ``/dev/null`` to prevent pipe buffer deadlock when pipetask output exceeds the OS buffer size.
