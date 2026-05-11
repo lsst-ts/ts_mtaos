@@ -13,6 +13,23 @@ Version History
 
 .. towncrier release notes start
 
+v0.29.2 (2026-05-11)
+====================
+
+Bug Fixes
+---------
+
+- Pass the cached ``Butler`` into ``define_visit`` instead of letting it construct its own from ``data_path`` and ``collections``, removing another per-WEP-call butler instantiation. (`DM-54852 <https://rubinobs.atlassian.net//browse/DM-54852>`_)
+- Cache a single ``Butler`` on ``Model`` instead of constructing a new one inside ``get_image_info`` and ``_poll_butler_outputs``, so the long-running CSC no longer leaks butler caches and registry connections each closed-loop iteration. (`DM-54852 <https://rubinobs.atlassian.net//browse/DM-54852>`_)
+- Send WEP subprocess stdout to ``/dev/null`` to prevent pipe buffer deadlock when pipetask output exceeds the OS buffer size. (`DM-54852 <https://rubinobs.atlassian.net//browse/DM-54852>`_)
+
+
+Performance Enhancement
+-----------------------
+
+- Cache the ``LsstCam`` camera on ``Model`` instead of calling ``LsstCam().getCamera()`` once per detector inside the ``get_corner_offsets`` loop. (`DM-54852 <https://rubinobs.atlassian.net//browse/DM-54852>`_)
+
+
 v0.29.1 (2026-04-22)
 ====================
 

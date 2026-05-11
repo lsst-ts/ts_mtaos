@@ -1,1 +1,0 @@
-- Cache the ``LsstCam`` camera on ``Model`` instead of calling ``LsstCam().getCamera()`` once per detector inside the ``get_corner_offsets`` loop.
