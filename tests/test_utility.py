@@ -32,9 +32,10 @@ from typing import Any
 import numpy as np
 import pytest
 
+from lsst.daf.butler import Butler
 from lsst.daf.butler.registry.interfaces import DatabaseConflictError
 from lsst.obs.lsst.translators.lsstCam import LsstCamTranslator
-from lsst.ts import mtaos
+from lsst.ts import mtaos  # type: ignore[attr-defined]
 from lsst.ts.wep.task.cutOutDonutsCwfsTask import CutOutDonutsCwfsTask
 from lsst.ts.wep.utils import getModulePath as getModulePathWep
 
@@ -181,10 +182,16 @@ class TestUtility(unittest.TestCase):
     )
     def test_define_visit(self) -> None:
         data_path = os.path.join(getModulePathWep(), "tests", "testData", "gen3TestRepo")
+        collections = ["LSSTCam/raw/all"]
+
+        butler = Butler.from_config(
+            data_path,
+            collections=collections,
+            writeable=True,
+        )
 
         mtaos.define_visit(
-            data_path=data_path,
-            collections=["LSSTCam/raw/all"],
+            butler=butler,
             instrument_name="LSSTCam",
             exposures_str="exposure IN (4021123106001, 4021123106002)",
         )

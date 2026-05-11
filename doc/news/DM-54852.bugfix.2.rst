@@ -1,0 +1,1 @@
+- Cache a single ``Butler`` on ``Model`` instead of constructing a new one inside ``get_image_info`` and ``_poll_butler_outputs``, so the long-running CSC no longer leaks butler caches and registry connections each closed-loop iteration.
