@@ -336,6 +336,11 @@ class MTAOS(salobj.ConfigurableCsc):
                 None,
                 ["summaryState", "heartbeat"],
             )
+            remotes_parameters["mtrotator"] = (
+                "MTRotator",
+                None,
+                ["summaryState", "rotation"],
+            )
 
         for remote_name in remotes_parameters:
             if remote_name in self.remotes:
@@ -351,6 +356,10 @@ class MTAOS(salobj.ConfigurableCsc):
                 self.log.warning("Timeout while waiting for remote to start. Continuing.")
             finally:
                 await asyncio.sleep(self.heartbeat_interval)
+
+        if "mtrotator" in self.remotes:
+            self.remotes["mtrotator"].tel_rotation.callback = self.follow_rotator_position
+
         self.log.info("All remotes ready.")
 
         # TODO (DM-31365): Remove workaround to visitId being of type long in
@@ -1270,12 +1279,6 @@ class MTAOS(salobj.ConfigurableCsc):
             ) as camera,
             salobj.Remote(
                 self.domain,
-                "MTRotator",
-                readonly=True,
-                include=["summaryState", "rotation"],
-            ) as mtrotator,
-            salobj.Remote(
-                self.domain,
                 "MTMount",
                 readonly=True,
                 include=["summaryState", "elevation"],
@@ -1285,7 +1288,6 @@ class MTAOS(salobj.ConfigurableCsc):
 
             camera.evt_startIntegration.callback = self.follow_start_integration
             camera.evt_endOfImageTelemetry.callback = self.follow_end_integration
-            mtrotator.tel_rotation.callback = self.follow_rotator_position
             mtmount.tel_elevation.callback = self.follow_elevation_position
 
             oods.evt_imageInOODS.flush()
