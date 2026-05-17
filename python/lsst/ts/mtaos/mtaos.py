@@ -339,7 +339,7 @@ class MTAOS(salobj.ConfigurableCsc):
             remotes_parameters["mtrotator"] = (
                 "MTRotator",
                 None,
-                ["summaryState", "rotation"],
+                ["summaryState", "heartbeat", "rotation"],
             )
 
         for remote_name in remotes_parameters:
