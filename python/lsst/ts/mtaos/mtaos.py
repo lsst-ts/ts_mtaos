@@ -1835,7 +1835,7 @@ class MTAOS(salobj.ConfigurableCsc):
         # current coordinates. The negative sign shows up when I analyise
         # on sky data and I believe is has to do with de-rotating the offsets,
         # e.g. undoing the camera rotation.
-        rotator_angle_rad = -np.deg2rad(self.current_rotator_position)
+        rotator_angle_rad = np.deg2rad(self.current_rotator_position)
         rot_mat = np.array(
             [
                 [np.cos(rotator_angle_rad), -np.sin(rotator_angle_rad)],
