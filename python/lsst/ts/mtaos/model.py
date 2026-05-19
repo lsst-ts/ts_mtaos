@@ -371,8 +371,10 @@ class Model:
             Array of shape (50, 2) mapping DoF to [x_mm, y_mm].
         """
         mat = np.asarray(matrix, dtype=float)
-        if mat.shape != (50, 2):
-            raise ValueError(f"pointing_correction_matrix must have shape (50,2); got {mat.shape}.")
+        if mat.shape != (self.ofc_data.ndofs, 2):
+            raise ValueError(
+                f"pointing_correction_matrix must have shape({self.ofc_data.ndofs},2); got {mat.shape}."
+            )
         self._pointing_correction_matrix = mat
 
     def set_pointing_origin_indices(self, pointing_origin_indices: list[int]) -> None:
