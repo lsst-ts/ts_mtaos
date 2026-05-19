@@ -1820,16 +1820,21 @@ class MTAOS(salobj.ConfigurableCsc):
         if not np.any(dof_aggr):
             self.log.info("Skipping pointing correction: aggregated DOF is zero.")
             return
-        x_mm, y_mm, _, _ = self.model.compute_pointing_correction_offset(dof_aggr)
+        dx, dy, ca, ce = self.model.compute_pointing_correction_offset(dof_aggr)
         try:
             await self.remotes["mtptg"].cmd_poriginOffset.set_start(
-                dx=float(x_mm),
-                dy=float(y_mm),
+                dx=dx,
+                dy=dy,
+                timeout=self.DEFAULT_TIMEOUT,
+            )
+            await self.remotes["mtptg"].cmd_collOffset.set_start(
+                ca=ca,
+                ce=ce,
                 timeout=self.DEFAULT_TIMEOUT,
             )
             self.log.info(
-                f"Successfully issued pointing correction to MTPtg (poriginOffset): "
-                f"dx={x_mm} mm, dy={y_mm} mm."
+                f"Successfully issued pointing correction to MTPtg (poriginOffset/collOffset): "
+                f"{dx=} mm, {dy=} mm, {ca=} arcsec, {ce=} arcsec."
             )
         except Exception as e:
             raise RuntimeError("Failed to issue pointing correction to MTPtg.") from e
