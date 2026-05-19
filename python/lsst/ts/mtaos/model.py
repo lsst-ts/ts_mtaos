@@ -346,8 +346,21 @@ class Model:
         self._wep_process_start_lock = asyncio.Lock()
 
         self.reset_wfe_correction()
+
         # Pointing correction matrix (50x2) if provided by CSC
         self._pointing_correction_matrix: np.ndarray | None = None
+
+        # Which degrees of freedom affect the telescope
+        # pointing origin?
+        self._pointing_origin_indices = [3, 4, 6, 7]
+
+        # Which degrees of freedom affect the telescope
+        # pointing collimation?
+        self._collimation_indices = [1, 2, 8, 9]
+
+        # Plate scale in arcsec/mm at the telescope focal plane.
+        # This is used to convert pointing offset from mm to arcsec.
+        self._pointing_correction_plate_scale = 20.0
 
     def set_pointing_correction_matrix(self, matrix: np.ndarray) -> None:
         """Set the pointing correction matrix.
@@ -361,6 +374,69 @@ class Model:
         if mat.shape != (50, 2):
             raise ValueError(f"pointing_correction_matrix must have shape (50,2); got {mat.shape}.")
         self._pointing_correction_matrix = mat
+
+    def set_pointing_origin_indices(self, pointing_origin_indices: list[int]) -> None:
+        """Set the pointing origin indices.
+
+        Parameters
+        ----------
+        pointing_origin_indices : `list`[`int`]
+            List of the degrees of freedom that affect the
+            pointing origin.
+
+        Raises
+        ------
+        ValueError
+            If the provided indices are invalid.
+        """
+        self._validate_pointing_indices(indices=pointing_origin_indices, name="Pointing origin")
+        self._pointing_origin_indices = pointing_origin_indices
+
+    def set_collimation_indices(self, collimation_indices: list[int]) -> None:
+        """Set the collimation indices.
+
+        Parameters
+        ----------
+        collimation_indices : `list`[`int`]
+            List of degrees of freedom that affect the
+            pointing collimation.
+
+        Raises
+        ------
+        ValueError
+            If the provided indices are invalid.
+        """
+        self._validate_pointing_indices(indices=collimation_indices, name="Collimation")
+        self._collimation_indices = collimation_indices
+
+    def _validate_pointing_indices(self, indices: list[int], name: str) -> None:
+        """Validate the provided indices and ensures they can be used
+        for the pointing corrections.
+
+        Parameters
+        ----------
+        indices : `list`[`int`]
+            Indices to validate.
+        name : `str`
+            The name of the correction the indices are intended for.
+
+        Raises
+        ------
+        ValueError
+            If the provided indices are invalid.
+        """
+        if any(indices) < 0:
+            raise ValueError(f"{name} indices cannot be smaller than 0. Got {indices=}.")
+        if any(indices >= self.ofc_data.ndofs):
+            raise ValueError(
+                f"{name} indices cannot be larger than or equal to "
+                f"the number of degrees of freedom ({self.ofc_data.ndofs}). "
+                f"Got {indices=}."
+            )
+        if len(indices) != len(set(indices)):
+            raise ValueError(
+                f"{name} indices cannot contain duplicated values. Got {{collimation_indices=}}."
+            )
 
     def compute_pointing_correction_offset(self, dof_vector: np.ndarray) -> tuple[float, float]:
         """Compute poriginOffset [x_mm, y_mm] from a DoF vector and
