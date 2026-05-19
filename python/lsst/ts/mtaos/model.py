@@ -352,11 +352,11 @@ class Model:
 
         # Which degrees of freedom affect the telescope
         # pointing origin?
-        self._pointing_origin_indices = [3, 4, 6, 7]
+        self._pointing_origin_indices: list[int] = []
 
         # Which degrees of freedom affect the telescope
         # pointing collimation?
-        self._collimation_indices = [1, 2, 8, 9]
+        self._collimation_indices: list[int] = [1, 2, 3, 4, 6, 7, 8, 9]
 
         # Plate scale in arcsec/mm at the telescope focal plane.
         # This is used to convert pointing offset from mm to arcsec.
@@ -440,9 +440,9 @@ class Model:
                 f"{name} indices cannot contain duplicated values. Got {{collimation_indices=}}."
             )
 
-    def compute_pointing_correction_offset(self, dof_vector: np.ndarray) -> tuple[float, float]:
-        """Compute poriginOffset [x_mm, y_mm] from a DoF vector and
-        sensitivity.
+    def compute_pointing_correction_offset(self, dof_vector: np.ndarray) -> tuple[float, float, float, float]:
+        """Compute pointing origin offset [x, y] (in mm) and collimation offset
+        [ca, ce] (in arcsec) from a DoF vector and sensitivity matrix.
 
         Parameters
         ----------
@@ -454,21 +454,46 @@ class Model:
 
         Returns
         -------
-        (x_mm, y_mm) : tuple[float, float]
-            Offsets for MTPtg.poriginOffset.
+        x : `float`
+            Pointing origin offset in x (in mm).
+        y : `float`
+            Pointing origin offset in y (in mm).
+        ca : `float`
+            Collimation offset in Az (in arcsec),
+        ce : `float`
+            Collimation offset in El (in arcsec),
 
         Notes
         -----
         If the sensitivity matrix is not set, returns (0.0, 0.0).
         """
         if self._pointing_correction_matrix is None:
-            return 0.0, 0.0
+            return 0.0, 0.0, 0.0, 0.0
         vec = np.asarray(dof_vector, dtype=float).reshape(-1)
-        if vec.shape[0] != 50:
-            raise ValueError(f"dof_vector must have 50 elements; got {vec.shape[0]}.")
+        if vec.shape[0] != self.ofc_data.ndofs:
+            raise ValueError(f"dof_vector must have {self.ofc_data.ndofs} elements; got {vec.shape[0]}.")
+
+        pointing_origin_matrix = self._pointing_correction_matrix[self._pointing_origin_indices]
+        collimation_matrix = self._pointing_correction_matrix[self._collimation_indices]
+
         # d^T · S == (S^T · d) -> 2-vector
-        offsets = np.matmul(self._pointing_correction_matrix.T, vec)
-        return float(offsets[0]), float(offsets[1])
+        pointing_origin_offsets = (
+            np.matmul(pointing_origin_matrix.T, vec[self._pointing_origin_indices])
+            if self._pointing_origin_indices
+            else (0.0, 0.0)
+        )
+        collimation_offsets = (
+            np.matmul(collimation_matrix.T, vec[self._collimation_indices])
+            if self._collimation_indices
+            else (0.0, 0.0)
+        )
+
+        return (
+            float(pointing_origin_offsets[0]),
+            float(pointing_origin_offsets[1]),
+            float(collimation_offsets[0] * self._pointing_correction_plate_scale),
+            float(collimation_offsets[1] * self._pointing_correction_plate_scale),
+        )
 
     def get_fwhm_sensors(self) -> list[int]:
         """Get list of fwhm sensor ids.
