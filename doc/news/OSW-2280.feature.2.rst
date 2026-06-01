@@ -1,0 +1,1 @@
+Updated 'MTAOS.issue_pointing_correction' to apply both x/y pointing origin offsets and collimation offsets concurrently.
