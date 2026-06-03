@@ -55,11 +55,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls._randomize_topic_subname = True
-        cls.dataDir = mtaos.getModulePath().joinpath("tests", "tmp")
-        cls.isrDir = cls.dataDir.joinpath("input")
+        data_dir = mtaos.getModulePath().joinpath("tests", "tmp")
+        isr_dir = data_dir.joinpath("input")
 
+        cls.dataDir = data_dir
+        cls.isrDir = isr_dir
         # Let the mtaos to set WEP based on this path variable
-        os.environ["ISRDIRPATH"] = cls.isrDir.as_posix()
+        os.environ["ISRDIRPATH"] = isr_dir.as_posix()
 
         cls.data_path = os.path.join(getModulePathWep(), "tests", "testData", "gen3TestRepo")
         cls.run_name = "run1"
@@ -794,11 +796,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # Sanity: compute returns two floats
             self.assertIsNotNone(self.csc.model)
             d = np.zeros(50)
-            d[0] = 2.5
-            d[1] = -3.0
-            dx, dy = self.csc.model.compute_pointing_correction_offset(d)
-            self.assertIsInstance(dx, float)
-            self.assertIsInstance(dy, float)
+            d[2] = 2500
+            d[1] = -3000
+            dx, dy, ca, ce = self.csc.model.compute_pointing_correction_offset(d)
+            self.assertAlmostEqual(dx, 0.0, places=3)
+            self.assertAlmostEqual(dy, 0.0, places=3)
+            self.assertAlmostEqual(ca, -0.6, places=3)
+            self.assertAlmostEqual(ce, 0.5, places=3)
 
     async def test_pointing_config_enabled_empty_matrix_rejected(self) -> None:
         async with self.make_csc(

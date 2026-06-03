@@ -192,21 +192,26 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
 
     def test_compute_pointing_correction_offset(self) -> None:
         # If matrix not set -> (0, 0)
-        dx, dy = self.model.compute_pointing_correction_offset(np.zeros(50))
+        dx, dy, ca, ce = self.model.compute_pointing_correction_offset(np.zeros(50))
         self.assertEqual((dx, dy), (0.0, 0.0))
+        self.assertEqual((ca, ce), (0.0, 0.0))
 
         # Set a simple matrix: x = d[0]; y = 2*d[1]
         mat = np.zeros((50, 2))
-        mat[0, 0] = 1.0
+        mat[2, 0] = 1.0
         mat[1, 1] = 2.0
         self.model.set_pointing_correction_matrix(mat)
+        self.model.set_pointing_origin_indices([])
+        self.model.set_collimation_indices([1, 2, 3, 4, 6, 7, 8, 9])
 
         d = np.zeros(50)
-        d[0] = 3.0
+        d[2] = 3.0
         d[1] = 5.0
-        dx, dy = self.model.compute_pointing_correction_offset(d)
-        self.assertAlmostEqual(dx, 3.0, places=3)
-        self.assertAlmostEqual(dy, 10.0, places=3)
+        dx, dy, ca, ce = self.model.compute_pointing_correction_offset(d)
+        self.assertAlmostEqual(dx, 0.0, places=3)
+        self.assertAlmostEqual(dy, 0.0, places=3)
+        self.assertAlmostEqual(ca, 3.0 * self.model._pointing_correction_plate_scale, places=3)
+        self.assertAlmostEqual(ce, 10.0 * self.model._pointing_correction_plate_scale, places=3)
 
     def test_add_correction(self) -> None:
         wavefront_errors = np.zeros(19)

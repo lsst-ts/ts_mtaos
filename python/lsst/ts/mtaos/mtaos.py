@@ -232,6 +232,8 @@ class MTAOS(salobj.ConfigurableCsc):
         # Lock to prevent multiple issueCorrection commands to execute at the
         # same time.
         self.issue_correction_lock = asyncio.Lock()
+        self._issue_correction = asyncio.Event()
+        self._completed_correction = asyncio.Event()
 
         self.wep_config: dict = dict()
 
@@ -265,6 +267,7 @@ class MTAOS(salobj.ConfigurableCsc):
         self.closed_loop_timeout_wep_results: float = 75.0
         self.timestamp_diff_tol: float = 1.0
         self.discard_intermediate_corrections: bool = True
+        self.synchronous_closed_loop: bool = True
 
         self.log.info("MTAOS CSC is ready.")
 
@@ -682,7 +685,33 @@ class MTAOS(salobj.ConfigurableCsc):
             result="issueCorrection started.",
         )
 
-        await self._execute_issue_correction()
+        if self.evt_closedLoopState.data.state == ClosedLoopState.IDLE:
+            await self._execute_issue_correction()
+        elif self.evt_closedLoopState.data.state == ClosedLoopState.WAITING_APPLY:
+            self._completed_correction.clear()
+            self._issue_correction.set()
+            if not self.synchronous_closed_loop:
+                self.log.info(
+                    "Received issue correction command while in closed loop "
+                    "but running in asynchronous mode. "
+                    "This command has no effect in this condition."
+                )
+            else:
+                self.log.debug(
+                    "Closed loop running and waiting to apply corrections. "
+                    "Triggered correction and waiting for correction to complete."
+                )
+            await self._completed_correction.wait()
+            self.log.debug("Correction completed.")
+            if self.evt_closedLoopState.data.state == ClosedLoopState.ERROR:
+                raise RuntimeError("Close loop failed.")
+        else:
+            raise RuntimeError(
+                "Cannot issue correction when closed loop state is "
+                f"{ClosedLoopState(self.evt_closedLoopState.data.state)!r}. "
+                "Must be either IDLE (for open loop correction) "
+                "or WAITING_APPLY (for close loop correction)."
+            )
 
     async def _execute_issue_correction(self) -> None:
         """Handles the core logic of issuing corrections to the components."""
@@ -853,10 +882,17 @@ class MTAOS(salobj.ConfigurableCsc):
                     }
 
                 start_time = time.time()
-                await self.ocps.cmd_execute.set_start(
-                    config=json.dumps(ocps_config),
-                    timeout=self.DEFAULT_TIMEOUT,
-                )
+                try:
+                    await self.ocps.cmd_execute.set_start(
+                        config=json.dumps(ocps_config),
+                        timeout=self.DEFAULT_TIMEOUT,
+                    )
+                except salobj.AckError as e:
+                    raise RuntimeError(
+                        f"Failed to send execute command to {self.ocps.salinfo.name_index}. "
+                        "This CSC is needed to send a trigger for RA to process the data. "
+                        "Ensure CSC is alive and ENABLED."
+                    ) from e
 
                 if "RUN_WEP" not in self.execution_times:
                     self.execution_times["RUN_WEP"] = []
@@ -1187,6 +1223,7 @@ class MTAOS(salobj.ConfigurableCsc):
         if data.config:
             config = yaml.safe_load(data.config)
             self.discard_intermediate_corrections = config.pop("discard_intermediate_corrections", True)
+            self.synchronous_closed_loop = config.pop("synchronous_closed_loop", True)
             self.last_run_ofc_configuration = yaml.safe_dump(config)
             self.log.debug(
                 f"Input configuration: {data.config}. "
@@ -1506,7 +1543,19 @@ class MTAOS(salobj.ConfigurableCsc):
                                 )
                                 continue
 
+                        self._issue_correction.clear()
+                        self._completed_correction.clear()
                         await self.evt_closedLoopState.set_write(state=ClosedLoopState.WAITING_APPLY)
+                        if self.synchronous_closed_loop:
+                            self.log.debug(
+                                "Running in synchronous closed loop mode. "
+                                "Waiting for issue correction command."
+                            )
+                            async with asyncio.timeout(delay=self.closed_loop_timeout_without_images):
+                                await self._issue_correction.wait()
+                        else:
+                            self.log.debug("Running in fully asynchronous mode. Applying correction.")
+
                         camera.evt_shutterDetailedState.flush()
                         camera_shutter_detailed_state = await camera.evt_shutterDetailedState.aget(
                             timeout=self.CMD_TIMEOUT
@@ -1543,6 +1592,8 @@ class MTAOS(salobj.ConfigurableCsc):
                     self.log.exception("Closed loop failed; turning off closed loop mode")
                     await self.evt_closedLoopState.set_write(state=ClosedLoopState.ERROR)
                     raise
+                finally:
+                    self._completed_correction.set()
 
     def apply_stress_correction(
         self,
@@ -1666,11 +1717,21 @@ class MTAOS(salobj.ConfigurableCsc):
             ]
         )
 
+        pointing_correction = (
+            asyncio.create_task(self.issue_pointing_correction())
+            if self.enable_pointing_correction
+            else make_done_future()
+        )
+
         # Wait for all corrections to complete
         await asyncio.gather(
             *[task for task in issue_corrections_tasks.values()],
             return_exceptions=True,
         )
+        try:
+            await pointing_correction
+        except Exception:
+            self.log.exception("Failed to apply pointing correction. Ignoring...")
 
         # Check if there was any exception. If so, undo all successfull
         # corrections and reject command.
@@ -1683,10 +1744,6 @@ class MTAOS(salobj.ConfigurableCsc):
             error_repor = await self.handle_undo_corrections(issue_corrections_tasks)
 
             raise RuntimeError(error_repor)
-
-        # All AOS corrections succeeded
-        if self.enable_pointing_correction:
-            await self.issue_pointing_correction()
 
         self._store_previous_dofs()
 
@@ -1728,6 +1785,15 @@ class MTAOS(salobj.ConfigurableCsc):
             else:
                 # Correction failed, store it as failed and continue.
                 failed_to_do.append(comp)
+
+        if self.enable_pointing_correction:
+            self.log.warning("Undoing pointing correction.")
+            try:
+                await self.issue_pointing_correction()
+            except Exception:
+                self.log.exception("Failed to undo pointing correction.")
+                failed_to_undo.append("pointing")
+
         # Generate a report about the issue.
         error_report = f"Failed to apply correction to: {failed_to_do}. "
         if len(failed_to_undo) > 0:
@@ -1754,16 +1820,21 @@ class MTAOS(salobj.ConfigurableCsc):
         if not np.any(dof_aggr):
             self.log.info("Skipping pointing correction: aggregated DOF is zero.")
             return
-        x_mm, y_mm = self.model.compute_pointing_correction_offset(dof_aggr)
+        dx, dy, ca, ce = self.model.compute_pointing_correction_offset(dof_aggr)
         try:
             await self.remotes["mtptg"].cmd_poriginOffset.set_start(
-                dx=float(x_mm),
-                dy=float(y_mm),
+                dx=dx,
+                dy=dy,
+                timeout=self.DEFAULT_TIMEOUT,
+            )
+            await self.remotes["mtptg"].cmd_collOffset.set_start(
+                ca=ca,
+                ce=ce,
                 timeout=self.DEFAULT_TIMEOUT,
             )
             self.log.info(
-                f"Successfully issued pointing correction to MTPtg (poriginOffset): "
-                f"dx={x_mm} mm, dy={y_mm} mm."
+                f"Successfully issued pointing correction to MTPtg (poriginOffset/collOffset): "
+                f"{dx=} mm, {dy=} mm, {ca=} arcsec, {ce=} arcsec."
             )
         except Exception as e:
             raise RuntimeError("Failed to issue pointing correction to MTPtg.") from e
