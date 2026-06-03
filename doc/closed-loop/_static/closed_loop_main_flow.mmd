@@ -1,0 +1,75 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#e8f4fd', 'primaryBorderColor': '#1b3a5c', 'lineColor': '#333', 'fontSize': '13px'}}}%%
+flowchart TD
+    START([run_closed_loop starts]) --> IDLE[Set state: WAITING_IMAGE]
+
+    IDLE --> OODS{OODS image<br/>event?}
+    OODS -->|Timeout| TIMEOUT{Timeout exceeded?<br/><i>closed_loop_timeout_without_images</i>}
+    TIMEOUT -->|Yes| FAULT([FAULT: no images])
+    TIMEOUT -->|No| OODS
+    OODS -->|Image received| FOLLOW{Image in<br/>following list?}
+    FOLLOW -->|No| SKIP_MISS[Log missed exposure]
+    SKIP_MISS --> MISS_COUNT{Too many misses?<br/><i>max_ofc_consecutive_failures</i>}
+    MISS_COUNT -->|Yes| FAULT2([FAULT])
+    MISS_COUNT -->|No| OODS
+    FOLLOW -->|Yes| ALREADY{Already processed?}
+    ALREADY -->|Yes| OODS
+    ALREADY -->|No| STALE{Exposure started before<br/>last correction?<br/><i>discard_intermediate_corrections</i>}
+    STALE -->|Yes, discard=True| SKIP_STALE[Skip stale image]
+    SKIP_STALE --> OODS
+    STALE -->|No / discard=False| METADATA[Get filter, elevation,<br/>rotation from metadata]
+
+    METADATA --> POINTING{Elevation or rotation<br/>delta > limit?<br/><i>elevation_delta_limit_max</i><br/><i>rotation_delta_limit</i>}
+    POINTING -->|Yes| SKIP_POINT[Skip: large slew]
+    SKIP_POINT --> OODS
+    POINTING -->|No| PROCESS[Set state: PROCESSING]
+
+    PROCESS --> WEP[Run wavefront estimation<br/><i>use_ocps → OCPS/RA</i><br/><i>wep_config</i>]
+    WEP -->|NotEnoughWFE| WFE_FAIL{Too many failures?<br/><i>max_ofc_consecutive_failures</i>}
+    WFE_FAIL -->|Yes| FAULT3([FAULT])
+    WFE_FAIL -->|No| OODS
+    WEP -->|NotEnoughRA| RA_FAIL{Too many failures?<br/><i>max_ofc_consecutive_failures</i>}
+    RA_FAIL -->|Yes| FAULT4([FAULT])
+    RA_FAIL -->|No| OODS
+    WEP -->|Success| GAIN_CHECK{Elevation change<br/>since last image?<br/><i>elevation_delta_limit_min</i><br/><i>elevation_delta_limit_max</i>}
+    GAIN_CHECK -->|"delta &gt; max (9 deg): gain=0"| SKIP_GAIN[Skip correction]
+    SKIP_GAIN --> OODS
+    GAIN_CHECK -->|"delta &lt; min (4 deg): full gain<br/>or between: scaled gain"| OFC[Execute OFC<br/><i>kp, ki, kd, truncation_index</i><br/><i>comp_dof_idx, used_dofs</i><br/><i>control_vmodes, subtract_intrinsics</i><br/><i>filter_change_gain override if active</i>]
+
+    OFC -->|Success| SHUTTER[Set state: WAITING_APPLY<br/>Wait for shutter closed]
+    OFC -->|Failure| OFC_FAIL{Too many failures?<br/><i>max_ofc_consecutive_failures</i>}
+    OFC_FAIL -->|Yes| FAULT5([FAULT])
+    OFC_FAIL -->|No| OODS
+
+    SHUTTER --> APPLY[Apply corrections<br/><i>stress_scale_approach</i><br/><i>m1m3_stress_limit, m2_stress_limit</i><br/><i>stress_scale_factor</i>]
+    APPLY --> STORE[Store DOFs,<br/>update timestamp]
+    STORE --> OODS
+
+    %% Happy path: green background
+    style IDLE fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style OODS fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style FOLLOW fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style ALREADY fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style STALE fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style METADATA fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style POINTING fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style PROCESS fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style WEP fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style GAIN fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style GAIN_CHECK fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style OFC fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style SHUTTER fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style APPLY fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+    style STORE fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
+
+    %% Fault states: red
+    style FAULT fill:#ffcdd2,stroke:#c62828
+    style FAULT2 fill:#ffcdd2,stroke:#c62828
+    style FAULT3 fill:#ffcdd2,stroke:#c62828
+    style FAULT4 fill:#ffcdd2,stroke:#c62828
+    style FAULT5 fill:#ffcdd2,stroke:#c62828
+
+    %% Skip states: yellow
+    style SKIP_STALE fill:#fff9c4,stroke:#f9a825
+    style SKIP_POINT fill:#fff9c4,stroke:#f9a825
+    style SKIP_GAIN fill:#fff9c4,stroke:#f9a825
+    style SKIP_MISS fill:#fff9c4,stroke:#f9a825

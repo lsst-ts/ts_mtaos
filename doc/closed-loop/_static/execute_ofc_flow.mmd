@@ -1,0 +1,80 @@
+---
+config:
+  theme: base
+  themeVariables:
+    primaryColor: '#f0f4f8'
+    primaryBorderColor: '#1b3a5c'
+    lineColor: '#333'
+    fontSize: 13px
+  layout: elk
+---
+flowchart TB
+    subgraph GAIN_SETUP["1. Gain Setup"]
+        direction TB
+        START([_execute_ofc called]) --> SAVE_GAINS[Save current kp, ki, kd]
+        SAVE_GAINS --> CHECK_GAIN{userGain &ne; 0?<br/><i>elevation gain scaling</i>}
+        CHECK_GAIN -->|Yes| SET_GAIN[Set controller.kp = userGain]
+        CHECK_GAIN -->|No| FILTER_CHECK
+        SET_GAIN --> FILTER_CHECK{Filter change<br/>override active?<br/><i>closed_loop_filter_change_gain</i>}
+        FILTER_CHECK -->|Yes| SET_FILTER[Override kp, ki, kd]
+        FILTER_CHECK -->|No| OUT_GAIN([→])
+        SET_FILTER --> OUT_GAIN
+    end
+
+    subgraph OFC_PARAMS["2. OFC Parameter Override"]
+        direction TB
+        IN_OFC([→]) --> SET_OFC[set_ofc_data_values:<br/><i>comp_dof_idx, truncation_index,</i><br/><i>zn_selected, …</i>]
+        SET_OFC --> SAVE_ORIG[Save original values]
+        SAVE_ORIG --> CALC([→ calculate_corrections])
+    end
+
+    subgraph CORRECTION["3. Correction Computation"]
+        direction TB
+        IN_CALC([→]) --> WFE_PROC[Get wavefront errors]
+        WFE_PROC --> DEFOCUS{Large defocus?<br/><i>dz_threshold_min</i>}
+        DEFOCUS -->|Yes, raise=True| ERROR([RuntimeError])
+        DEFOCUS -->|Yes, raise=False| REFOCUS[Auto-refocus<br/><i>dz_threshold_max</i>]
+        DEFOCUS -->|No| STATE_EST[State estimation<br/><i>truncation_index,</i><br/><i>subtract_intrinsics</i>]
+        STATE_EST --> PID[PID control_step<br/><i>kp, ki, kd, setpoint,</i><br/><i>max_integral</i>]
+        PID --> AGGREGATE[Aggregate DOF state]
+        AGGREGATE --> CORRECTIONS[Component corrections:<br/>hexapod, M1M3, M2]
+        REFOCUS --> CLEAR
+        CORRECTIONS --> CLEAR[Clear WFE collection]
+    end
+
+    subgraph RESTORE["4. Publish & Restore"]
+        direction TB
+        IN_REST([→]) --> PUBLISH[Publish events:<br/>degreeOfFreedom,<br/>mirrorStresses, corrections]
+        PUBLISH --> RESTORE_OFC[Restore OFC data values]
+        RESTORE_OFC --> RESTORE_GAINS[Restore kp, ki, kd]
+        RESTORE_GAINS --> DONE([Return])
+    end
+
+    OUT_GAIN --> IN_OFC
+    CALC --> IN_CALC
+    CLEAR --> IN_REST
+
+    %% Happy path
+    style SAVE_GAINS fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style SET_GAIN fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style SET_OFC fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style SAVE_ORIG fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style WFE_PROC fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style STATE_EST fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style PID fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style AGGREGATE fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style CORRECTIONS fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style CLEAR fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style PUBLISH fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style RESTORE_OFC fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style RESTORE_GAINS fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+
+    %% Decisions
+    style CHECK_GAIN fill:#fef3c7,stroke:#f59e0b
+    style FILTER_CHECK fill:#fef3c7,stroke:#f59e0b
+    style DEFOCUS fill:#fef3c7,stroke:#f59e0b
+
+    %% Alternates
+    style SET_FILTER fill:#fff9c4,stroke:#f9a825
+    style REFOCUS fill:#fff9c4,stroke:#f9a825
+    style ERROR fill:#ffcdd2,stroke:#c62828
