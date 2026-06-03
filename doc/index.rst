@@ -55,6 +55,17 @@ MTAOS's configuration is described at the following link.
     configuration/configuration
     :maxdepth: 1
 
+.. _Closed_Loop:
+
+Closed Loop Operations
+======================
+
+The closed-loop correction task is the primary operational mode of the MTAOS during survey observations.
+
+.. toctree::
+    closed-loop/closed-loop
+    :maxdepth: 1
+
 .. _Development_Documentation:
 
 Development Documentation

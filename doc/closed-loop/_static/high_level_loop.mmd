@@ -1,0 +1,35 @@
+---
+config:
+  theme: base
+  themeVariables:
+    primaryColor: '#f0f4f8'
+    primaryBorderColor: '#1b3a5c'
+    lineColor: '#333'
+    fontSize: '14px'
+  layout: elk
+---
+flowchart LR
+    subgraph STARTUP["Startup (once)"]
+        direction TB
+        CONFIG[Load configuration<br/><i>see: config_flow diagram</i>]
+        CONFIG --> INIT[Initialize Model + OFC<br/>+ StateEstimator]
+    end
+
+    subgraph LOOP["Closed Loop (repeats per image)"]
+        direction TB
+        WAIT[Wait for next<br/>valid image] --> CHECK[Image filtering<br/>& gain computation<br/><i>see: main_flow diagram</i>]
+        CHECK -->|valid| OFC_CALL[_execute_ofc<br/><i>see: execute_ofc_flow diagram</i>]
+        CHECK -->|skip| WAIT
+        OFC_CALL --> APPLY[Wait shutter closed<br/>→ Apply corrections]
+        APPLY --> WAIT
+    end
+
+    CMD_START([startClosedLoop]) --> LOOP
+    STARTUP --> CMD_START
+    CMD_STOP([stopClosedLoop]) -.->|stops| LOOP
+
+    style STARTUP fill:#e8f5e9,stroke:#2e7d32
+    style LOOP fill:#e3f2fd,stroke:#1565c0
+    style OFC_CALL fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style CMD_START fill:#fff9c4,stroke:#f9a825
+    style CMD_STOP fill:#ffcdd2,stroke:#c62828

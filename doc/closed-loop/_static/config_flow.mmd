@@ -1,0 +1,61 @@
+---
+config:
+  theme: base
+  themeVariables:
+    primaryColor: '#f8f8f0'
+    primaryBorderColor: '#1b3a5c'
+    lineColor: '#333'
+    fontSize: 13px
+  layout: elk
+---
+flowchart TB
+    subgraph CSC_CONFIG["CSC Configuration (ts_config_mttcs MTAOS/v13/_init.yaml)"]
+        direction TB
+        CSC_CAMERA[camera: lsstCam]
+        CSC_INSTRUMENT[instrument: lsst]
+        CSC_VMODES[control_vmodes: True/False]
+        CSC_DOFS[used_dofs: list of DOF indices]
+        CSC_SUBTRACT[subtract_intrinsics: True/False]
+        CSC_EL_MAX[elevation_delta_limit_max: 9.0°]
+        CSC_EL_MIN[elevation_delta_limit_min: 4.0°]
+        CSC_ROT[rotation_delta_limit: 9.0°]
+        CSC_STRESS[stress_scale_approach: scale/truncate]
+        CSC_OCPS[use_ocps: True/False]
+        CSC_FILTER_GAIN[closed_loop_filter_change_gain]
+        CSC_POINTING[enable_pointing_correction]
+    end
+
+    subgraph OFC_CONFIG["OFC Controller Config (MTAOS/ofc/configurations/init.yaml)"]
+        direction TB
+        OFC_KP[kp: gain array or scalar]
+        OFC_KI[ki: integral gain]
+        OFC_KD[kd: derivative gain]
+        OFC_TRUNC[truncation_index: 12]
+        OFC_ZN[zn_selected: Zernike list]
+        OFC_SETPOINT[setpoint: target DOF state]
+        OFC_MAX_INT[max_integral: per-DOF limits]
+        OFC_NORM[normalization_weights_filename]
+    end
+
+    subgraph RUNTIME["Runtime Override (startClosedLoop / runOFC config)"]
+        direction TB
+        RT_TRUNC[truncation_index]
+        RT_COMP[comp_dof_idx]
+        RT_ZN[zn_selected]
+        RT_FILTER[filter_name]
+        RT_ROT[rotation_angle]
+    end
+
+    subgraph WEP_OVERRIDE["WEP Override (per iteration)"]
+        direction TB
+        WEP_ZN[zn_selected from WEP output<br/>OVERWRITES config value]
+    end
+
+    CSC_CONFIG -->|"CSC startup<br/>(configure)"| MODEL[Model + OFC initialized]
+    OFC_CONFIG -->|"OFCData init<br/>(configure_controller)"| MODEL
+    MODEL -->|startClosedLoop| LOOP[run_closed_loop]
+    RUNTIME -->|per iteration via<br/>set_ofc_data_values| LOOP
+    WEP_OVERRIDE -->|_calculate_corrections<br/>line 1683| LOOP
+
+    style WEP_OVERRIDE fill:#fff3e0,stroke:#cc3300
+    style RUNTIME fill:#e8f5e9,stroke:#2e7d32
