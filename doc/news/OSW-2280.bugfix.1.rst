@@ -1,0 +1,1 @@
+Enhanced error handling for the OCPS execute command in 'mtaos.py' to provide clearer context when OCPS:101 is not enabled.

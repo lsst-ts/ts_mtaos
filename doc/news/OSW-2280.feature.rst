@@ -1,0 +1,1 @@
+Refactored pointing correction logic in 'model.py' to decouple and independently split pointing origin and collimation offsets.
