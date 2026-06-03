@@ -13,6 +13,24 @@ Version History
 
 .. towncrier release notes start
 
+v0.30.0 (2026-06-03)
+====================
+
+New Features
+------------
+
+- Updated 'MTAOS.issue_pointing_correction' to apply both x/y pointing origin offsets and collimation offsets concurrently. (`OSW-2280 <https://rubinobs.atlassian.net//browse/OSW-2280>`_)
+- Refactored pointing correction logic in 'model.py' to decouple and independently split pointing origin and collimation offsets. (`OSW-2280 <https://rubinobs.atlassian.net//browse/OSW-2280>`_)
+- Updated 'compute_pointing_correction_offset' across the model and MTAOS to calculate and return both pointing origin and collimation pointing offsets. (`OSW-2280 <https://rubinobs.atlassian.net//browse/OSW-2280>`_)
+
+
+Bug Fixes
+---------
+
+- Patched 'MTAOS.set_pointing_correction_matrix' to dynamically use the number of degrees of freedom from 'OFCData' instead of a hard-coded value. (`OSW-2280 <https://rubinobs.atlassian.net//browse/OSW-2280>`_)
+- Enhanced error handling for the OCPS execute command in 'mtaos.py' to provide clearer context when OCPS:101 is not enabled. (`OSW-2280 <https://rubinobs.atlassian.net//browse/OSW-2280>`_)
+
+
 v0.29.2 (2026-05-11)
 ====================
 

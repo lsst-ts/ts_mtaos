@@ -1,1 +1,0 @@
-Patched 'MTAOS.set_pointing_correction_matrix' to dynamically use the number of degrees of freedom from 'OFCData' instead of a hard-coded value.

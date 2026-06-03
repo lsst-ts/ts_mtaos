@@ -1,1 +1,0 @@
-Updated 'compute_pointing_correction_offset' across the model and MTAOS to calculate and return both pointing origin and collimation pointing offsets.
