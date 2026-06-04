@@ -18,7 +18,7 @@ flowchart LR
     subgraph LOOP["Closed Loop (repeats per image)"]
         direction TB
         WAIT[Wait for next<br/>valid image] --> CHECK[Image filtering<br/>& gain computation<br/><i>see: main_flow diagram</i>]
-        CHECK -->|valid| OFC_CALL[_execute_ofc<br/><i>see: execute_ofc_flow diagram</i>]
+        CHECK -->|valid| OFC_CALL[_execute_ofc<br/><i>setup → compute → cleanup</i>]
         CHECK -->|skip| WAIT
         OFC_CALL --> APPLY[Wait shutter closed<br/>→ Apply corrections]
         APPLY --> WAIT
