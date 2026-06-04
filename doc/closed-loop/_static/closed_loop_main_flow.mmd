@@ -6,7 +6,7 @@ flowchart TD
     OODS -->|Timeout| TIMEOUT{Timeout exceeded?<br/><i>closed_loop_timeout_without_images</i>}
     TIMEOUT -->|Yes| FAULT([FAULT: no images])
     TIMEOUT -->|No| OODS
-    OODS -->|Image received| FOLLOW{Image in<br/>following list?}
+    OODS -->|Image received| FOLLOW{Image in following list?<br/><i>startIntegration received?</i>}
     FOLLOW -->|No| SKIP_MISS[Log missed exposure]
     SKIP_MISS --> MISS_COUNT{Too many misses?<br/><i>max_ofc_consecutive_failures</i>}
     MISS_COUNT -->|Yes| FAULT2([FAULT])
@@ -54,7 +54,6 @@ flowchart TD
     style POINTING fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
     style PROCESS fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
     style WEP fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
-    style GAIN fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
     style GAIN_CHECK fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
     style OFC fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
     style SHUTTER fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px
