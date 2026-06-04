@@ -44,8 +44,24 @@ from lsst.ts.ofc import OFC, BendModeToForce, Correction, OFCData
 from lsst.ts.ofc.utils.ofc_data_helpers import get_intrinsic_zernikes, get_sensor_names
 from lsst.ts.salobj import DefaultingValidator
 from lsst.ts.utils import make_done_future
-from lsst.ts.wep.task.donutStamps import DonutStamps
-from lsst.ts.wep.utils import writePipetaskCmd
+
+try:
+    from lsst.ts.wep.utils import writePipetaskCmd
+except LookupError:
+    import warnings
+
+    warnings.warn("Failed to load wep.")
+
+    def writePipetaskCmd(
+        repoDir: str,
+        runName: str,
+        instrument: str,
+        collections: str,
+        taskName: str | None = None,
+        pipelineYaml: str | None = None,
+    ) -> str:
+        raise ImportError("Could not import writePipetaskCmd from lsst.ts.wep.utils")
+
 
 from .config_schema import (
     COMCAM_PIPELINE_CONFIG,
@@ -55,6 +71,7 @@ from .config_schema import (
     SCIENCE_SENSOR_PIPELINE_CONFIG,
     WEP_HEADER_CONFIG,
 )
+from .types import IDonutStamps, IWritePipetaskCmd
 from .utility import (
     NotEnoughRAOutputsError,
     NotEnoughWaveFrontDataError,
@@ -1230,6 +1247,7 @@ class Model:
         instrument: str,
         config_filename: str,
         exposures_str: str,
+        write_pipetask_cmd: IWritePipetaskCmd = writePipetaskCmd,
     ) -> str:
         """Generate pipetask command to execute as a process.
 
@@ -1243,6 +1261,9 @@ class Model:
             Name of the configuration file.
         exposures_str : `str`
             String expressing a query for the images to be processed.
+        write_pipetask_cmd : `IWritePipetaskCmd`, optional
+            Function to generate pipetask command.
+            Defaults to writePipetaskCmd.
 
         Returns
         -------
@@ -1250,7 +1271,7 @@ class Model:
             A formatted string with the command line execution for the
             pipeline task.
         """
-        run_pipetask_cmd = writePipetaskCmd(
+        run_pipetask_cmd = write_pipetask_cmd(
             self.data_path,
             run_name,
             self.pipeline_instrument[instrument],
@@ -1600,12 +1621,12 @@ class Model:
 
         return offset
 
-    def get_radius(self, ds: DonutStamps, label: str, data_id: dict) -> float:
+    def get_radius(self, ds: IDonutStamps, label: str, data_id: dict) -> float:
         """Get the donut radius from the DonutStamps dataset.
 
         Parameters
         ----------
-        ds : `DonutStamps`
+        ds : `IDonutStamps`
             DonutStamps dataset.
         label : `str`
             Label for logging purposes.
