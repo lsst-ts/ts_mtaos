@@ -64,6 +64,7 @@ The closed-loop correction task is the primary operational mode of the MTAOS dur
 
 .. toctree::
     closed-loop/closed-loop
+    closed-loop/analysis
     :maxdepth: 1
 
 .. _Development_Documentation:
