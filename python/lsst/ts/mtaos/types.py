@@ -1,0 +1,75 @@
+# This file is part of ts_MTAOS.
+#
+# Developed for the LSST Telescope and Site Systems.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+import typing
+from collections.abc import Mapping
+
+
+class IDonutStamps(typing.Protocol):
+    """Protocol for DonutStamps objects.
+
+    This defines the minimal interface used by get_radius method.
+    """
+
+    @property
+    def metadata(self) -> Mapping[str, typing.Any]:
+        """Return the metadata dict-like object."""
+        ...
+
+
+class IWritePipetaskCmd(typing.Protocol):
+    """Protocol for writePipetaskCmd function.
+
+    This defines the interface used to generate pipetask commands.
+    """
+
+    def __call__(
+        self,
+        repoDir: str,
+        runName: str,
+        instrument: str,
+        collections: str,
+        taskName: str | None = None,
+        pipelineYaml: str | None = None,
+    ) -> str:
+        """Generate pipetask command string.
+
+        Parameters
+        ----------
+        repoDir : str
+            Location of Gen 3 repository.
+        runName : str
+            Name of collection for data produced by the task.
+        instrument : str
+            The instrument to use for the task.
+        collections : str
+            The data collections needed for the task.
+        taskName : str | None
+            Full task function name in lsst namespace.
+        pipelineYaml : str | None
+            Yaml file that specifies a pipeline configuration.
+
+        Returns
+        -------
+        str
+            Pipetask run command.
+        """
+        ...
