@@ -102,16 +102,16 @@ Elevation/rotation position check has a timing gap
 The closed loop includes a position check designed to skip corrections when the telescope has moved too far from where the image was taken.
 This check compares the image's elevation/rotation to the live telescope position and skips the image if the delta exceeds ``elevation_delta_limit_max`` (9°) or ``rotation_delta_limit`` (9°).
 
-The intent is correct: prevent applying a correction derived from one pointing at a significantly different pointing.
-However, the check runs **at image arrival time** (when the OODS event is received), not at the time the correction is actually applied.
+The intent sounds reasonable: avoid applying a correction derived at one pointing to a significantly different pointing.
+However, the check runs only **at image arrival time** (when the OODS event is received, T=32 s in the timeline below), not when the correction is actually applied.
 
 With 30–75 s of processing latency between arrival and application, the telescope continues slewing to new fields.
-The position delta that was within limits at arrival time may exceed limits by the time the correction is applied — but this is not re-evaluated.
+The position delta that was within limits at arrival time may exceed limits by the time the correction is applied, but this is not re-evaluated.
 
 In other words:
 
-- If the telescope has already moved far **before** the image arrives → the check catches it correctly → image is skipped ✓
-- If the telescope moves far **during** the 30–75 s processing window → the check already passed → correction is applied at the wrong position without re-validation ✗
+- If the telescope has already moved far **before** the image arrives → the check catches it correctly → image is skipped ✅ 
+- If the telescope moves far **during** the 30–75 s processing window → the check already passed → correction is applied at the wrong position without re-validation ❌
 
 The protection works as intended when processing latency is small relative to slew rates.
 With the current N+2 to N+3 latency, the telescope can move significantly during processing, creating a gap where the check's guarantee no longer holds at the moment of application.
