@@ -37,7 +37,7 @@ flowchart TB
         OFC_NORM[normalization_weights_filename]
     end
 
-    subgraph SCRIPT["EnableAOSClosedLoop Script"]
+    subgraph SCRIPT["startClosedLoop command config (per session)"]
         direction TB
         SC_DOFS[used_dofs → comp_dof_idx]
         SC_TRUNC[truncation_index]
@@ -59,7 +59,7 @@ flowchart TB
 
     CSC_CONFIG -->|"CSC startup<br/>(configure)"| MODEL[Model + OFC initialized]
     OFC_CONFIG -->|"OFCData init<br/>(configure_controller)"| MODEL
-    SCRIPT -->|"startClosedLoop command<br/>(last_run_ofc_configuration)"| LOOP[run_closed_loop]
+    SCRIPT -->|"stored in<br/>last_run_ofc_configuration"| LOOP[run_closed_loop]
     MODEL --> LOOP
     PER_ITER -->|"added each iteration"| OFC_CALL[_execute_ofc]
     SCRIPT -->|"set_ofc_data_values<br/>each iteration"| OFC_CALL

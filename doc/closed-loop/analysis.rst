@@ -7,7 +7,7 @@ Closed Loop Behavior Analysis
 This section presents an analysis of the MTAOS closed-loop behavior, focusing on the parameter space, special cases that modify control parameters at runtime,
 and potential issues identified during code review.
 
-This analysis was motivated by the question: 
+This analysis was motivated by the question:
 *"What is the current logic and parameter space options, including all the special cases that trigger changes in the parameters of the state estimation and PID loop?"*
 
 For the factual description of the closed loop flow and its configuration, see :ref:`Closed_Loop_Operations`.
@@ -28,43 +28,141 @@ The ``comp_dof_idx`` set/restore cycle in :py:meth:`~lsst.ts.mtaos.MTAOS._execut
 Combined with the current config (``ki=0``, ``kd=0``), the controller operates as proportional-only.
 Even if ``ki`` or ``kd`` were configured non-zero, they would not accumulate across iterations.
 
+The mechanism is as follows.
+In ``_execute_ofc``, the config (which includes ``comp_dof_idx``) is applied before computing corrections and restored after:
+
+.. code-block:: python
+
+   # mtaos.py – _execute_ofc (simplified)
+
+   async with self.issue_correction_lock:
+       kp, ki, kd = (
+           self.model.ofc.controller.kp,
+           self.model.ofc.controller.ki,
+           self.model.ofc.controller.kd,
+       )
+
+       if np.any(userGain != 0.0):
+           self.model.ofc.controller.kp = userGain
+
+       loaded_config = yaml.safe_load(config) if len(config) > 0 else dict()
+
+       # This sets comp_dof_idx, which triggers reset_history()
+       original_ofc_data_values = await self.model.set_ofc_data_values(**loaded_config)
+
+       try:
+           # ... compute corrections ...
+       finally:
+           # Restore original values, which triggers reset_history() again
+           await self.model.set_ofc_data_values(**original_ofc_data_values)
+           self.model.ofc.controller.kp = kp
+           self.model.ofc.controller.ki = ki
+           self.model.ofc.controller.kd = kd
+
+Inside ``set_ofc_data_values``, setting ``comp_dof_idx`` triggers the reset:
+
+.. code-block:: python
+
+   # model.py – set_ofc_data_values (excerpt)
+
+   elif key == "comp_dof_idx":
+       # ...
+       self.ofc.ofc_data.comp_dof_idx = new_comp_dof_idx
+       self.ofc.controller.reset_history()
+       original_ofc_data_values[key] = self.ofc.ofc_data.default_comp_dof_idx
+
+And ``reset_history`` zeros out the integral and derivative state:
+
+.. code-block:: python
+
+   # base_controller.py – reset_history
+
+   def reset_history(self) -> None:
+       self.dof_state0 = self.dof_state.copy()
+       self.integral = np.zeros(len(self.ofc_data.dof_idx))
+       self.previous_error = np.zeros(len(self.ofc_data.dof_idx))
+       self.filtered_derivative = np.zeros(len(self.ofc_data.dof_idx))
+
+Since ``comp_dof_idx`` is always in the per-session config (passed from the ``EnableAOSClosedLoop`` script), this reset happens on **every iteration**. 
+It happens both at the start (when setting parameters) and at the end (when restoring them).
+
 Implication: the system cannot build up correction for persistent biases that the proportional term alone cannot eliminate in a single step.
 Whether this matters depends on how well the subsystem LUTs pre-compensate for gravity and thermal effects.
 
 The ``zn_selected`` parameter is overridden by WEP
 --------------------------------------------------
 
-The ``zn_selected`` parameter from configuration is overwritten inside :py:meth:`~lsst.ts.mtaos.Model.calculate_corrections` (line 1683) by the Zernike indices that WEP actually produced.
-The configured value has no effect on the final correction. This is not inherently problematic, but it should remain explicit and well understood.
+The ``zn_selected`` parameter from configuration is overwritten inside :py:meth:`~lsst.ts.mtaos.Model._calculate_corrections` by the Zernike indices that WEP actually produced.
+The configured value has no effect on the final correction:
+
+.. code-block:: python
+
+   # model.py – _calculate_corrections (first line of the method body)
+
+   def _calculate_corrections(self, wfe, zk_indices, sensor_ids, **kwargs):
+       self.ofc.ofc_data.zn_selected = zk_indices  # overwrites any configured value
+       # ...
+
+The ``zk_indices`` argument comes from the WEP output, whatever Zernike indices the pipeline produced.
+This is not inherently problematic, but it should remain explicit and well understood.
 
 Two elevation checks with different semantics
 ----------------------------------------------
 
 Elevation is checked at two separate points:
 
-1. **Image filtering** (before WEP):
-   compares the image's position to the *live telescope position*.
+1. **Image filtering** (before WEP): compares the image's position to the *live telescope position*.
    Also checks rotation.
    Purpose: skip images from a position the telescope has already left.
 
-2. **Gain scaling** (after WEP, before OFC):
-   compares *consecutive image elevations* (previous vs current).
-   Purpose: detect large slews between observations and reduce gain.
-   Does not check rotation.
+   .. code-block:: python
+
+      # mtaos.py – run_closed_loop (check 1: image vs live position)
+
+      if (
+          (np.abs(rotation_angle - current_rotator_position) > self.rotation_angle_limit)
+          or (np.abs(elevation - current_elevation_position) > self.elevation_angle_limit)
+      ):
+          skipped_images.append(visit_id)
+          continue
+
+2. **Gain scaling** (after WEP, before OFC): compares *consecutive image elevations* (previous vs current).
+   Purpose: detect large slews between observations and reduce gain. Does not check rotation.
+
+   .. code-block:: python
+
+      # model.py – get_correction_gain (check 2: consecutive images)
+
+      elevation_diff = (
+          np.abs(elevation - previous_elevation)
+          if previous_elevation is not None
+          else 0.0
+      )
+      if elevation_diff >= self.elevation_delta_limit_max:
+          return np.zeros(self.ofc.ofc_data.ndofs)  # zero gain → skip
+
+      if elevation_diff <= self.elevation_delta_limit_min:
+          return self.ofc.controller.kp  # full gain
+
+      # Linear interpolation between min and max
+      gain = (
+          self.ofc.controller.kp
+          * (self.elevation_delta_limit_max - elevation_diff)
+          / (self.elevation_delta_limit_max - self.elevation_delta_limit_min)
+      )
+      return gain
 
 These are distinct checks with different reference points and different actions (skip vs scale).
+Note that with the current configuration (``elevation_delta_limit_min = elevation_delta_limit_max = 9.0``), the linear interpolation region has zero width, and the gain is either full ``kp`` or zero.
 
 Configuration precedence
 -------------------------
 
 Parameters are loaded at three levels:
 
-1. **OFC controller config** (``MTAOS/ofc/configurations/init.yaml``)
-   — loaded at OFCData initialization.
-2. **CSC config** (``MTAOS/v13/_init.yaml``)
-   — applied at CSC startup; overrides OFC-level.
-3. **Runtime config** (:py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop`)
-   — applied per iteration; overrides both previous levels.
+1. **OFC controller config** (``MTAOS/ofc/configurations/init.yaml``): loaded at OFCData initialization.
+2. **CSC config** (``MTAOS/v13/_init.yaml``): applied at CSC startup; overrides OFC-level.
+3. **Runtime config** (:py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop`): applied per iteration; overrides both previous levels.
 
 WEP output overrides ``zn_selected`` regardless of all three levels.
 
@@ -92,7 +190,7 @@ Measured operational performance:
 With 30 s exposures, the correction computed from image N is typically applied after images N+1 and N+2 have already been taken (or are in progress).
 The system currently operates at **N+2 to N+3 latency**: the correction from image N is applied during/after image N+2 or N+3.
 
-This means each correction is based on the optical state **2–3 fields ago** — potentially at a significantly different elevation and rotator angle.
+This means each correction is based on the optical state **2–3 fields ago**, potentially at a significantly different elevation and rotator angle.
 
 .. _Closed_Loop_Position_Mismatch:
 
@@ -100,17 +198,51 @@ Elevation/rotation position check has a timing gap
 ----------------------------------------------------
 
 The closed loop includes a position check designed to skip corrections when the telescope has moved too far from where the image was taken.
-This check compares the image's elevation/rotation to the live telescope position and skips the image if the delta exceeds ``elevation_delta_limit_max`` (9°) or ``rotation_delta_limit`` (9°).
+This check compares the image's elevation/rotation to the live telescope position and skips the image if the delta exceeds ``elevation_delta_limit_max`` (9°) or ``rotation_delta_limit`` (9°):
+
+.. code-block:: python
+
+   # mtaos.py – run_closed_loop (position check, before WEP)
+
+   current_rotator_position = self.current_rotator_position
+   current_elevation_position = self.current_elevation_position
+
+   if (
+       current_elevation_position is None
+       or current_rotator_position is None
+       or (
+           (np.abs(rotation_angle - current_rotator_position) > self.rotation_angle_limit)
+           or (np.abs(elevation - current_elevation_position) > self.elevation_angle_limit)
+       )
+   ):
+       # ... log and skip ...
+       skipped_images.append(visit_id)
+       continue
 
 The intent sounds reasonable: avoid applying a correction derived at one pointing to a significantly different pointing.
 However, the check runs only **at image arrival time** (when the OODS event is received, T=32 s in the timeline below), not when the correction is actually applied.
+
+After the correction is computed (30–75 s later), it is applied without re-checking the position:
+
+.. code-block:: python
+
+   # mtaos.py – run_closed_loop (correction application, no position re-check)
+
+   while camera_shutter_detailed_state.substate != 1:
+       camera_shutter_detailed_state = await camera.evt_shutterDetailedState.next(
+           flush=False
+       )
+
+   # No position re-check here. It applies directly
+   await self._execute_issue_correction()
+   time_last_correction_applied = current_tai()
 
 With 30–75 s of processing latency between arrival and application, the telescope continues slewing to new fields.
 The position delta that was within limits at arrival time may exceed limits by the time the correction is applied, but this is not re-evaluated.
 
 In other words:
 
-- If the telescope has already moved far **before** the image arrives → the check catches it correctly → image is skipped ✅ 
+- If the telescope has already moved far **before** the image arrives → the check catches it correctly → image is skipped ✅
 - If the telescope moves far **during** the 30–75 s processing window → the check already passed → correction is applied at the wrong position without re-validation ❌
 
 The protection works as intended when processing latency is small relative to slew rates.
@@ -159,7 +291,20 @@ Stale image discarding
 -----------------------
 
 The timing diagram above also shows what happens to the intermediate images (N+1, N+2) that were taken during processing.
-The ``discard_intermediate_corrections`` feature handles this: after applying the correction at T=95s, images whose exposure started before that timestamp are discarded.
+The ``discard_intermediate_corrections`` feature handles this: after applying the correction at T=95s, images whose exposure started before that timestamp are discarded:
+
+.. code-block:: python
+
+   # mtaos.py – run_closed_loop (stale image check)
+
+   elif (
+       delta_time := self.image_started_time[image_in_oods.obsid]
+       - time_last_correction_applied
+   ) < 0:
+       if self.discard_intermediate_corrections:
+           # Exposure started before the last correction → skip
+           skipped_images.append(visit_id)
+           continue
 
 As shown in the diagram:
 
@@ -191,7 +336,20 @@ The filter change detection and correction flow involves several interactions be
 2. The hexapod CSC applies the filter LUT offset independently (e.g., camera hex dZ changes by -378 µm for r→i).
    This is a **separate layer** from the AOS correction.
 3. The first image after the filter change arrives with the new filter label in its metadata.
-4. MTAOS detects the change by comparing `filter_label` of the current image to `prev_filter` from the last processed image.
+4. MTAOS detects the change by comparing ``filter_label`` of the current image to ``prev_filter`` from the last processed image:
+
+.. code-block:: python
+
+   # mtaos.py – run_closed_loop (filter change detection)
+
+   filter_label, elevation = await self.model.get_image_info(self.camera_name)
+
+   filter_changed = prev_filter is not None and filter_label != prev_filter
+
+   if self.filter_change_gain_n_iter > 0 and filter_changed:
+       filter_gain_override_iters_left = self.filter_change_gain_n_iter
+       # ... log and apply gain override ...
+   prev_filter = filter_label
 
 **What happens to the last old-filter correction:**
 
@@ -206,8 +364,7 @@ However, this is likely harmless because:
 
 After the filter change, the optical state changes slightly (different glass properties, different thermal characteristics).
 The AOS internal state (``controller.dof_state``) still reflects the old filter's residual.
-The first image with the new filter will measure the new residual, and the OFC will compute a correction relative to the internal state, 
-which may produce a larger-than-expected correction on the first iteration.
+The first image with the new filter will measure the new residual, and the OFC will compute a correction relative to the internal state, which may produce a larger-than-expected correction on the first iteration.
 
 **Current mitigation:**
 
@@ -223,7 +380,7 @@ The first post-filter-change image is processed normally.
 
 **No skip mechanism for filter changes (potential gap):**
 
-There is no logic in the current code that says "a filter change is in progress — skip the pending correction."
+There is no logic in the current code that says "a filter change is in progress, skip the pending correction."
 The only filter-related mechanism is the optional gain override (``closed_loop_filter_change_gain``, currently disabled with ``n_iter = 0``).
 
 If a correction from the old filter is still pending when the shutter closes for the filter change, the "wait for shutter closed" condition is met and the correction may be applied during the filter swap.
@@ -242,7 +399,7 @@ PID integral reset
 -------------------
 
 The integral reset (due to ``comp_dof_idx`` set/restore) prevents the controller from accumulating correction for persistent biases.
-If biases exist (imperfect LUTs, unmodeled thermal effects), the proportional term can only reduce them by the ``kp`` fraction per iteration — never reaching zero.
+If biases exist (imperfect LUTs, unmodeled thermal effects), the proportional term can only reduce them by the ``kp`` fraction per iteration, never reaching zero.
 
 Whether this is a practical limitation depends on:
 
@@ -259,7 +416,7 @@ Both paths use the same PID controller
 ----------------------------------------
 
 Both the ``close_loop_lsstcam.py`` script and the MTAOS :py:meth:`~lsst.ts.mtaos.MTAOS.run_closed_loop` task call the **same underlying OFC** (``ts_ofc``) through the same MTAOS commands.
-The script calls ``cmd_runOFC`` which internally invokes :py:meth:`~lsst.ts.mtaos.MTAOS._execute_ofc` — the same function the closed loop calls directly.
+The script calls ``cmd_runOFC`` which internally invokes :py:meth:`~lsst.ts.mtaos.MTAOS._execute_ofc`, which is the same function the closed loop calls directly.
 
 In both cases, the per-iteration correction is computed by:
 
@@ -272,7 +429,7 @@ The PID integral is reset in both paths (due to ``comp_dof_idx`` set/restore tri
 Outer loop orchestration differs
 ---------------------------------
 
-The difference is in **how the outer loop is managed** — who decides when to take images, what gain to use, and when to stop:
+The difference is in **how the outer loop is managed**, who decides when to take images, what gain to use, and when to stop:
 
 **close_loop script:**
 
@@ -352,14 +509,14 @@ With ``kp = 0.75``:
 - Iteration 2: correct 75% of 25% → 6.25% remains
 - Iteration 3: correct 75% of 6.25% → 1.56% remains
 
-This geometric convergence works because the telescope is at a **fixed pointing** — the optical state doesn't change between iterations except for the correction applied.
+This geometric convergence works because the telescope is at a **fixed pointing**, so the optical state doesn't change between iterations except for the correction applied.
 
 Why the MTAOS closed loop does not converge the same way
 ---------------------------------------------------------
 
 The MTAOS closed loop cannot converge in the same sense because:
 
-- The telescope **slews between images** — the optical state changes due to gravity, thermal effects, and LUT residuals at each new pointing
+- The telescope **slews between images**. The optical state changes due to gravity, thermal effects, and LUT residuals at each new pointing
 - The "target" (zero DOF state) is never reached because the real optical state keeps changing with each new field
 - The gain (kp=0.45) is lower than the script's typical gain (0.5–0.75)
 - Each correction addresses the state at the *previous* pointing, not the current one
