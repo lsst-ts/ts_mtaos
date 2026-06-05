@@ -518,7 +518,7 @@ The MTAOS closed loop cannot converge in the same sense because:
 
 - The telescope **slews between images**. The optical state changes due to gravity, thermal effects, and LUT residuals at each new pointing
 - The "target" (zero DOF state) is never reached because the real optical state keeps changing with each new field
-- The gain (kp=0.45) is lower than the script's typical gain (0.5–0.75)
+- The gain (kp=0.30) is lower than the script's typical gain (0.5–0.75)
 - Each correction addresses the state at the *previous* pointing, not the current one
 
 The closed loop is designed to **track** a changing optical state, not converge to a fixed point.

@@ -64,8 +64,10 @@ During operation, the loop publishes its state via the ``evt_closedLoopState`` e
 
 1. **WAITING_IMAGE**: Idle, waiting for the next OODS event
 2. **PROCESSING**: Running wavefront estimation and OFC
-3. **WAITING_APPLY**: Waiting for the camera shutter to close before
-   applying corrections
+3. **WAITING_APPLY**: In synchronous mode (the default), waits for an
+   explicit ``issueCorrection`` command, then waits for the camera shutter
+   to close before applying corrections.
+   In asynchronous mode, proceeds directly to waiting for the shutter.
 4. **ERROR**: A fatal error occurred; the loop has stopped
 
 The following diagram shows the detailed flow with all decision points, skip conditions, and fault states:
@@ -155,7 +157,7 @@ Before computing corrections, the MTAOS determines the gain to apply based on th
    If elevation_delta > elevation_delta_limit_max (9°):
        gain = 0  →  skip corrections entirely
 
-   If elevation_delta < elevation_delta_limit_min (4°):
+   If elevation_delta < elevation_delta_limit_min (9°):
        gain = controller.kp  (full gain from OFC config)
 
    If elevation_delta_limit_min < elevation_delta < elevation_delta_limit_max:
@@ -191,7 +193,8 @@ The function proceeds through three logical blocks:
 - Save current kp, ki, kd for later restoration
 - If ``userGain != 0``: override ``controller.kp`` with the elevation-scaled gain
 - If filter change override is active: override kp/ki/kd with ``filter_change_gains``
-- Call :py:meth:`~lsst.ts.mtaos.Model.set_ofc_data_values` to apply per-iteration config (``comp_dof_idx``, ``filter_name``, ``rotation_angle``, ``truncation_index``) and save the originals
+- Call :py:meth:`~lsst.ts.mtaos.Model.set_ofc_data_values` to apply per-iteration config (``comp_dof_idx``, ``truncation_index``) and save the originals.
+  The ``filter_name`` and ``rotation_angle`` are also in the config dict but are not consumed by ``set_ofc_data_values`` — they pass through as ``**kwargs`` to :py:meth:`~lsst.ts.mtaos.Model.calculate_corrections` where they are used by the state estimator.
 
 The ``comp_dof_idx`` parameter is a per-component boolean mask that selects which degrees of freedom are active in the correction.
 It is received as a dictionary of boolean arrays keyed by component (``m2HexPos``, ``camHexPos``, ``M1M3Bend``, ``M2Bend``), where each entry indicates which DOFs within that component participate.
@@ -207,7 +210,7 @@ This mask determines the dimension of the state estimation and control problem.
 **Cleanup** (in a ``finally`` block, always runs):
 
 - Publish events (degreeOfFreedom, mirrorStresses, corrections)
-- Restore original OFC data values
+- Restore original OFC data values (note: ``truncation_index`` is not saved/restored by ``set_ofc_data_values`` — it uses a special code path that recreates the state estimator but does not store the original value)
 - Restore original kp, ki, kd
 
 .. warning::
@@ -218,7 +221,7 @@ This mask determines the dimension of the state estimation and control problem.
 Zernike selection override
 --------------------------
 
-Inside :py:meth:`~lsst.ts.mtaos.Model.calculate_corrections`, the ``zn_selected`` value from the config is **overwritten** by the Zernike indices actually produced by WEP (``model.py:1683``).
+Inside :py:meth:`~lsst.ts.mtaos.Model._calculate_corrections`, the ``zn_selected`` value from the config is **overwritten** by the Zernike indices actually produced by WEP.
 This means the ``zn_selected`` passed via the :py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop` config or the OFC controller config does not determine which Zernikes are used.
 It is WEP that determines the selection.
 
@@ -271,12 +274,13 @@ Parameters that change state estimation behavior
    * - Parameter
      - Effect on state estimation
    * - ``truncation_index``
-     - Controls how many v-modes are retained. Lower values discard more modes. Higher values retain more modes (better resolution but more noise sensitivity).
+     - Controls how many v-modes are retained. Lower values discard more modes. Higher values retain more modes.
    * - ``used_dofs`` / ``comp_dof_idx``
      - Determines which DOFs participate. Changes the dimension of the problem: n_used_dofs → n_vmodes. Fewer DOFs = fewer v-modes = simpler estimation.
    * - ``subtract_intrinsics``
-     - When False, the estimator sees the full wavefront including design aberrations.
-       The OFC then tries to "correct" these, which may not be desirable. Set to False only if the intrinsic model is inaccurate.
+     - When True, the state estimator subtracts the intrinsic (design) Zernikes from the measured wavefront error before estimating the DOF state.
+       When False, only the ``y2_correction`` is subtracted.
+       Currently set to False.
    * - ``rotation_angle``
      - Rotates the sensor field angles when evaluating the sensitivity matrix, and derotates the measured wavefront errors.
        The v-mode basis itself is constant (computed once at initialization, independent of rotation).
@@ -334,13 +338,14 @@ That focus offset is implemented via the **y2_correction** (a static per-sensor 
 The PID setpoint operates in DOF space and is all zeros, meaning the controller drives the estimated DOF state toward zero.
 
 The ``xref`` parameter determines which reference point the OIC controller uses when computing the correction.
-It defines what "zero" means for the aggregated DOF state:
+It is only relevant when the controller ``name`` is set to ``OIC`` — the current PID controller does not use it.
+For the OIC controller, the options are:
 
-- ``x00``: the reference is the absolute zero state (all DOFs at zero). This is the default and most common setting.
-- ``x0``: the reference is the initial DOF state at startup (``dof_state0`` from config). Corrections drive the system back toward wherever it started.
-- ``0``: equivalent to ``x00`` (zero reference).
+- ``x0``: correction based only on the current optical state, no motion penalty on the accumulated state.
+- ``x00``: adds a penalty on deviation from the initial state (``dof_state - dof_state0``). Corrections that move far from the starting position are penalized.
+- ``0``: adds a penalty on the absolute accumulated state (``dof_state``), targeting zero. Corrections that produce large absolute offsets are penalized.
 
-In practice, ``x00`` is used for survey operations, meaning the controller tries to minimize the total DOF offset from the nominal optical alignment.
+In practice, the current config uses the PID controller (``name: PID``), so ``xref`` has no effect.
 
 Special cases that modify PID parameters during the loop
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -403,7 +408,10 @@ For the mathematical details, see `SOTN-001 <https://sotn-001.lsst.io>`_.
 Correction Application
 ======================
 
-After OFC computes corrections, MTAOS waits for the camera shutter to close, then applies corrections to each subsystem:
+After OFC computes corrections, MTAOS enters the WAITING_APPLY state.
+In synchronous mode (the default), it waits for an explicit ``issueCorrection`` command before proceeding.
+In asynchronous mode, it proceeds immediately.
+In both cases, it then waits for the camera shutter to close (``shutterDetailedState.substate == 1``) before applying corrections to each subsystem:
 
 - **M2 Hexapod**: position offsets (dZ, dX, dY, rX, rY)
 - **Camera Hexapod**: position offsets
@@ -447,7 +455,7 @@ The OFC maintains an internal aggregated DOF state that tracks the cumulative co
 
 This state is published via ``evt_degreeOfFreedom`` and is preserved across CSC state transitions (FAULT → DISABLED → ENABLED) via the ``previous_dofs`` mechanism.
 
-The aggregated state can be reset via the :py:meth:`~lsst.ts.mtaos.MTAOS.do_resetWavefrontCorrection` command or by starting with a ``set_dof.py`` script.
+The aggregated state can be reset via the :py:meth:`~lsst.ts.mtaos.MTAOS.do_resetCorrection` command.
 
 .. _Closed_Loop_Config:
 
@@ -480,8 +488,10 @@ Additionally, each iteration automatically injects (blue in the diagram):
 Finally, the WEP output overwrites ``zn_selected`` (orange in the diagram) with the Zernikes actually produced by the wavefront estimation pipeline.
 This means the configured ``zn_selected`` value has no effect on the final correction, and it is always determined by WEP.
 
-CSC-level parameters (``ts_config_mttcs/MTAOS/v13/_init.yaml``)
------------------------------------------------------------------
+CSC-level parameters
+---------------------
+
+Source: ``ts_config_mttcs/MTAOS/v13/_init.yaml``
 
 .. list-table::
    :header-rows: 1
@@ -548,8 +558,10 @@ CSC-level parameters (``ts_config_mttcs/MTAOS/v13/_init.yaml``)
      - 75.0
      - Seconds to wait for WEP results before timing out
 
-OFC controller parameters (``ts_config_mttcs/MTAOS/ofc/configurations/init.yaml``)
-------------------------------------------------------------------------------------
+OFC controller parameters
+---------------------------
+
+Source: ``ts_config_mttcs/MTAOS/ofc/configurations/init.yaml``
 
 .. list-table::
    :header-rows: 1
@@ -592,10 +604,10 @@ OFC controller parameters (``ts_config_mttcs/MTAOS/ofc/configurations/init.yaml`
      - 0.0
      - Fixed offset added to the rotation angle (degrees)
 
-Per-session parameters (from :py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop` config)
------------------------------------------------------------------------------------------
+Per-session parameters
+-----------------------
 
-These are passed as a config dict via the :py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop` command.
+Passed via the :py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop` command config.
 They are applied and restored on each iteration via :py:meth:`~lsst.ts.mtaos.Model.set_ofc_data_values`:
 
 - ``truncation_index``: override the truncation for this session
