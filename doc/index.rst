@@ -61,6 +61,8 @@ Closed Loop Operations
 ======================
 
 The closed-loop correction task is the primary operational mode of the MTAOS during survey observations.
+The first document describes the current implementation: operational flow, decision points, and configuration parameters.
+The second provides a behavior analysis of the system, discussing observations about the control loop and comparing it with the alignment script.
 
 .. toctree::
     closed-loop/closed-loop

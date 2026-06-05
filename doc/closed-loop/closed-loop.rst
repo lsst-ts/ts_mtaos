@@ -454,24 +454,30 @@ Configuration Reference
    :alt: Configuration flow diagram
    :width: 100%
 
-   How configuration flows from CSC config to OFC to per-iteration overrides. The WEP output overrides ``zn_selected`` regardless of what was configured.
+   How configuration flows from CSC config and OFC config (at startup), through the ``EnableAOSClosedLoop`` script (at session start), to per-iteration values (automatic), and finally the WEP override.
 
 Configuration is loaded in two phases at startup:
 
-1. **OFCData initialization** — The OFC controller config (``MTAOS/ofc/configurations/init.yaml``) is read by :py:meth:`~lsst.ts.ofc.OFCData.configure_controller`. 
+1. **OFCData initialization** — The OFC controller config (``MTAOS/ofc/configurations/init.yaml``) is read by :py:meth:`~lsst.ts.ofc.OFCData.configure_controller`.
    This sets the PID gains (kp, ki, kd), truncation index, normalization weights, and other OFC-internal parameters.
 
-2. **CSC configuration** — The MTAOS CSC config (``MTAOS/v13/_init.yaml``) is read by ``configure()``. 
+2. **CSC configuration** — The MTAOS CSC config (``MTAOS/v13/_init.yaml``) is read by ``configure()``.
    This sets the operational parameters: which DOFs to use, whether to use OCPS, elevation/rotation limits, stress limits, and pointing correction.
 
-During operation, the :py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop` command config provides per-session runtime overrides (green in the diagram).
-These are applied and restored on each iteration via :py:meth:`~lsst.ts.mtaos.Model.set_ofc_data_values`.
+When the closed loop is started, the ``EnableAOSClosedLoop`` script (green in the diagram) constructs a config dict from its own parameters and passes it via the :py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop` command.
+This config typically includes ``comp_dof_idx`` (derived from ``used_dofs``), ``truncation_index``, and optionally ``zn_selected``.
+It is stored in ``last_run_ofc_configuration`` and applied on each iteration via :py:meth:`~lsst.ts.mtaos.Model.set_ofc_data_values`.
 
-Finally, on each iteration, the WEP output overwrites ``zn_selected`` with the Zernikes actually produced by the wavefront estimation pipeline (orange in the diagram).
+Additionally, each iteration automatically injects (blue in the diagram):
+
+- ``filter_name`` — from the current image's butler metadata
+- ``rotation_angle`` — from the rotator telemetry during the exposure
+
+Finally, the WEP output overwrites ``zn_selected`` (orange in the diagram) with the Zernikes actually produced by the wavefront estimation pipeline.
 This means the configured ``zn_selected`` value has no effect on the final correction — it is always determined by WEP.
 
-CSC-level parameters (``_init.yaml``)
--------------------------------------
+CSC-level parameters (``ts_config_mttcs/MTAOS/v13/_init.yaml``)
+-----------------------------------------------------------------
 
 .. list-table::
    :header-rows: 1
@@ -484,10 +490,10 @@ CSC-level parameters (``_init.yaml``)
      - False
      - Whether to perform PID control in v-mode space
    * - ``used_dofs``
-     - [0..10]
-     - Which DOFs participate in the correction
+     - [0..14, 30..34]
+     - Which DOFs participate in the correction (20 DOFs)
    * - ``subtract_intrinsics``
-     - True
+     - False
      - Subtract design wavefront before state estimation
    * - ``use_ocps``
      - True
@@ -496,14 +502,23 @@ CSC-level parameters (``_init.yaml``)
      - 9.0
      - Skip corrections if elevation changed more than this (degrees)
    * - ``elevation_delta_limit_min``
-     - 4.0
-     - Scale gain if elevation changed more than this (degrees)
+     - 9.0
+     - Scale gain if elevation changed more than this (degrees). Currently set equal to max, meaning gain is either full or zero (no linear scaling).
    * - ``rotation_delta_limit``
      - 9.0
      - Skip image if rotation changed more than this (degrees)
    * - ``stress_scale_approach``
      - scale
      - How to handle stress limit violations (scale or truncate)
+   * - ``stress_scale_factor``
+     - 1.25
+     - Safety factor applied to computed stresses before comparing to limits
+   * - ``m1m3_stress_limit``
+     - 137900.0
+     - Maximum allowed M1M3 stress (Pa, approx. 20 psi)
+   * - ``m2_stress_limit``
+     - 344737.0
+     - Maximum allowed M2 stress (Pa, approx. 50 psi)
    * - ``raise_on_large_defocus``
      - True
      - Whether to fault on large defocus or auto-refocus
@@ -516,9 +531,21 @@ CSC-level parameters (``_init.yaml``)
    * - ``max_ofc_consecutive_failures``
      - 3
      - Maximum failures before faulting
+   * - ``closed_loop_filter_change_gain``
+     - n_iter: 0, gain: null
+     - Number of iterations to apply reduced gain after a filter change, and the gain value. Currently disabled (n_iter=0).
+   * - ``enable_pointing_correction``
+     - True
+     - Apply pointing offsets derived from wavefront error
+   * - ``closed_loop_timeout_without_images``
+     - 1800.0
+     - Seconds to wait before faulting if no images arrive (30 min)
+   * - ``closed_loop_timeout_wep_results``
+     - 75.0
+     - Seconds to wait for WEP results before timing out
 
-OFC controller parameters (``init.yaml``)
------------------------------------------
+OFC controller parameters (``ts_config_mttcs/MTAOS/ofc/configurations/init.yaml``)
+------------------------------------------------------------------------------------
 
 .. list-table::
    :header-rows: 1
@@ -528,14 +555,20 @@ OFC controller parameters (``init.yaml``)
      - Default
      - Description
    * - ``kp``
-     - 0.18
-     - Proportional gain (scalar or 50-element array)
+     - 0.30
+     - Proportional gain (scalar or 50-element array, uniform 0.30 in current config)
    * - ``ki``
-     - 0.022
-     - Integral gain
+     - 0.0
+     - Integral gain (currently zero)
    * - ``kd``
      - 0.0
      - Derivative gain
+   * - ``derivative_filter_coeff``
+     - 1.0
+     - Coefficient of the derivative low-pass filter
+   * - ``xref``
+     - x00
+     - Reference state for the controller (``x0``, ``x00``, or ``0``)
    * - ``truncation_index``
      - 12
      - Number of v-modes retained in state estimation
@@ -544,21 +577,39 @@ OFC controller parameters (``init.yaml``)
      - Zernike indices (overridden by WEP output)
    * - ``setpoint``
      - all zeros
-     - Target DOF state
+     - Target DOF state (50-element array)
    * - ``max_integral``
      - per-DOF
-     - Maximum integral accumulation per DOF
+     - Maximum integral accumulation per DOF (see note below)
+   * - ``normalization_weights_filename``
+     - range0.5_fwhm-0.15.yaml
+     - Weights file used to normalize the sensitivity matrix
+   * - ``rotation_offset``
+     - 0.0
+     - Fixed offset added to the rotation angle (degrees)
 
-Runtime override parameters (:py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop` config)
-------------------------------------------------------------------------------------------
+Per-session parameters (from ``EnableAOSClosedLoop`` script)
+-------------------------------------------------------------
 
-These can be passed via the :py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop` command and are applied per iteration via :py:meth:`~lsst.ts.mtaos.Mode.set_ofc_data_values`:
+These are constructed by the ``EnableAOSClosedLoop`` script from its own configuration and passed via the :py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop` command.
+They are applied and restored on each iteration via :py:meth:`~lsst.ts.mtaos.Model.set_ofc_data_values`:
 
 - ``truncation_index`` — override the truncation for this session
-- ``comp_dof_idx`` — select which DOFs are active
+- ``comp_dof_idx`` — derived from ``used_dofs`` in the script config; selects which DOFs are active
 - ``zn_selected`` — Zernike selection (overridden by WEP anyway)
-- ``filter_name`` — current filter (set automatically)
-- ``rotation_angle`` — current rotation (set automatically)
+
+Per-iteration parameters (automatic)
+--------------------------------------
+
+These are injected automatically on each iteration from image metadata and telemetry — not from any configuration file:
+
+- ``filter_name`` — read from the current image's butler metadata
+- ``elevation`` — image elevation from butler metadata.
+  Used for the position check (vs current live position) and for the gain computation (vs previous processed image elevation).
+- ``rotation_angle`` — average rotator position during the exposure (from MTRotator telemetry).
+  Used for the position check (vs current live rotator position) and passed to ``set_ofc_data_values`` for the sensitivity matrix rotation.
+- ``userGain`` — elevation-based gain computed by :py:meth:`~lsst.ts.mtaos.Model.get_correction_gain` from the elevation delta between consecutive processed images.
+  This overrides the controller's ``kp`` for that iteration (passed separately from the config dict, directly to ``_execute_ofc``).
 
 
 .. _Closed_Loop_Further_Reading:
