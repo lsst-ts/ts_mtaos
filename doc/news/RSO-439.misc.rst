@@ -1,0 +1,1 @@
+Updated license headers, enabled the ``insert-license`` check in the ts-pre-commit configuration, and migrated linting to the shared ``tssw_workflows`` workflow.
