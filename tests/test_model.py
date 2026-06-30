@@ -183,6 +183,42 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(np.all(self.model.get_dof_aggr() == new_dof_aggr))
 
+    def test_set_dof_aggr_with_reduced_active_dofs(self) -> None:
+        """Test setting a complete DOF state with a reduced active mask."""
+        ofc_data = self.model.ofc.ofc_data
+        controller = self.model.ofc.controller
+        original_dof_aggr = self.model.get_dof_aggr().copy()
+        original_comp_dof_idx = {
+            comp: ofc_data.dof_idx_mask[
+                comp_data["startIdx"] : comp_data["startIdx"] + comp_data["idxLength"]
+            ].copy()
+            for comp, comp_data in ofc_data.comp_dof_idx.items()
+        }
+        reduced_comp_dof_idx = {
+            comp: np.zeros(comp_data["idxLength"], dtype=bool)
+            for comp, comp_data in ofc_data.comp_dof_idx.items()
+        }
+        reduced_comp_dof_idx["m2HexPos"][0] = True
+        reduced_comp_dof_idx["camHexPos"][1] = True
+        reduced_comp_dof_idx["M1M3Bend"][2] = True
+        reduced_comp_dof_idx["M2Bend"][3] = True
+
+        try:
+            ofc_data.comp_dof_idx = reduced_comp_dof_idx
+            new_dof_aggr = original_dof_aggr + np.arange(len(original_dof_aggr), dtype=float) + 1.0
+            expected_dof_aggr = original_dof_aggr.copy()
+            expected_dof_aggr[ofc_data.dof_idx] = new_dof_aggr[ofc_data.dof_idx]
+
+            self.model.set_dof_aggr(new_dof_aggr)
+
+            np.testing.assert_array_equal(
+                self.model.get_dof_aggr(),
+                expected_dof_aggr,
+            )
+        finally:
+            ofc_data.comp_dof_idx = original_comp_dof_idx
+            controller.dof_state[:] = original_dof_aggr
+
     def test_get_dof(self) -> None:
         self.assertEqual(len(self.model.get_dof_lv()), 50)
 

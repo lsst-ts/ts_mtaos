@@ -608,9 +608,9 @@ class Model:
         Parameters
         ----------
         dof_aggr : `numpy.ndarray`
-            Aggregated DOF.
+            Complete aggregated DOF state.
         """
-        self.ofc.controller.set_aggregated_state(dof_aggr)
+        self.ofc.controller.set_aggregated_state(dof_aggr[self.ofc.ofc_data.dof_idx])
 
     def get_dof_lv(self) -> np.ndarray:
         """Get the DOF correction from the last visit.
