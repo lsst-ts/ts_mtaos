@@ -9,3 +9,4 @@ mypy: true
 nbstripout: false
 ruff: true
 towncrier: true
+insert-license: true
