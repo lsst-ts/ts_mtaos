@@ -1,0 +1,1 @@
+Fixed PID controller history handling so the integral term accumulates across successive corrections within a closed loop and resets when the closed-loop lifecycle ends.

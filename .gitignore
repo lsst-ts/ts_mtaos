@@ -32,3 +32,4 @@ pytest_session.txt
 .eggs
 *.egg-info
 towncrier.toml
+.LICENSE.txt

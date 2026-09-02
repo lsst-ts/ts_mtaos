@@ -1,6 +1,6 @@
-# This file is part of ts_MTAOS.
+# This file is part of ts_mtaos.
 #
-# Developed for the LSST Telescope and Site Systems.
+# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -13,11 +13,11 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
 import glob
@@ -959,6 +959,152 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.assertTrue(np.allclose(controller.kp, 1.0))
             self.assertTrue(np.allclose(controller.ki, 2.0))
             self.assertTrue(np.allclose(controller.kd, 3.0))
+
+    def _get_active_comp_dof_idx(self, ofc_data: OFCData) -> dict[str, np.ndarray]:
+        """Get the active DOF mask for each component."""
+        return {
+            comp: ofc_data.dof_idx_mask[
+                comp_data["startIdx"] : comp_data["startIdx"] + comp_data["idxLength"]
+            ].copy()
+            for comp, comp_data in ofc_data.comp_dof_idx.items()
+        }
+
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_execute_ofc_skips_ofc_data_configuration(self, MockButler: Mock) -> None:
+        """Verify runtime OFC parameters do not mutate ofc_data.
+
+        Closed-loop corrections configure OFC data once at the start of the
+        loop. Per-image runtime values, such as filter and rotation angle,
+        should still be passed to the correction calculation without calling
+        ``set_ofc_data_values``.
+        """
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await self.remote.cmd_start.set_start(
+                configurationOverride="valid_comcam.yaml", timeout=STD_TIMEOUT
+            )
+
+            csc = self.csc
+            csc.pubEvent_degreeOfFreedom = AsyncMock()
+            csc.pubEvent_mirrorStresses = AsyncMock()
+            csc.pubEvent_m2HexapodCorrection = AsyncMock()
+            csc.pubEvent_cameraHexapodCorrection = AsyncMock()
+            csc.pubEvent_m1m3Correction = AsyncMock()
+            csc.pubEvent_m2Correction = AsyncMock()
+            csc.pubEvent_ofcDuration = AsyncMock()
+            csc.model.set_ofc_data_values = AsyncMock()
+            csc.model.calculate_corrections = Mock()
+            csc.execution_times.setdefault("CALCULATE_CORRECTIONS", [])
+
+            config = {
+                "filter_name": "r",
+                "rotation_angle": 12.3,
+            }
+
+            await csc._execute_ofc(
+                userGain=0.0,
+                config=yaml.safe_dump(config),
+                timeout=STD_TIMEOUT,
+                apply_filter_change_override=False,
+                raise_on_large_defocus=False,
+                configure_ofc_data=False,
+            )
+
+            csc.model.set_ofc_data_values.assert_not_called()
+            csc.model.calculate_corrections.assert_called_once()
+            call_kwargs = csc.model.calculate_corrections.call_args.kwargs
+            self.assertEqual(call_kwargs["filter_name"], config["filter_name"])
+            self.assertEqual(call_kwargs["rotation_angle"], config["rotation_angle"])
+
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_execute_ofc_restores_comp_dof_idx(self, MockButler: Mock) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await self.remote.cmd_start.set_start(
+                configurationOverride="valid_comcam.yaml", timeout=STD_TIMEOUT
+            )
+
+            csc = self.csc
+            csc.pubEvent_degreeOfFreedom = AsyncMock()
+            csc.pubEvent_mirrorStresses = AsyncMock()
+            csc.pubEvent_m2HexapodCorrection = AsyncMock()
+            csc.pubEvent_cameraHexapodCorrection = AsyncMock()
+            csc.pubEvent_m1m3Correction = AsyncMock()
+            csc.pubEvent_m2Correction = AsyncMock()
+            csc.pubEvent_ofcDuration = AsyncMock()
+            csc.execution_times.setdefault("CALCULATE_CORRECTIONS", [])
+
+            default_comp_dof_idx = {
+                comp: mask.copy() for comp, mask in csc.model.ofc.ofc_data.default_comp_dof_idx.items()
+            }
+            comp_dof_idx = {comp: mask.copy() for comp, mask in default_comp_dof_idx.items()}
+            comp_dof_idx["m2HexPos"][0] = False
+            config = {
+                "comp_dof_idx": {comp: mask.tolist() for comp, mask in comp_dof_idx.items()},
+                "filter_name": "r",
+                "rotation_angle": 12.3,
+            }
+            active_during_calculation = []
+            calculation_kwargs = []
+
+            def calculate_corrections_stub(*args: object, **kwargs: object) -> None:
+                active_during_calculation.append(self._get_active_comp_dof_idx(csc.model.ofc.ofc_data))
+                calculation_kwargs.append(kwargs)
+
+            csc.model.calculate_corrections = calculate_corrections_stub
+
+            await csc._execute_ofc(
+                userGain=0.0,
+                config=yaml.safe_dump(config),
+                timeout=STD_TIMEOUT,
+                apply_filter_change_override=False,
+                raise_on_large_defocus=False,
+            )
+
+            for comp, mask in comp_dof_idx.items():
+                self.assertTrue(np.array_equal(active_during_calculation[0][comp], mask))
+            self.assertEqual(calculation_kwargs[0]["filter_name"], config["filter_name"])
+            self.assertEqual(calculation_kwargs[0]["rotation_angle"], config["rotation_angle"])
+
+            active_comp_dof_idx = self._get_active_comp_dof_idx(csc.model.ofc.ofc_data)
+            for comp, mask in default_comp_dof_idx.items():
+                self.assertTrue(np.array_equal(active_comp_dof_idx[comp], mask))
+
+    @patch("lsst.ts.mtaos.model.Butler")
+    async def test_ofc_data_configuration_restores_at_context_end(self, MockButler: Mock) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+        ):
+            await self.remote.cmd_start.set_start(
+                configurationOverride="valid_comcam.yaml", timeout=STD_TIMEOUT
+            )
+
+            csc = self.csc
+            default_comp_dof_idx = {
+                comp: mask.copy() for comp, mask in csc.model.ofc.ofc_data.default_comp_dof_idx.items()
+            }
+            comp_dof_idx = {comp: mask.copy() for comp, mask in default_comp_dof_idx.items()}
+            comp_dof_idx["m2HexPos"][0] = False
+            config = {
+                "comp_dof_idx": {comp: mask.tolist() for comp, mask in comp_dof_idx.items()},
+            }
+
+            async with csc._ofc_data_configuration(config):
+                active_comp_dof_idx = self._get_active_comp_dof_idx(csc.model.ofc.ofc_data)
+                for comp, mask in comp_dof_idx.items():
+                    self.assertTrue(np.array_equal(active_comp_dof_idx[comp], mask))
+
+            active_comp_dof_idx = self._get_active_comp_dof_idx(csc.model.ofc.ofc_data)
+            for comp, mask in default_comp_dof_idx.items():
+                self.assertTrue(np.array_equal(active_comp_dof_idx[comp], mask))
 
 
 if __name__ == "__main__":
