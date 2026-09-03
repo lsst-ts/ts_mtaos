@@ -1,0 +1,68 @@
+---
+config:
+  theme: base
+  themeVariables:
+    fontSize: 12px
+---
+sequenceDiagram
+    participant Tel as Telescope Position
+    participant Cam as Camera
+    participant OODS as OODS
+    participant MTAOS as MTAOS
+    participant Sub as Subsystems
+
+    Note over Tel: Field F1<br/>el=70 rot=15
+
+    rect rgb(200, 230, 201)
+    Cam->>Cam: Exposure N (30s)
+    end
+
+    Cam->>OODS: Image N ingested
+    OODS->>MTAOS: evt_imageInOODS
+
+    rect rgb(200, 230, 201)
+    Note over MTAOS: Position check<br/>image el=70 vs live el=70<br/>delta=0 ... PASSES
+    end
+
+    Note over Tel: Slew to F2<br/>el=65 rot=20
+    rect rgb(255, 249, 196)
+    Cam->>Cam: Exposure N+1 (30s)
+    end
+
+    rect rgb(187, 222, 251)
+    MTAOS->>MTAOS: WEP processing (~37s)
+    end
+
+    Note over Tel: Slew to F3<br/>el=55 rot=30
+    rect rgb(255, 249, 196)
+    Cam->>Cam: Exposure N+2 (30s)
+    end
+
+    rect rgb(187, 222, 251)
+    MTAOS->>MTAOS: OFC computation (3s)
+    end
+
+    MTAOS->>MTAOS: Wait shutter closed...
+
+    Cam-->>MTAOS: Shutter closed (N+2 ends)
+
+    rect rgb(255, 205, 210)
+    Note over MTAOS: NO position re-check<br/>image was el=70<br/>telescope is now el=55<br/>delta=15 exceeds 9 threshold
+    MTAOS->>Sub: Apply correction from image N
+    Note over Sub: Correction for el=70<br/>applied at el=55
+    end
+
+    MTAOS->>MTAOS: time_last_correction = now
+
+    Note over OODS: Image N+1 arrives
+    OODS->>MTAOS: evt_imageInOODS (N+1)
+    Note over MTAOS: N+1 started before<br/>last correction<br/>DISCARDED
+
+    Note over OODS: Image N+2 arrives
+    OODS->>MTAOS: evt_imageInOODS (N+2)
+    Note over MTAOS: N+2 started before<br/>last correction<br/>DISCARDED
+
+    rect rgb(200, 230, 201)
+    Cam->>Cam: Exposure N+3 (30s)
+    Note over MTAOS: N+3 starts after correction<br/>FIRST VALID IMAGE
+    end
