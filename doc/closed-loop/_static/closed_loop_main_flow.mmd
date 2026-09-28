@@ -1,6 +1,7 @@
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#e8f4fd', 'primaryBorderColor': '#1b3a5c', 'lineColor': '#333', 'fontSize': '13px'}}}%%
 flowchart TD
-    START([run_closed_loop starts]) --> IDLE[Set state: WAITING_IMAGE]
+    START([run_closed_loop starts]) --> SESSION_CFG["Apply startClosedLoop OFC config<br/><i>(any OFCData parameter, e.g. comp_dof_idx,<br/>truncation_index, zn_selected)</i>.<br/>Controller history is reset."]
+    SESSION_CFG --> IDLE[Set state: WAITING_IMAGE]
 
     IDLE --> OODS{OODS image<br/>event?}
     OODS -->|Timeout| TIMEOUT{Timeout exceeded?<br/><i>closed_loop_timeout_without_images</i>}
@@ -31,11 +32,11 @@ flowchart TD
     RA_FAIL -->|Yes| FAULT4([FAULT])
     RA_FAIL -->|No| OODS
     WEP -->|Success| GAIN_CHECK{Elevation change<br/>since last image?<br/><i>elevation_delta_limit_min</i><br/><i>elevation_delta_limit_max</i>}
-    GAIN_CHECK -->|"delta &gt; max (9 deg): gain=0"| SKIP_GAIN[Skip correction]
+    GAIN_CHECK -->|"delta &ge; max (9 deg): gain=0"| SKIP_GAIN[Skip correction]
     SKIP_GAIN --> OODS
-    GAIN_CHECK -->|"delta &lt; min (4 deg): full gain<br/>or between: scaled gain"| OFC[Execute OFC<br/><i>kp, ki, kd, truncation_index</i><br/><i>comp_dof_idx, used_dofs</i><br/><i>control_vmodes, subtract_intrinsics</i><br/><i>filter_change_gain override if active</i>]
+    GAIN_CHECK -->|"delta &le; min (9 deg): full gain<br/>between min and max: scaled gain"| OFC[Execute OFC<br/><i>kp = userGain, ki, kd</i><br/><i>filter_name, rotation_angle</i><br/><i>control_vmodes, subtract_intrinsics</i><br/><i>filter_change_gain override if active</i>]
 
-    OFC -->|Success| SHUTTER[Set state: WAITING_APPLY<br/>Wait for shutter closed]
+    OFC -->|Success| SHUTTER[Set state: WAITING_APPLY<br/>sync mode: wait for issueCorrection<br/>Wait for shutter closed]
     OFC -->|Failure| OFC_FAIL{Too many failures?<br/><i>max_ofc_consecutive_failures</i>}
     OFC_FAIL -->|Yes| FAULT5([FAULT])
     OFC_FAIL -->|No| OODS
@@ -43,6 +44,18 @@ flowchart TD
     SHUTTER --> APPLY[Apply corrections<br/><i>stress_scale_approach</i><br/><i>m1m3_stress_limit, m2_stress_limit</i><br/><i>stress_scale_factor</i>]
     APPLY --> STORE[Store DOFs,<br/>update timestamp]
     STORE --> OODS
+
+    STOP([stopClosedLoop /<br/>CSC leaves ENABLED]) -.-> SESSION_END["Restore OFC values saved at start<br/><i>(truncation_index is not restored)</i>.<br/>Controller history is reset."]
+    FAULT --> SESSION_END
+    FAULT2 --> SESSION_END
+    FAULT3 --> SESSION_END
+    FAULT4 --> SESSION_END
+    FAULT5 --> SESSION_END
+
+    %% Session boundaries: yellow
+    style SESSION_CFG fill:#fff9c4,stroke:#f9a825
+    style SESSION_END fill:#fff9c4,stroke:#f9a825
+    style STOP fill:#ffcdd2,stroke:#c62828
 
     %% Happy path: green background
     style IDLE fill:#c8e6c9,stroke:#2e7d32,stroke-width:3px

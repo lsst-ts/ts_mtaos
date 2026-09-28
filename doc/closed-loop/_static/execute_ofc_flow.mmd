@@ -8,7 +8,7 @@ config:
     fontSize: 13px
   layout: elk
 ---
-flowchart TB
+flowchart LR
     subgraph GAIN_SETUP["1. Gain Setup"]
         direction TB
         START([_execute_ofc called]) --> SAVE_GAINS[Save current kp, ki, kd]
@@ -17,48 +17,48 @@ flowchart TB
         CHECK_GAIN -->|No| FILTER_CHECK
         SET_GAIN --> FILTER_CHECK{Filter change<br/>override active?<br/><i>closed_loop_filter_change_gain</i>}
         FILTER_CHECK -->|Yes| SET_FILTER[Override kp, ki, kd]
-        FILTER_CHECK -->|No| OUT_GAIN([→])
-        SET_FILTER --> OUT_GAIN
+        FILTER_CHECK -->|No| PARSE
+        SET_FILTER --> PARSE[Parse config<br/><i>closed loop: filter_name, rotation_angle</i>]
     end
 
-    subgraph OFC_PARAMS["2. OFC Parameter Override"]
+    subgraph OFC_PARAMS["2. OFC Data Configuration (runOFC command only)"]
         direction TB
-        IN_OFC([→]) --> SET_OFC[set_ofc_data_values:<br/><i>comp_dof_idx, truncation_index,</i><br/><i>zn_selected, …</i>]
+        CFG{configure_ofc_data?<br/><i>True: runOFC command</i><br/><i>False: closed loop</i>}
+        CFG -->|Yes| SET_OFC[set_ofc_data_values:<br/><i>comp_dof_idx, truncation_index,</i><br/><i>zn_selected, …</i><br/>resets controller history]
         SET_OFC --> SAVE_ORIG[Save original values]
-        SAVE_ORIG --> CALC([→ calculate_corrections])
+        SAVE_ORIG --> CALC([calculate_corrections])
+        CFG -->|No| CALC
     end
 
     subgraph CORRECTION["3. Correction Computation"]
         direction TB
-        IN_CALC([→]) --> WFE_PROC[Get wavefront errors]
-        WFE_PROC --> DEFOCUS{Large defocus?<br/><i>dz_threshold_min</i>}
-        DEFOCUS -->|Yes, raise=True| ERROR([RuntimeError])
-        DEFOCUS -->|Yes, raise=False| REFOCUS[Auto-refocus<br/><i>dz_threshold_max</i>]
+        WFE_PROC[Get wavefront errors] --> DEFOCUS{Large defocus?<br/><i>dz_threshold_min</i>}
+        DEFOCUS -->|Yes<br/>raise_on_large_defocus=True| ERROR([RuntimeError])
+        DEFOCUS -->|Yes<br/>raise_on_large_defocus=False| REFOCUS[Auto-refocus<br/><i>dz_threshold_max</i>]
         DEFOCUS -->|No| STATE_EST[State estimation<br/><i>truncation_index,</i><br/><i>subtract_intrinsics</i>]
         STATE_EST --> PID[PID control_step<br/><i>kp, ki, kd, setpoint,</i><br/><i>max_integral</i>]
         PID --> AGGREGATE[Aggregate DOF state]
         AGGREGATE --> CORRECTIONS[Component corrections:<br/>hexapod, M1M3, M2]
-        REFOCUS --> CLEAR
-        CORRECTIONS --> CLEAR[Clear WFE collection]
+        REFOCUS --> CLEAR[Clear WFE collection]
+        CORRECTIONS --> CLEAR
     end
 
     subgraph RESTORE["4. Publish & Restore"]
         direction TB
-        IN_REST([→]) --> PUBLISH[Publish events:<br/>degreeOfFreedom,<br/>mirrorStresses, corrections]
-        PUBLISH --> RESTORE_OFC[Restore OFC data values]
+        PUBLISH[Publish events:<br/>degreeOfFreedom,<br/>mirrorStresses, corrections] --> RESTORE_CFG{configure_ofc_data?}
+        RESTORE_CFG -->|Yes| RESTORE_OFC[Restore OFC data values<br/>resets controller history]
         RESTORE_OFC --> RESTORE_GAINS[Restore kp, ki, kd]
-        RESTORE_GAINS --> DONE([Return])
+        RESTORE_CFG -->|No| RESTORE_GAINS
+        RESTORE_GAINS --> DONE([Return / exception propagates])
     end
 
-    OUT_GAIN --> IN_OFC
-    CALC --> IN_CALC
-    CLEAR --> IN_REST
+    %% Connect the groups rather than their internal nodes so each group retains its TB layout.
+    GAIN_SETUP --> OFC_PARAMS --> CORRECTION --> RESTORE
 
     %% Happy path
     style SAVE_GAINS fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
     style SET_GAIN fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style SET_OFC fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style SAVE_ORIG fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style PARSE fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
     style WFE_PROC fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
     style STATE_EST fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
     style PID fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
@@ -66,15 +66,19 @@ flowchart TB
     style CORRECTIONS fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
     style CLEAR fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
     style PUBLISH fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style RESTORE_OFC fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
     style RESTORE_GAINS fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
 
     %% Decisions
     style CHECK_GAIN fill:#fef3c7,stroke:#f59e0b
     style FILTER_CHECK fill:#fef3c7,stroke:#f59e0b
     style DEFOCUS fill:#fef3c7,stroke:#f59e0b
+    style CFG fill:#fef3c7,stroke:#f59e0b
+    style RESTORE_CFG fill:#fef3c7,stroke:#f59e0b
 
     %% Alternates
+    style SET_OFC fill:#fff9c4,stroke:#f9a825
+    style SAVE_ORIG fill:#fff9c4,stroke:#f9a825
+    style RESTORE_OFC fill:#fff9c4,stroke:#f9a825
     style SET_FILTER fill:#fff9c4,stroke:#f9a825
     style REFOCUS fill:#fff9c4,stroke:#f9a825
     style ERROR fill:#ffcdd2,stroke:#c62828

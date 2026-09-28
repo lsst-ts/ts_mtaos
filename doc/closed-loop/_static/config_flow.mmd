@@ -30,6 +30,7 @@ flowchart TB
         OFC_KP[kp: gain array or scalar]
         OFC_KI[ki: integral gain]
         OFC_KD[kd: derivative gain]
+        OFC_LEAKY[use_leaky_integrator: true<br/>n_iterms: 10, i_factor: 0.5]
         OFC_TRUNC[truncation_index: 12]
         OFC_ZN[zn_selected: Zernike list]
         OFC_SETPOINT[setpoint: target DOF state]
@@ -42,6 +43,7 @@ flowchart TB
         SC_DOFS[used_dofs → comp_dof_idx]
         SC_TRUNC[truncation_index]
         SC_ZN[zn_selected]
+        SC_FLAGS[discard_intermediate_corrections<br/>synchronous_closed_loop<br/><i>consumed by the CSC</i>]
     end
 
     subgraph PER_ITER["Per-Iteration (automatic)"]
@@ -59,11 +61,10 @@ flowchart TB
 
     CSC_CONFIG -->|"CSC startup<br/>(configure)"| MODEL[Model + OFC initialized]
     OFC_CONFIG -->|"OFCData init<br/>(configure_controller)"| MODEL
-    SCRIPT -->|"stored in<br/>last_run_ofc_configuration"| LOOP[run_closed_loop]
+    SCRIPT -->|"stored in last_run_ofc_configuration;<br/>applied via set_ofc_data_values at loop start,<br/>restored at loop exit"| LOOP[run_closed_loop]
     MODEL --> LOOP
-    PER_ITER -->|"added each iteration"| OFC_CALL[_execute_ofc]
-    SCRIPT -->|"set_ofc_data_values<br/>each iteration"| OFC_CALL
-    LOOP --> OFC_CALL
+    PER_ITER -->|"used per image;<br/>filter_name, rotation_angle, userGain<br/>go to _execute_ofc"| OFC_CALL[_execute_ofc]
+    LOOP -->|"once per valid image"| OFC_CALL
     WEP_OVERRIDE -->|"_calculate_corrections"| OFC_CALL
 
     style WEP_OVERRIDE fill:#fff3e0,stroke:#cc3300

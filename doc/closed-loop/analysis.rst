@@ -18,46 +18,35 @@ Key Behaviors
 =============
 
 The following behaviors emerge from how the current implementation and configuration interact.
-They are not immediately obvious from reading the code or configuration, and result from a combination of multiple design choices (e.g. PID reset mechanism, config overrides, WEP pipeline output, elevation check semantics, etc).
+They are not immediately obvious from reading the code or configuration, and result from a combination of multiple design choices (e.g. controller history handling, config overrides, WEP pipeline output, elevation check semantics).
 Understanding these is essential for interpreting the system's performance and diagnosing unexpected behavior.
 
-Proportional-only control
---------------------------
+Controller history spans a closed-loop session
+----------------------------------------------
 
-The ``comp_dof_idx`` set/restore cycle in :py:meth:`~lsst.ts.mtaos.MTAOS._execute_ofc` resets the PID integral, derivative, and previous error every iteration.
-Combined with the current config (``ki=0``, ``kd=0``), the controller operates as proportional-only.
-Even if ``ki`` or ``kd`` were configured non-zero, they would not accumulate across iterations.
-
-The mechanism is as follows.
-In ``_execute_ofc``, the config (which includes ``comp_dof_idx``) is applied before computing corrections and restored after:
+The PID controller history (stored errors, integral and filtered derivative) is reset only when the closed loop starts and when it exits.
+Both resets are side effects of setting ``comp_dof_idx``: the session configuration is applied when :py:meth:`~lsst.ts.mtaos.MTAOS.run_closed_loop` starts and restored when it ends, and each of these steps goes through :py:meth:`~lsst.ts.mtaos.Model.set_ofc_data_values`, which calls ``controller.reset_history()``.
+The per-image call to :py:meth:`~lsst.ts.mtaos.MTAOS._execute_ofc` does not touch the OFC data:
 
 .. code-block:: python
 
-   # mtaos.py – _execute_ofc (simplified)
+   # mtaos.py – run_closed_loop (simplified)
 
-   async with self.issue_correction_lock:
-       kp, ki, kd = (
-           self.model.ofc.controller.kp,
-           self.model.ofc.controller.ki,
-           self.model.ofc.controller.kd,
-       )
+   closed_loop_ofc_config = yaml.safe_load(self.last_run_ofc_configuration) or dict()
 
-       if np.any(userGain != 0.0):
-           self.model.ofc.controller.kp = userGain
-
-       loaded_config = yaml.safe_load(config) if len(config) > 0 else dict()
-
-       # This sets comp_dof_idx, which triggers reset_history()
-       original_ofc_data_values = await self.model.set_ofc_data_values(**loaded_config)
-
-       try:
-           # ... compute corrections ...
-       finally:
-           # Restore original values, which triggers reset_history() again
-           await self.model.set_ofc_data_values(**original_ofc_data_values)
-           self.model.ofc.controller.kp = kp
-           self.model.ofc.controller.ki = ki
-           self.model.ofc.controller.kd = kd
+   async with (
+       self._ofc_data_configuration(closed_loop_ofc_config),  # applied here, restored on exit
+       salobj.Remote(...) as oods,
+       ...
+   ):
+       while self.summary_state == salobj.State.ENABLED:
+           ...
+           await self._execute_ofc(
+               userGain=gain,
+               config=yaml.safe_dump({"filter_name": filter_label, "rotation_angle": rotation_angle}),
+               ...
+               configure_ofc_data=False,  # no set_ofc_data_values per image
+           )
 
 Inside ``set_ofc_data_values``, setting ``comp_dof_idx`` triggers the reset:
 
@@ -71,23 +60,13 @@ Inside ``set_ofc_data_values``, setting ``comp_dof_idx`` triggers the reset:
        self.ofc.controller.reset_history()
        original_ofc_data_values[key] = self.ofc.ofc_data.default_comp_dof_idx
 
-And ``reset_history`` zeros out the integral and derivative state:
+Consequences worth keeping in mind:
 
-.. code-block:: python
-
-   # base_controller.py – reset_history
-
-   def reset_history(self) -> None:
-       self.dof_state0 = self.dof_state.copy()
-       self.integral = np.zeros(len(self.ofc_data.dof_idx))
-       self.previous_error = np.zeros(len(self.ofc_data.dof_idx))
-       self.filtered_derivative = np.zeros(len(self.ofc_data.dof_idx))
-
-Since ``comp_dof_idx`` is always in the per-session config (passed from the ``EnableAOSClosedLoop`` script), this reset happens on **every iteration**. 
-It happens both at the start (when setting parameters) and at the end (when restoring them).
-
-Implication: the system cannot build up correction for persistent biases that the proportional term alone cannot eliminate in a single step.
-Whether this matters depends on how well the subsystem LUTs pre-compensate for gravity and thermal effects.
+- The history is not reset by a filter change, a large-slew skip or a zero-gain image.
+  Errors measured before those events stay in the integral window; with the leaky integrator they are attenuated by ``i_factor`` at each subsequent correction and drop out after ``n_iterms`` corrections.
+- Only computed corrections add samples, so the ``n_iterms`` window covers a variable amount of time and sky, depending on how many images were skipped in between.
+- The :py:meth:`~lsst.ts.mtaos.MTAOS.do_runOFC` command applies and restores its configuration on every call, so when the configuration includes ``comp_dof_idx`` the history is reset before each computation (see :ref:`Closed_Loop_Comparison`).
+- On the first correction after a reset, the integral and the derivative both equal the current error, so ``ki`` and ``kd`` add to the proportional gain on that step (see :ref:`Closed_Loop_PID_History`).
 
 The ``zn_selected`` parameter is overridden by WEP
 --------------------------------------------------
@@ -162,7 +141,7 @@ Parameters are loaded at three levels:
 
 1. **OFC controller config** (``MTAOS/ofc/configurations/init.yaml``): loaded at OFCData initialization.
 2. **CSC config** (``MTAOS/v13/_init.yaml``): applied at CSC startup; overrides OFC-level.
-3. **Runtime config** (:py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop`): applied per iteration; overrides both previous levels.
+3. **Runtime config** (:py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop`): applied when the loop starts and kept for the session; overrides both previous levels.
 
 WEP output overrides ``zn_selected`` regardless of all three levels.
 
@@ -366,6 +345,9 @@ After the filter change, the optical state changes slightly (different glass pro
 The AOS internal state (``controller.dof_state``) still reflects the old filter's residual.
 The first image with the new filter will measure the new residual, and the OFC will compute a correction relative to the internal state, which may produce a larger-than-expected correction on the first iteration.
 
+The controller history is not reset on a filter change either.
+Errors measured with the previous filter remain in the integral window until they age out (after ``n_iterms`` corrections) or are attenuated by ``i_factor``, and the derivative on the first new-filter correction is taken against the last old-filter error.
+
 **Current mitigation:**
 
 The ``closed_loop_filter_change_gain`` feature (currently disabled with ``n_iter = 0``) was designed to address this: it overrides the gain for N iterations after a filter change,
@@ -393,19 +375,56 @@ If the AOS internal state diverges significantly after a filter change, the firs
 
 This needs investigation: a potential improvement would be to detect that a filter change is in progress (e.g., via camera events) and either skip pending corrections or reset the internal DOF state.
 
-.. _Closed_Loop_PID_Reset:
+.. _Closed_Loop_Truncation_Index_Not_Restored:
 
-PID integral reset
--------------------
+``truncation_index`` outlives the session
+------------------------------------------
 
-The integral reset (due to ``comp_dof_idx`` set/restore) prevents the controller from accumulating correction for persistent biases.
-If biases exist (imperfect LUTs, unmodeled thermal effects), the proportional term can only reduce them by the ``kp`` fraction per iteration, never reaching zero.
+:py:meth:`~lsst.ts.mtaos.Model.set_ofc_data_values` handles ``truncation_index`` through ``OFC.set_truncation_index``, which rebuilds the state estimator but does not record the previous value.
+When the closed loop exits, every other session parameter is restored, but ``truncation_index`` keeps the session value.
+A later :py:meth:`~lsst.ts.mtaos.MTAOS.do_runOFC` command, or a closed loop started without an explicit ``truncation_index``, therefore runs with the last session's value rather than the ``ts_config_mttcs`` default.
 
-Whether this is a practical limitation depends on:
+.. _Closed_Loop_Config_While_Running:
 
-- Magnitude of persistent biases vs measurement noise
-- Quality of subsystem LUT compensation
-- Target image quality requirements
+Configuration accepted while the loop is running
+-------------------------------------------------
+
+``last_run_ofc_configuration`` is updated by both :py:meth:`~lsst.ts.mtaos.MTAOS.do_startClosedLoop` and :py:meth:`~lsst.ts.mtaos.MTAOS.do_runOFC` before either command checks whether the loop is running.
+When the loop is running, both commands are otherwise ignored (the loop logs "already running" and returns).
+The stored configuration does not affect the running session, but it silently becomes the configuration used the next time the loop starts without an explicit config.
+
+.. _Closed_Loop_Serial_WEP_Wait:
+
+Wavefront estimation is awaited one image at a time
+----------------------------------------------------
+
+For each image that passes filtering, the loop sends the OCPS request and then polls the butler for that image's results, up to ``closed_loop_timeout_wep_results`` (75 s):
+
+.. code-block:: python
+
+   # mtaos.py – _execute_wavefront_estimation (OCPS path, simplified)
+
+   await self.ocps.cmd_execute.set_start(config=json.dumps(ocps_config), ...)
+   await self.model.query_ocps_results(
+       self.model.instrument,
+       timeout=self.closed_loop_timeout_wep_results,
+   )
+
+While it waits, OODS events for newer images accumulate in the event queue but are not examined.
+If the pipeline is slow or fails on image N (for example because of a problem specific to that image), the loop keeps waiting on N until the timeout expires, even if image N+1 has already been ingested and processed.
+Only then does it raise ``NotEnoughRAOutputsError``, count one failure towards ``max_ofc_consecutive_failures``, and move on to N+1, which by then may itself be close to stale.
+Three such timeouts in a row fault the CSC.
+
+A possible improvement is to make the wait aware of newer images: while polling for N, check whether results for a more recent following-list image are already available and switch to it, abandoning N.
+
+.. _Closed_Loop_Test_Coverage:
+
+Limited unit-test coverage of the closed loop
+----------------------------------------------
+
+The CSC unit tests exercise :py:meth:`~lsst.ts.mtaos.MTAOS._execute_ofc`, the OFC configuration context manager and the filter-change gain override, but :py:meth:`~lsst.ts.mtaos.MTAOS.run_closed_loop` itself has no dedicated test.
+The image filtering (following list, stale check, position check), the elevation-based gain, the WEP wait and failure counting, and the shutter-wait/apply sequence are only exercised on sky.
+Tests around these decision points, with mocked OODS, camera and OCPS remotes, would make the behaviors described in this document verifiable and protect them against regressions.
 
 .. _Closed_Loop_Comparison:
 
@@ -424,7 +443,9 @@ In both cases, the per-iteration correction is computed by:
 2. PID ``control_step``: ``uk = kp × error + ki × integral + kd × derivative``
 3. DOF aggregation and component corrections
 
-The PID integral is reset in both paths (due to ``comp_dof_idx`` set/restore triggering ``reset_history()``), so both effectively operate as proportional-only controllers.
+The two paths differ in how the controller history is handled.
+The script sends the full OFC configuration (including ``comp_dof_idx``) with every ``cmd_runOFC``, and :py:meth:`~lsst.ts.mtaos.MTAOS.do_runOFC` applies and restores it on each call, so the history is reset before every correction.
+The closed loop applies the configuration once when it starts, so the history accumulates across corrections within a session (see :ref:`Closed_Loop_PID_History`).
 
 Outer loop orchestration differs
 ---------------------------------
@@ -488,22 +509,22 @@ Summary table
    * - Stale image handling
      - N/A (script takes fresh images immediately)
      - ``discard_intermediate_corrections``
-   * - PID integral
-     - Reset each iteration (same ``comp_dof_idx`` mechanism)
-     - Reset each iteration (same mechanism)
+   * - Controller history
+     - Reset on every ``cmd_runOFC`` call (``comp_dof_idx`` in the command config)
+     - Preserved for the session; reset at loop start and exit
 
 How the script achieves convergence
 ------------------------------------
 
-The script converges **not** through PID integral buildup, but through repeated proportional corrections:
+The script converges through repeated corrections at a fixed pointing:
 
 1. Each iteration measures the **current** optical state (fresh image)
-2. The PID computes ``uk = kp × state`` (proportional-only, since integral is reset)
-3. The correction reduces the state by the ``kp`` fraction
+2. The controller history is reset by the ``comp_dof_idx`` in the ``cmd_runOFC`` configuration, so the correction is ``uk = (kp + ki + kd × derivative_filter_coeff) × state``, with ``kp`` replaced by the iteration's ``userGain`` (see :ref:`Closed_Loop_PID_History`)
+3. The correction reduces the state by that fraction
 4. The next iteration measures the reduced state
 5. If the remaining state is below ``threshold``, stop
 
-With ``kp = 0.75``:
+With an effective gain of 0.75 (``kp = 0.75``):
 
 - Iteration 1: correct 75% → 25% remains
 - Iteration 2: correct 75% of 25% → 6.25% remains
