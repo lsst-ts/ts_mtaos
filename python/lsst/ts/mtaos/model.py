@@ -790,6 +790,7 @@ class Model:
         """
 
         self._clear_wfe_collections()
+        self.reset_pid_diagnostics()
         (
             self.m2_hexapod_correction,
             self.cam_hexapod_correction,
