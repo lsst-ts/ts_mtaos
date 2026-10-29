@@ -816,6 +816,7 @@ class Model:
         # Update last visit DOF which is the last
         # applied dof not the aggregated one.
         self.ofc.lv_dof = offset
+        self.reset_pid_diagnostics()
 
         (
             self.m2_hexapod_correction,
