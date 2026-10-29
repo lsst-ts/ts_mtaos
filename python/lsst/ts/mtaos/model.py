@@ -1910,6 +1910,7 @@ class Model:
             subtract_intrinsics=self.subtract_intrinsics,
             control_vmodes=self.control_vmodes,
         )
+        self._update_pid_diagnostics()
 
         self.log.debug(
             f"{self.m2_hexapod_correction=}, "
