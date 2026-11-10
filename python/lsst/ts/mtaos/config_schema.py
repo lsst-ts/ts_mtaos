@@ -38,7 +38,7 @@ $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_MTAOS/blob/master/python/lsst/ts/MTAOS/schema_config.py
 # title must end with one or more spaces followed by the schema version, which
 # must begin with "v"
-title: MTAOS v13
+title: MTAOS v14
 description: Schema for MTAOS configuration files
 type: object
 
@@ -110,6 +110,14 @@ properties:
   num_expected_tables_min:
     description: Minimum number of expected tables to poll from the butler.
     type: integer
+
+  butler_poll_interval:
+    description: >-
+      How often to poll the butler for WEP outputs (in seconds) when
+      waiting for the wavefront estimation results.
+    type: number
+    exclusiveMinimum: 0
+    default: 0.1
 
   zernike_column_pattern:
     description: Regular expression pattern to match zernike coefficient columns.

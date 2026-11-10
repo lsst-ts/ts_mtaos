@@ -391,6 +391,7 @@ class MTAOS(salobj.ConfigurableCsc):
             run_name=config.run_name,
             num_expected_tables=config.num_expected_tables,
             num_expected_tables_min=config.num_expected_tables_min,
+            butler_poll_interval=getattr(config, "butler_poll_interval", 0.1),
             collections=config.collections,
             pipeline_instrument=(
                 config.pipeline_instrument if hasattr(config, "pipeline_instrument") else None
