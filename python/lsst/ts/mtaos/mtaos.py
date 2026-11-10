@@ -1,6 +1,6 @@
-# This file is part of ts_MTAOS.
+# This file is part of ts_mtaos.
 #
-# Developed for the LSST Telescope and Site Systems.
+# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -13,17 +13,18 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 __all__ = ["MTAOS"]
 
 import argparse
 import asyncio
 import collections
+import contextlib
 import functools
 import inspect
 import json
@@ -969,6 +970,7 @@ class MTAOS(salobj.ConfigurableCsc):
         timeout: float,
         apply_filter_change_override: bool = False,
         raise_on_large_defocus: bool = False,
+        configure_ofc_data: bool = True,
     ) -> None:
         """Handles the core logic of running the OFC,
         sending calls to the model to compute corrections.
@@ -992,6 +994,10 @@ class MTAOS(salobj.ConfigurableCsc):
             Configuration for the OFC process.
         timeout : float
             Timeout for the OFC process.
+        configure_ofc_data : bool, optional
+            Apply ``config`` to ``model.ofc_data`` for this call. Closed loop
+            sets this to `False` because its persistent OFC configuration is
+            applied for the lifetime of the loop.
         """
         async with self.issue_correction_lock:
             kp, ki, kd = (
@@ -1013,47 +1019,45 @@ class MTAOS(salobj.ConfigurableCsc):
                     self.model.ofc.controller.kd = kd_override
 
             loaded_config = yaml.safe_load(config) if len(config) > 0 else dict()
+            if loaded_config is None:
+                loaded_config = dict()
 
-            # Set the ofc_data values based on configuration
-            # This is needed to set what degrees of freedom will be used,
-            # how many zernikes, etc.
-            original_ofc_data_values = await self.model.set_ofc_data_values(**loaded_config)
-            self.log.debug(
-                f"Customizing OFC parameters: {loaded_config}. original {original_ofc_data_values}"
-            )
+            ofc_data_config = loaded_config if configure_ofc_data else None
+            if not configure_ofc_data:
+                self.log.debug(f"Running OFC with runtime parameters: {loaded_config}.")
 
             try:
-                # If this call fails (raise an exeception), command will be
-                # rejected.
-                # This is not a coroutine so it will block the event loop. Need
-                # to think about how to fix it, maybe run in executor?
-                #
-                # Adding a executor to run the blocking call in a separate
-                # thread to avoid blocking the running loop.
-                loop = asyncio.get_running_loop()
+                async with self._ofc_data_configuration(ofc_data_config):
+                    try:
+                        # If this call fails (raise an exeception), command
+                        # will be rejected.
+                        # This is not a coroutine so it will block the event
+                        # loop. Need to think about how to fix it, maybe run
+                        # in executor?
+                        #
+                        # Adding a executor to run the blocking call in a
+                        # separate thread to avoid blocking the running loop.
+                        loop = asyncio.get_running_loop()
 
-                func = functools.partial(
-                    self.model.calculate_corrections,
-                    raise_on_large_defocus=raise_on_large_defocus,
-                    log_time=self.execution_times,
-                    **loaded_config,
-                )
+                        func = functools.partial(
+                            self.model.calculate_corrections,
+                            raise_on_large_defocus=raise_on_large_defocus,
+                            log_time=self.execution_times,
+                            **loaded_config,
+                        )
 
-                await loop.run_in_executor(None, func)
+                        await loop.run_in_executor(None, func)
 
-                self.model.wavefront_errors.clear()
+                        self.model.wavefront_errors.clear()
+                    finally:
+                        await self.pubEvent_degreeOfFreedom()
+                        await self.pubEvent_mirrorStresses()
+                        await self.pubEvent_m2HexapodCorrection()
+                        await self.pubEvent_cameraHexapodCorrection()
+                        await self.pubEvent_m1m3Correction()
+                        await self.pubEvent_m2Correction()
+                        await self.pubEvent_ofcDuration()
             finally:
-                await self.pubEvent_degreeOfFreedom()
-                await self.pubEvent_mirrorStresses()
-                await self.pubEvent_m2HexapodCorrection()
-                await self.pubEvent_cameraHexapodCorrection()
-                await self.pubEvent_m1m3Correction()
-                await self.pubEvent_m2Correction()
-                await self.pubEvent_ofcDuration()
-
-                self.log.info("Restore ofc data values.")
-                await self.model.set_ofc_data_values(**original_ofc_data_values)
-
                 self.model.ofc.controller.kp = kp
                 self.model.ofc.controller.ki = ki
                 self.model.ofc.controller.kd = kd
@@ -1209,6 +1213,25 @@ class MTAOS(salobj.ConfigurableCsc):
             self.log.info("Timedout waiting for closed loop task to finish.")
             pass
 
+    @contextlib.asynccontextmanager
+    async def _ofc_data_configuration(
+        self, ofc_data_config: dict[str, Any] | None
+    ) -> typing.AsyncIterator[None]:
+        """Apply and restore OFC data configuration."""
+        if not ofc_data_config:
+            yield
+            return
+
+        original_ofc_data_values = await self.model.set_ofc_data_values(**ofc_data_config)
+        self.log.debug(f"Customizing OFC parameters: {ofc_data_config}. Original {original_ofc_data_values}.")
+
+        try:
+            yield
+        finally:
+            if len(original_ofc_data_values) > 0:
+                self.log.info("Restore ofc data values.")
+                await self.model.set_ofc_data_values(**original_ofc_data_values)
+
     def do_startClosedLoop(self, data: type_hints.BaseMsgType) -> None:
         """Start the closed loop operation.
 
@@ -1251,8 +1274,14 @@ class MTAOS(salobj.ConfigurableCsc):
         self.current_rotator_position = None
         self.current_elevation_position = None
         time_last_correction_applied = current_tai()
+        closed_loop_ofc_config = (
+            yaml.safe_load(self.last_run_ofc_configuration) if self.last_run_ofc_configuration else dict()
+        )
+        if closed_loop_ofc_config is None:
+            closed_loop_ofc_config = dict()
 
         async with (
+            self._ofc_data_configuration(closed_loop_ofc_config),
             salobj.Remote(
                 self.domain,
                 oods_name,
@@ -1480,18 +1509,11 @@ class MTAOS(salobj.ConfigurableCsc):
                     prev_elevation = elevation
 
                     if np.any(gain > 0.0):
-                        config = (
-                            yaml.safe_load(self.last_run_ofc_configuration)
-                            if self.last_run_ofc_configuration
-                            else dict()
-                        )
-                        config.update(
-                            {
-                                "filter_name": filter_label,
-                                "rotation_angle": rotation_angle,
-                            }
-                        )
-                        self.log.debug(f"Closed loop OFC configuration: {config}.")
+                        config = {
+                            "filter_name": filter_label,
+                            "rotation_angle": rotation_angle,
+                        }
+                        self.log.debug(f"Closed loop OFC runtime parameters: {config}.")
 
                         config_yaml = yaml.safe_dump(config)
 
@@ -1511,6 +1533,7 @@ class MTAOS(salobj.ConfigurableCsc):
                                 timeout=self.CMD_TIMEOUT,
                                 apply_filter_change_override=use_filter_gain_override,
                                 raise_on_large_defocus=self.raise_on_large_defocus,
+                                configure_ofc_data=False,
                             )
                             ofc_failure_count = 0
 
