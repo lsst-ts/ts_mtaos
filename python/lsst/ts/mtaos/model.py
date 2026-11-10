@@ -100,6 +100,7 @@ class Model:
         run_name: str = "mtaos_wep",
         num_expected_tables: int = 8,
         num_expected_tables_min: int = 3,
+        butler_poll_interval: float = 0.1,
         collections: str = "LSSTComCam/raw/all,LSSTComCam/calib",
         pipeline_instrument: dict | None = None,
         pipeline_n_processes: int = 9,
@@ -142,6 +143,9 @@ class Model:
             Number of expected tables to poll from the butler.
         num_expected_tables_min : `int`, optional
             Minimum number of expected tables to poll from the butler.
+        butler_poll_interval : `float`, optional
+            How often to poll the butler for WEP outputs (in seconds).
+            Default is 0.1.
         collections : `str`, optional
             String with the data collections to add to the pipeline task.
             Default is "LSSTComCam/raw/all,LSSTComCam/calib".
@@ -254,6 +258,7 @@ class Model:
         self.run_name = run_name
         self.num_expected_tables = num_expected_tables
         self.num_expected_tables_min = num_expected_tables_min
+        self.butler_poll_interval = butler_poll_interval
 
         self.collections = collections
         self.pipeline_instrument = (
@@ -957,6 +962,7 @@ class Model:
         wavefront_results, radii_results = await self._poll_butler_outputs(
             instrument=instrument,
             timeout=timeout,
+            poll_interval=self.butler_poll_interval,
         )
         self.log.debug(
             f"OCPS wavefront error results: {wavefront_results} "
