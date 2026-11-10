@@ -1,1 +1,0 @@
-Updated documentation configuration to make it work with the latest version documenteer.

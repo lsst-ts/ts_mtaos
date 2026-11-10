@@ -13,6 +13,28 @@ Version History
 
 .. towncrier release notes start
 
+v0.30.1 (2026-11-10)
+====================
+
+Bug Fixes
+---------
+
+- Fixed PID controller history handling so the integral term accumulates across successive corrections within a closed loop and resets when the closed-loop lifecycle ends. (`RSO-439 <https://rubinobs.atlassian.net//browse/RSO-439>`_)
+
+
+Documentation
+-------------
+
+- Updated documentation configuration to make it work with the latest version documenteer. (`RSO-599 <https://rubinobs.atlassian.net//browse/RSO-599>`_)
+
+
+Other Changes and Additions
+---------------------------
+
+- Updated license headers, enabled the ``insert-license`` check in the ts-pre-commit configuration, and migrated linting to the shared ``tssw_workflows`` workflow. (`RSO-439 <https://rubinobs.atlassian.net//browse/RSO-439>`_)
+- Included a types submodule to host interface definition for some external classes that are defined but not directly used. (`RSO-599 <https://rubinobs.atlassian.net//browse/RSO-599>`_)
+
+
 v0.30.0 (2026-06-03)
 ====================
 
