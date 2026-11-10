@@ -1399,7 +1399,6 @@ class Model:
         TimeoutError
             If the dataset is not available within the specified timeout.
         """
-        self.log.debug("Polling butler for WEP outputs.")
 
         start_time = time.time()
         elapsed_time = 0.0
@@ -1412,16 +1411,16 @@ class Model:
             n_tables = self.num_expected_tables
             n_tables_min = self.num_expected_tables_min
 
-        self.log.debug(f"Polling for {n_tables} tables. Minimum number of tables: {n_tables_min}.")
-
+        self.log.info(
+            f"Polling for {n_tables} tables ({poll_interval=}s, {timeout=}s). "
+            f"Minimum number of tables: {n_tables_min}. "
+            f"Querying datasets: zernike_table_name={self.zernike_table_name}, "
+            f"zernike column: {self.zernike_column_pattern}, "
+            f"{self.run_name=} {pair_id=}."
+        )
         refs = []
         while elapsed_time < timeout:
             try:
-                self.log.info(
-                    f"Querying datasets: zernike_table_name={self.zernike_table_name}, "
-                    f"zernike column: {self.zernike_column_pattern}, "
-                    f"{self.run_name=} {pair_id=}."
-                )
                 refs = self.butler.query_datasets(
                     self.zernike_table_name,
                     collections=[self.run_name],
