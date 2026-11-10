@@ -1,0 +1,1 @@
+Add configuration parameter ``butler_poll_interval`` (default 0.1 s) to control how often the butler is polled for WEP outputs in ``Model._poll_butler_outputs``, replacing the hard-coded 5 s interval. Bump the configuration schema version to v14.

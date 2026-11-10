@@ -1,0 +1,1 @@
+Fix ``Model._poll_butler_outputs`` so it no longer sleeps for an extra ``poll_interval`` after the expected number of tables has been retrieved.
