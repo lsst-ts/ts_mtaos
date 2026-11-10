@@ -1427,17 +1427,18 @@ class Model:
                     collections=[self.run_name],
                     where=f"visit in ({pair_id})",
                 )
-                if len(refs) >= n_tables:
-                    self.log.debug(f"Query returned {len(refs)} results.")
-                    break
-                else:
-                    self.log.debug(f"Query returned {len(refs)} entries, waiting for {n_tables}. Continuing.")
             except EmptyQueryResultError:
                 self.log.debug(f"Collection '{self.run_name}' not found. Waiting {poll_interval}s.")
-                continue
-            finally:
-                await asyncio.sleep(poll_interval)
-                elapsed_time = time.time() - start_time
+            else:
+                if len(refs) >= n_tables:
+                    self.log.info(f"Query returned {len(refs)} results.")
+                    break
+                self.log.debug(
+                    f"Query returned {len(refs)} entries, waiting for {n_tables} ({elapsed_time=}s). "
+                    "Continuing."
+                )
+            await asyncio.sleep(poll_interval)
+            elapsed_time = time.time() - start_time
         else:
             self.log.error(f"Finished polling the butler in {elapsed_time:.2f}s.")
 
