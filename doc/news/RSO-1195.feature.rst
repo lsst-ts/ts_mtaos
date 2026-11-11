@@ -5,3 +5,10 @@ marked ``used=False`` (newer WEP flags invalid results this way), or
 when the average Zernike coefficients are all NaN (older WEP). This
 keeps all-NaN measurements from being counted toward the minimum table
 check and fed into the OFC correction.
+
+In addition, ``Model.calculate_corrections`` now enforces that at least
+``num_expected_tables_min`` valid wavefront-error measurements remain
+after filtering, raising ``NotEnoughWaveFrontDataError`` (so the image
+is skipped) instead of only logging the count. This guards the case
+where enough non-empty tables are polled but too few survive the
+``used``/NaN filtering to run OFC.
