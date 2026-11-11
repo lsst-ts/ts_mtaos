@@ -2064,6 +2064,7 @@ class Model:
                         self.log.info(f"{self.ofc.ofc_data.comp_dof_idx=}\n{new_comp_dof_idx=}")
                         self.ofc.ofc_data.comp_dof_idx = new_comp_dof_idx
                         self.ofc.controller.reset_history()
+                        self.reset_pid_diagnostics()
                         original_ofc_data_values[key] = self.ofc.ofc_data.default_comp_dof_idx
 
                     elif key == "xref":
