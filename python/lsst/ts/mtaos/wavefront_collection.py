@@ -96,7 +96,50 @@ class WavefrontCollection(object):
             x_position, y_position of the sensor, and the radius of
             the donuts in that sensor.
         """
-        zernikes_array = [(sensor_id, zernikes) for sensor_id, zernikes in zernikes_data if len(zernikes) > 0]
+        zernikes_array = list()
+        for sensor_id, zernikes in zernikes_data:
+            if len(zernikes) == 0:
+                warnings.warn(
+                    f"Zernike table for sensor {sensor_id} is empty. "
+                    "Skipping the zernike table for this sensor.",
+                    UserWarning,
+                )
+                continue
+            if isinstance(zernikes, QTable):
+                avg_row = zernikes[zernikes["label"] == "average"][0]
+                # The latest versions of WEP set the 'used' column to False
+                # for the average row when the zernike coefficients are not
+                # valid. Skip those sensors.
+                if not bool(avg_row["used"]):
+                    warnings.warn(
+                        f"Zernike table for sensor {sensor_id} has 'average' "
+                        "row with 'used' column set to False. "
+                        "Skipping the zernike table for this sensor.",
+                        UserWarning,
+                    )
+                    continue
+                # Older versions of WEP may leave the 'used' column True
+                # while still writing NaN coefficients, so guard against an
+                # all-NaN average row as well.
+                z_columns = zernikes.meta[self.zernike_column_pattern]
+                avg_nan = np.isnan([avg_row[col].to(u.um).value for col in z_columns])
+                if np.any(avg_nan):
+                    warnings.warn(
+                        f"Zernike table for sensor {sensor_id} has "
+                        "'average' row with NaN values. "
+                        "Skipping the zernike table for this sensor.",
+                        UserWarning,
+                    )
+                    continue
+            elif isinstance(zernikes, np.ndarray):
+                if np.any(np.isnan(zernikes)):
+                    warnings.warn(
+                        f"Zernike array for sensor {sensor_id} has NaN values. "
+                        "Skipping the zernike array for this sensor.",
+                        UserWarning,
+                    )
+                    continue
+            zernikes_array.append((sensor_id, zernikes))
         self._collectionData.append(zernikes_array)
         self._collectionRadii.append(radius_data)
 

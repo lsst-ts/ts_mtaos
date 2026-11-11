@@ -1,0 +1,7 @@
+Filter invalid wavefront-error tables in
+``WavefrontCollection.append``. A sensor is now skipped (with a
+warning) when its Zernike table is empty, when the ``average`` row is
+marked ``used=False`` (newer WEP flags invalid results this way), or
+when the average Zernike coefficients are all NaN (older WEP). This
+keeps all-NaN measurements from being counted toward the minimum table
+check and fed into the OFC correction.
