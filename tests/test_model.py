@@ -318,6 +318,69 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             f"{actCorr} not almost close to 0.",
         )
 
+    def _wfe(self, n_sensors: int, n_zk: int = 19) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Build a (sensor_ids, zk_indices, wfe) tuple with ``n_sensors``
+        rows, as returned by ``Model.get_wavefront_errors``."""
+        sensor_ids = np.arange(n_sensors)
+        zk_indices = np.tile(np.arange(4, 4 + n_zk), (n_sensors, 1))
+        wfe = np.ones((n_sensors, n_zk))
+        return sensor_ids, zk_indices, wfe
+
+    def test_calculate_corrections_raises_below_min(self) -> None:
+        """Fewer valid wavefront errors than ``num_expected_tables_min``
+        raises ``NotEnoughWaveFrontDataError`` without running OFC."""
+        from lsst.ts.mtaos.utility import NotEnoughWaveFrontDataError
+
+        # Empty radii -> dz is NaN -> the correction-count branch is taken
+        # rather than the automatic-refocus branch.
+        with (
+            patch.object(self.model, "num_expected_tables_min", 3),
+            patch.object(self.model, "get_wavefront_errors", return_value=self._wfe(2)),
+            patch.object(
+                self.model.wavefront_errors,
+                "getListOfRadiiInTakenData",
+                return_value=[],
+            ),
+            patch.object(self.model, "_calculate_corrections") as mock_calc,
+        ):
+            with self.assertRaises(NotEnoughWaveFrontDataError):
+                self.model.calculate_corrections(raise_on_large_defocus=False)
+            mock_calc.assert_not_called()
+
+    def test_calculate_corrections_raises_when_empty(self) -> None:
+        """No valid wavefront errors raises rather than feeding an empty
+        array into OFC."""
+        from lsst.ts.mtaos.utility import NotEnoughWaveFrontDataError
+
+        with (
+            patch.object(self.model, "num_expected_tables_min", 3),
+            patch.object(self.model, "get_wavefront_errors", return_value=self._wfe(0)),
+            patch.object(
+                self.model.wavefront_errors,
+                "getListOfRadiiInTakenData",
+                return_value=[],
+            ),
+            patch.object(self.model, "_calculate_corrections") as mock_calc,
+        ):
+            with self.assertRaises(NotEnoughWaveFrontDataError):
+                self.model.calculate_corrections(raise_on_large_defocus=False)
+            mock_calc.assert_not_called()
+
+    def test_calculate_corrections_proceeds_at_min(self) -> None:
+        """At the minimum number of valid wavefront errors, OFC runs."""
+        with (
+            patch.object(self.model, "num_expected_tables_min", 3),
+            patch.object(self.model, "get_wavefront_errors", return_value=self._wfe(3)),
+            patch.object(
+                self.model.wavefront_errors,
+                "getListOfRadiiInTakenData",
+                return_value=[],
+            ),
+            patch.object(self.model, "_calculate_corrections") as mock_calc,
+        ):
+            self.model.calculate_corrections(raise_on_large_defocus=False)
+            mock_calc.assert_called_once()
+
     def test_m2_hexapod_correction(self) -> None:
         x, y, z, u, v, w = self.model.m2_hexapod_correction()
         self.assertEqual(self.model.m2_hexapod_correction.correction_type, CorrectionType.POSITION)
