@@ -377,6 +377,33 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             with self.subTest(index=index, step="reset_wfe_correction"):
                 np.testing.assert_array_equal(value, np.zeros(50))
 
+    async def test_pid_diagnostics_reset_on_dof_change(self) -> None:
+        wavefront_errors = np.zeros(19)
+        wavefront_errors[0] = 0.1
+        self.model.add_correction(wavefront_errors, config={"sensor_ids": [0, 1, 2, 3, 4, 5, 6, 7, 8]})
+
+        self.assertTrue(np.any(self.model.get_pid_diagnostics()[0] != 0))
+
+        original_ofc_data_values = await self.model.set_ofc_data_values(
+            comp_dof_idx=dict(
+                m2HexPos=[1, 1, 1, 1, 1],
+                camHexPos=[1, 1, 1, 1, 1],
+                M1M3Bend=[0] * 20,
+                M2Bend=[0] * 20,
+            )
+        )
+        try:
+            for index, value in enumerate(self.model.get_pid_diagnostics()):
+                with self.subTest(index=index, step="reset"):
+                    np.testing.assert_array_equal(value, np.zeros(50))
+
+            self.model.add_correction(wavefront_errors, config={"sensor_ids": [0, 1, 2, 3, 4, 5, 6, 7, 8]})
+            optical_state = self.model.get_pid_diagnostics()[0]
+            self.assertTrue(np.any(optical_state[:10] != 0))
+            np.testing.assert_array_equal(optical_state[10:], 0.0)
+        finally:
+            await self.model.set_ofc_data_values(**original_ofc_data_values)
+
     def test_m2_hexapod_correction(self) -> None:
         x, y, z, u, v, w = self.model.m2_hexapod_correction()
         self.assertEqual(self.model.m2_hexapod_correction.correction_type, CorrectionType.POSITION)
