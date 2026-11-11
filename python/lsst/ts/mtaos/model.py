@@ -681,7 +681,8 @@ class Model:
 
         The values are in the basis the controller works in, the DOF basis or
         the v-mode basis, and are mapped to the slots of the used DOFs. They
-        are all zero if the last correction was not calculated by the
+        are all zero after the used DOFs change, since the controller history
+        is reset, and if the last correction was not calculated by the
         controller.
 
         Returns
@@ -727,13 +728,13 @@ class Model:
         """Update the PID diagnostics with the values of the last controller
         step.
 
-        The controller values cover the used DOFs only; they are written to
-        the slots given by ``dof_idx`` and the other slots are left at zero.
+        The controller values cover the used DOFs only and are written to
+        the slots given by ``dof_idx``. The other slots were zeroed when the
+        used DOFs were set, together with the controller history.
         """
         controller = self.ofc.controller
         dof_idx = self.ofc.ofc_data.dof_idx
 
-        self.reset_pid_diagnostics()
         self._pid_diagnostics[0][dof_idx] = self.ofc.optical_state
         self._pid_diagnostics[1][dof_idx] = controller.integral_unclipped
         self._pid_diagnostics[2][dof_idx] = controller.integral
