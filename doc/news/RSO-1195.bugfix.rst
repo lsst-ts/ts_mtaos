@@ -1,5 +1,0 @@
-Skip wavefront-error tables whose ``average`` row is not marked
-``used`` (e.g. all-NaN averages), or that do not have exactly one
-``average`` row, when polling Rapid Analysis outputs. This prevents
-all-NaN Zernikes from being counted toward the minimum table check and
-fed into the OFC correction.
