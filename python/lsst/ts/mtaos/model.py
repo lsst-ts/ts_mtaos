@@ -1451,8 +1451,21 @@ class Model:
             )
 
             n_rows = len(table)
-            if n_rows > 0:
-                wavefront_errors.append((ref.dataId["detector"], table))
+            avg_rows = table[table['label'] == 'average']
+            if len(avg_rows) == 1:
+                is_used = bool(avg_rows['used'][0])
+                if is_used:
+                    wavefront_errors.append((ref.dataId["detector"], table))
+                else:
+                    self.log.warning(
+                        f"Table for detector {ref.dataId['detector']} has {n_rows} rows, "
+                        "but the 'average' row is not marked as 'used'. Skipping."
+                    )
+            else:
+                self.log.warning(
+                    f"Table for detector {ref.dataId['detector']} does not have "
+                    "exactly one 'average' row. Skipping."
+                )
 
         if len(wavefront_errors) < n_tables_min:
             raise NotEnoughWaveFrontDataError(
@@ -1549,6 +1562,7 @@ class Model:
         try:
             sensor_ids, zk_indices, wfe = self.get_wavefront_errors()
             self.log.debug(f"Retrieved sensor_ids: {sensor_ids}")
+
             corner_offsets = self.wavefront_errors.getListOfRadiiInTakenData()
 
             dz = np.nan
