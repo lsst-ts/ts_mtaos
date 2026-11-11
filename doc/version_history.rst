@@ -13,6 +13,21 @@ Version History
 
 .. towncrier release notes start
 
+v0.31.0 (2026-11-11)
+====================
+
+New Features
+------------
+
+- Add configuration parameter ``butler_poll_interval`` (default 0.1 s) to control how often the butler is polled for WEP outputs in ``Model._poll_butler_outputs``, replacing the hard-coded 5 s interval. Bump the configuration schema version to v14. (`DM-56930 <https://rubinobs.atlassian.net//browse/DM-56930>`_)
+
+
+Bug Fixes
+---------
+
+- Fix ``Model._poll_butler_outputs`` so it no longer sleeps for an extra ``poll_interval`` after the expected number of tables has been retrieved. (`DM-56930 <https://rubinobs.atlassian.net//browse/DM-56930>`_)
+
+
 v0.30.1 (2026-11-10)
 ====================
 
