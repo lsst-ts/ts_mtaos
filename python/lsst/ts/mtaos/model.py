@@ -100,6 +100,7 @@ class Model:
         run_name: str = "mtaos_wep",
         num_expected_tables: int = 8,
         num_expected_tables_min: int = 3,
+        butler_poll_interval: float = 0.1,
         collections: str = "LSSTComCam/raw/all,LSSTComCam/calib",
         pipeline_instrument: dict | None = None,
         pipeline_n_processes: int = 9,
@@ -142,6 +143,9 @@ class Model:
             Number of expected tables to poll from the butler.
         num_expected_tables_min : `int`, optional
             Minimum number of expected tables to poll from the butler.
+        butler_poll_interval : `float`, optional
+            How often to poll the butler for WEP outputs (in seconds).
+            Default is 0.1.
         collections : `str`, optional
             String with the data collections to add to the pipeline task.
             Default is "LSSTComCam/raw/all,LSSTComCam/calib".
@@ -254,6 +258,7 @@ class Model:
         self.run_name = run_name
         self.num_expected_tables = num_expected_tables
         self.num_expected_tables_min = num_expected_tables_min
+        self.butler_poll_interval = butler_poll_interval
 
         self.collections = collections
         self.pipeline_instrument = (
@@ -957,6 +962,7 @@ class Model:
         wavefront_results, radii_results = await self._poll_butler_outputs(
             instrument=instrument,
             timeout=timeout,
+            poll_interval=self.butler_poll_interval,
         )
         self.log.debug(
             f"OCPS wavefront error results: {wavefront_results} "
@@ -1393,7 +1399,6 @@ class Model:
         TimeoutError
             If the dataset is not available within the specified timeout.
         """
-        self.log.debug("Polling butler for WEP outputs.")
 
         start_time = time.time()
         elapsed_time = 0.0
@@ -1406,32 +1411,33 @@ class Model:
             n_tables = self.num_expected_tables
             n_tables_min = self.num_expected_tables_min
 
-        self.log.debug(f"Polling for {n_tables} tables. Minimum number of tables: {n_tables_min}.")
-
+        self.log.info(
+            f"Polling for {n_tables} tables ({poll_interval=}s, {timeout=}s). "
+            f"Minimum number of tables: {n_tables_min}. "
+            f"Querying datasets: zernike_table_name={self.zernike_table_name}, "
+            f"zernike column: {self.zernike_column_pattern}, "
+            f"{self.run_name=} {pair_id=}."
+        )
         refs = []
         while elapsed_time < timeout:
             try:
-                self.log.info(
-                    f"Querying datasets: zernike_table_name={self.zernike_table_name}, "
-                    f"zernike column: {self.zernike_column_pattern}, "
-                    f"{self.run_name=} {pair_id=}."
-                )
                 refs = self.butler.query_datasets(
                     self.zernike_table_name,
                     collections=[self.run_name],
                     where=f"visit in ({pair_id})",
                 )
-                if len(refs) >= n_tables:
-                    self.log.debug(f"Query returned {len(refs)} results.")
-                    break
-                else:
-                    self.log.debug(f"Query returned {len(refs)} entries, waiting for {n_tables}. Continuing.")
             except EmptyQueryResultError:
                 self.log.debug(f"Collection '{self.run_name}' not found. Waiting {poll_interval}s.")
-                continue
-            finally:
-                await asyncio.sleep(poll_interval)
-                elapsed_time = time.time() - start_time
+            else:
+                if len(refs) >= n_tables:
+                    self.log.info(f"Query returned {len(refs)} results.")
+                    break
+                self.log.debug(
+                    f"Query returned {len(refs)} entries, waiting for {n_tables} ({elapsed_time=}s). "
+                    "Continuing."
+                )
+            await asyncio.sleep(poll_interval)
+            elapsed_time = time.time() - start_time
         else:
             self.log.error(f"Finished polling the butler in {elapsed_time:.2f}s.")
 
