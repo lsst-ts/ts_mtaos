@@ -47,8 +47,78 @@ class TestWavefrontCollection(unittest.TestCase):
 
         self.assertEqual(self.wavefront_collection.getNumOfData(), 1)
 
+    def _makeZkTable(self, used: bool = True, nan: bool = False) -> QTable:
+        """Build a single-sensor Zernike table.
+
+        Parameters
+        ----------
+        used : `bool`
+            Value of the ``used`` column on the ``average`` row.
+        nan : `bool`
+            If `True`, fill the average Zernike coefficients with NaN.
+        """
+        dtype: list = [("label", "<U12"), ("used", np.bool_)]
+        for j in range(4, 22):
+            dtype.append((f"Z{j}", "<f4"))
+
+        table = QTable(dtype=dtype)
+        for j in range(4, 22):
+            table[f"Z{j}"].unit = u.nm
+
+        value = np.nan if nan else 1.0
+        row: dict = {"label": "average", "used": used}
+        row.update({f"Z{j}": value * u.nm for j in range(4, 22)})
+        table.add_row(row)
+
+        table.meta = {
+            "noll_indices": range(4, 22),
+            "opd_columns": [f"Z{j}" for j in range(4, 22)],
+        }
+        return table
+
+    def testAppendSkipsUnusedAverageRow(self) -> None:
+        """A table whose average row is marked used=False is skipped."""
+        wf_err = [
+            (1, self._makeZkTable(used=True)),
+            (2, self._makeZkTable(used=False)),
+        ]
+        self.wavefront_collection.append(wf_err, [1.0, 2.0])
+
+        kept = self.wavefront_collection._collectionData[-1]
+        self.assertEqual([sensor_id for sensor_id, _ in kept], [1])
+
+    def testAppendSkipsNaNAverageRow(self) -> None:
+        """A table with an all-NaN average row is skipped even when its
+        'used' flag is True (older WEP)."""
+        wf_err = [
+            (1, self._makeZkTable(used=True)),
+            (2, self._makeZkTable(used=True, nan=True)),
+        ]
+        self.wavefront_collection.append(wf_err, [1.0, 2.0])
+
+        kept = self.wavefront_collection._collectionData[-1]
+        self.assertEqual([sensor_id for sensor_id, _ in kept], [1])
+
+    def testAppendSkipsEmptyTable(self) -> None:
+        """An empty table is skipped with a warning."""
+        empty = QTable(dtype=[("label", "<U12")])
+        self.wavefront_collection.append([(1, empty)], [1.0])
+
+        self.assertEqual(self.wavefront_collection._collectionData[-1], [])
+
+    def testAppendSkipsNaNArray(self) -> None:
+        """An ndarray with NaN values is skipped; a finite one is kept."""
+        wf_err = [
+            (1, np.ones(19)),
+            (2, np.full(19, np.nan)),
+        ]
+        self.wavefront_collection.append(wf_err, [1.0, 2.0])
+
+        kept = self.wavefront_collection._collectionData[-1]
+        self.assertEqual([sensor_id for sensor_id, _ in kept], [1])
+
     def _prepareListOfWfErr(self) -> list:
-        dtype = [("label", "<U12")]
+        dtype = [("label", "<U12"), ("used", np.bool_)]
         for j in range(4, 22):
             dtype.append((f"Z{j}", "<f4"))
 
@@ -58,6 +128,7 @@ class TestWavefrontCollection(unittest.TestCase):
         table.add_row(
             {
                 "label": "average",
+                "used": True,
                 **{f"Z{j}": np.random.rand(1) * u.nm for j in range(4, 22)},
             }
         )

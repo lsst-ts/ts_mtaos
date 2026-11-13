@@ -1595,9 +1595,15 @@ class Model:
                 else:
                     self.log.info(f"Refocus using corner offsets accepted: dz={dz:.2f} um")
             else:
+                n_found = wfe.shape[0]
+                if n_found < self.num_expected_tables_min:
+                    raise NotEnoughWaveFrontDataError(
+                        f"Only {n_found} valid wavefront error measurements "
+                        f"found (need at least {self.num_expected_tables_min}/4). "
+                        "Skipping correction for this image."
+                    )
                 self.log.info(
-                    f"{wfe.shape[0]}/4 wavefront error measurements were found. "
-                    "If fewer than 3 are found, this image will be skipped."
+                    f"{n_found} valid wavefront error measurements found. "
                     "Proceeding to estimate the corrections with OFC."
                 )
                 self._calculate_corrections(wfe=wfe, zk_indices=zk_indices, sensor_ids=sensor_ids, **kwargs)
