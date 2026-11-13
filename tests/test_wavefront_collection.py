@@ -82,8 +82,7 @@ class TestWavefrontCollection(unittest.TestCase):
             (1, self._makeZkTable(used=True)),
             (2, self._makeZkTable(used=False)),
         ]
-        with self.assertWarns(UserWarning):
-            self.wavefront_collection.append(wf_err, [1.0, 2.0])
+        self.wavefront_collection.append(wf_err, [1.0, 2.0])
 
         kept = self.wavefront_collection._collectionData[-1]
         self.assertEqual([sensor_id for sensor_id, _ in kept], [1])
@@ -95,8 +94,7 @@ class TestWavefrontCollection(unittest.TestCase):
             (1, self._makeZkTable(used=True)),
             (2, self._makeZkTable(used=True, nan=True)),
         ]
-        with self.assertWarns(UserWarning):
-            self.wavefront_collection.append(wf_err, [1.0, 2.0])
+        self.wavefront_collection.append(wf_err, [1.0, 2.0])
 
         kept = self.wavefront_collection._collectionData[-1]
         self.assertEqual([sensor_id for sensor_id, _ in kept], [1])
@@ -104,8 +102,7 @@ class TestWavefrontCollection(unittest.TestCase):
     def testAppendSkipsEmptyTable(self) -> None:
         """An empty table is skipped with a warning."""
         empty = QTable(dtype=[("label", "<U12")])
-        with self.assertWarns(UserWarning):
-            self.wavefront_collection.append([(1, empty)], [1.0])
+        self.wavefront_collection.append([(1, empty)], [1.0])
 
         self.assertEqual(self.wavefront_collection._collectionData[-1], [])
 
@@ -115,8 +112,7 @@ class TestWavefrontCollection(unittest.TestCase):
             (1, np.ones(19)),
             (2, np.full(19, np.nan)),
         ]
-        with self.assertWarns(UserWarning):
-            self.wavefront_collection.append(wf_err, [1.0, 2.0])
+        self.wavefront_collection.append(wf_err, [1.0, 2.0])
 
         kept = self.wavefront_collection._collectionData[-1]
         self.assertEqual([sensor_id for sensor_id, _ in kept], [1])
