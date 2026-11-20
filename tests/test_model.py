@@ -318,6 +318,155 @@ class TestModel(unittest.IsolatedAsyncioTestCase):
             f"{actCorr} not almost close to 0.",
         )
 
+    def _wfe(self, n_sensors: int, n_zk: int = 19) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Build a (sensor_ids, zk_indices, wfe) tuple with ``n_sensors``
+        rows, as returned by ``Model.get_wavefront_errors``."""
+        sensor_ids = np.arange(n_sensors)
+        zk_indices = np.tile(np.arange(4, 4 + n_zk), (n_sensors, 1))
+        wfe = np.ones((n_sensors, n_zk))
+        return sensor_ids, zk_indices, wfe
+
+    def test_calculate_corrections_raises_below_min(self) -> None:
+        """Fewer valid wavefront errors than ``num_expected_tables_min``
+        raises ``NotEnoughWaveFrontDataError`` without running OFC."""
+        from lsst.ts.mtaos.utility import NotEnoughWaveFrontDataError
+
+        # Empty radii -> dz is NaN -> the correction-count branch is taken
+        # rather than the automatic-refocus branch.
+        with (
+            patch.object(self.model, "num_expected_tables_min", 3),
+            patch.object(self.model, "get_wavefront_errors", return_value=self._wfe(2)),
+            patch.object(
+                self.model.wavefront_errors,
+                "getListOfRadiiInTakenData",
+                return_value=[],
+            ),
+            patch.object(self.model, "_calculate_corrections") as mock_calc,
+        ):
+            with self.assertRaises(NotEnoughWaveFrontDataError):
+                self.model.calculate_corrections(raise_on_large_defocus=False)
+            mock_calc.assert_not_called()
+
+    def test_calculate_corrections_raises_when_empty(self) -> None:
+        """No valid wavefront errors raises rather than feeding an empty
+        array into OFC."""
+        from lsst.ts.mtaos.utility import NotEnoughWaveFrontDataError
+
+        with (
+            patch.object(self.model, "num_expected_tables_min", 3),
+            patch.object(self.model, "get_wavefront_errors", return_value=self._wfe(0)),
+            patch.object(
+                self.model.wavefront_errors,
+                "getListOfRadiiInTakenData",
+                return_value=[],
+            ),
+            patch.object(self.model, "_calculate_corrections") as mock_calc,
+        ):
+            with self.assertRaises(NotEnoughWaveFrontDataError):
+                self.model.calculate_corrections(raise_on_large_defocus=False)
+            mock_calc.assert_not_called()
+
+    def test_calculate_corrections_proceeds_at_min(self) -> None:
+        """At the minimum number of valid wavefront errors, OFC runs."""
+        with (
+            patch.object(self.model, "num_expected_tables_min", 3),
+            patch.object(self.model, "get_wavefront_errors", return_value=self._wfe(3)),
+            patch.object(
+                self.model.wavefront_errors,
+                "getListOfRadiiInTakenData",
+                return_value=[],
+            ),
+            patch.object(self.model, "_calculate_corrections") as mock_calc,
+        ):
+            self.model.calculate_corrections(raise_on_large_defocus=False)
+            mock_calc.assert_called_once()
+
+    def test_pid_diagnostics(self) -> None:
+        dof_idx = self.model.ofc.ofc_data.dof_idx
+        unused_dof_idx = np.setdiff1d(np.arange(50), dof_idx)
+        controller = self.model.ofc.controller
+        controller.ki = 0.1
+        controller.kd = 0.05
+
+        self.model.reset_pid_diagnostics()
+        for index, value in enumerate(self.model.get_pid_diagnostics()):
+            with self.subTest(index=index, step="reset"):
+                np.testing.assert_array_equal(value, np.zeros(50))
+
+        wavefront_errors = np.zeros(19)
+        wavefront_errors[0] = 0.1
+        self.model.add_correction(wavefront_errors, config={"sensor_ids": [0, 1, 2, 3, 4, 5, 6, 7, 8]})
+
+        (
+            optical_state,
+            integral_error,
+            integral_error_clipped,
+            derivative_term,
+            derivative_term_filtered,
+        ) = self.model.get_pid_diagnostics()
+        self.assertTrue(np.any(optical_state != 0))
+        for name, value, expected_value in (
+            ("optical_state", optical_state, self.model.ofc.optical_state),
+            ("integral_error", integral_error, controller.integral_unclipped),
+            ("integral_error_clipped", integral_error_clipped, controller.integral),
+            ("derivative_term", derivative_term, controller.derivative),
+            ("derivative_term_filtered", derivative_term_filtered, controller.filtered_derivative),
+        ):
+            with self.subTest(name=name, step="correction"):
+                self.assertEqual(len(value), 50)
+                np.testing.assert_array_equal(value[dof_idx], expected_value)
+                np.testing.assert_array_equal(value[unused_dof_idx], 0.0)
+
+        # The correction of the visit is rebuilt from the diagnostics.
+        error = controller.setpoint[dof_idx] - optical_state[dof_idx]
+        np.testing.assert_array_almost_equal(
+            self.model.get_dof_lv()[dof_idx],
+            -(
+                controller.kp[dof_idx] * error
+                + controller.ki[dof_idx] * integral_error_clipped[dof_idx]
+                + controller.kd[dof_idx] * derivative_term_filtered[dof_idx]
+            ),
+        )
+
+        # Corrections not calculated by the controller clear the diagnostics.
+        self.model.offset_dof(np.zeros(len(dof_idx)))
+        for index, value in enumerate(self.model.get_pid_diagnostics()):
+            with self.subTest(index=index, step="offset"):
+                np.testing.assert_array_equal(value, np.zeros(50))
+
+        self.model.add_correction(wavefront_errors, config={"sensor_ids": [0, 1, 2, 3, 4, 5, 6, 7, 8]})
+        self.model.reset_wfe_correction()
+        for index, value in enumerate(self.model.get_pid_diagnostics()):
+            with self.subTest(index=index, step="reset_wfe_correction"):
+                np.testing.assert_array_equal(value, np.zeros(50))
+
+    async def test_pid_diagnostics_reset_on_dof_change(self) -> None:
+        wavefront_errors = np.zeros(19)
+        wavefront_errors[0] = 0.1
+        self.model.add_correction(wavefront_errors, config={"sensor_ids": [0, 1, 2, 3, 4, 5, 6, 7, 8]})
+
+        self.assertTrue(np.any(self.model.get_pid_diagnostics()[0] != 0))
+
+        original_ofc_data_values = await self.model.set_ofc_data_values(
+            comp_dof_idx=dict(
+                m2HexPos=[1, 1, 1, 1, 1],
+                camHexPos=[1, 1, 1, 1, 1],
+                M1M3Bend=[0] * 20,
+                M2Bend=[0] * 20,
+            )
+        )
+        try:
+            for index, value in enumerate(self.model.get_pid_diagnostics()):
+                with self.subTest(index=index, step="reset"):
+                    np.testing.assert_array_equal(value, np.zeros(50))
+
+            self.model.add_correction(wavefront_errors, config={"sensor_ids": [0, 1, 2, 3, 4, 5, 6, 7, 8]})
+            optical_state = self.model.get_pid_diagnostics()[0]
+            self.assertTrue(np.any(optical_state[:10] != 0))
+            np.testing.assert_array_equal(optical_state[10:], 0.0)
+        finally:
+            await self.model.set_ofc_data_values(**original_ofc_data_values)
+
     def test_m2_hexapod_correction(self) -> None:
         x, y, z, u, v, w = self.model.m2_hexapod_correction()
         self.assertEqual(self.model.m2_hexapod_correction.correction_type, CorrectionType.POSITION)
