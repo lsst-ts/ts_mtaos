@@ -1,0 +1,1 @@
+Add closed loop operations documentation covering the operational flow, configuration parameters, decision points, and special cases that trigger parameter changes at runtime.
