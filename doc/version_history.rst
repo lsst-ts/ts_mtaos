@@ -13,6 +13,31 @@ Version History
 
 .. towncrier release notes start
 
+v0.32.0 (2026-11-20)
+====================
+
+New Features
+------------
+
+- In ``mtaos.py``, published the PID diagnostics (``opticalState``, ``integralError``, ``integralErrorClipped``, ``derivativeTerm`` and ``derivativeTermFiltered``) in the ``degreeOfFreedom`` and ``rejectedDegreeOfFreedom`` events. (`RSO-1009 <https://rubinobs.atlassian.net//browse/RSO-1009>`_)
+- In ``model.py``, added ``Model.get_pid_diagnostics`` and ``Model.reset_pid_diagnostics`` to keep the PID diagnostics of the last correction calculation, mapped to the 50 degrees of freedom.
+  The diagnostics are cleared when the used DOFs change or the correction is not calculated by the controller. (`RSO-1009 <https://rubinobs.atlassian.net//browse/RSO-1009>`_)
+- Filter invalid wavefront-error tables in
+  ``WavefrontCollection.append``. A sensor is now skipped
+  when its Zernike table is empty, when the ``average`` row is
+  marked ``used=False`` (newer WEP flags invalid results this way), or
+  when the average Zernike coefficients are all NaN (older WEP). This
+  keeps all-NaN measurements from being counted toward the minimum table
+  check and fed into the OFC correction.
+
+  In addition, ``Model.calculate_corrections`` now enforces that at least
+  ``num_expected_tables_min`` valid wavefront-error measurements remain
+  after filtering, raising ``NotEnoughWaveFrontDataError`` (so the image
+  is skipped) instead of only logging the count. This guards the case
+  where enough non-empty tables are polled but too few survive the
+  ``used``/NaN filtering to run OFC. (`RSO-1195 <https://rubinobs.atlassian.net//browse/RSO-1195>`_)
+
+
 v0.31.0 (2026-11-11)
 ====================
 
